@@ -1,0 +1,84 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/produtos"
+  to = "/pages/produtos.html"
+  status = 200
+
+[[redirects]]
+  from = "/produtos.html"
+  to = "/pages/produtos.html"
+  status = 200
+
+[[redirects]]
+  from = "/sobre"
+  to = "/pages/sobre.html"
+  status = 200
+
+[[redirects]]
+  from = "/sobre.html"
+  to = "/pages/sobre.html"
+  status = 200
+
+[[redirects]]
+  from = "/contato"
+  to = "/pages/contato.html"
+  status = 200
+
+[[redirects]]
+  from = "/contato.html"
+  to = "/pages/contato.html"
+  status = 200
+
+[[redirects]]
+  from = "/login"
+  to = "/pages/login.html"
+  status = 200
+
+[[redirects]]
+  from = "/login.html"
+  to = "/pages/login.html"
+  status = 200
+
+[[redirects]]
+  from = "/pagamento"
+  to = "/pages/pagamento.html"
+  status = 200
+
+[[redirects]]
+  from = "/pagamento.html"
+  to = "/pages/pagamento.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracoes"
+  to = "/pages/configuracoes.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracoes.html"
+  to = "/pages/configuracoes.html"
+  status = 200
+
+[[redirects]]
+  from = "/painel"
+  to = "/pages/painel.html"
+  status = 200
+
+[[redirects]]
+  from = "/painel.html"
+  to = "/pages/painel.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
