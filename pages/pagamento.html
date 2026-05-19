@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pagamento | Monte Sinai</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=20260519">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="../js/script.js"></script>
+  <script defer src="../js/script.js?v=20260519"></script>
 </head>
 <body>
   <header class="navbar">
@@ -38,7 +38,7 @@
       <div class="section-head">
         <span class="eyebrow">Finalização segura</span>
         <h1>Finalize seu pedido do seu jeito</h1>
-        <p>Entre com sua conta para usar os dados salvos e escolha pagar por Pix, cartão, na entrega ou encaminhar pelo WhatsApp.</p>
+        <p>Entre com sua conta para usar os dados salvos e escolha pagar na entrega ou encaminhar pelo WhatsApp. A taxa de entrega de R$ 3,00 será adicionada no fechamento.</p>
       </div>
     </section>
 
@@ -65,19 +65,29 @@
             <p id="checkout-account-text">Entre ou crie uma conta para não preencher tudo novamente.</p>
           </div>
           <div class="checkout-account-actions">
-            <a class="btn btn-secondary" href="login.html">
+            <a class="btn btn-secondary" href="login.html" data-account-login>
               <i class="fa-solid fa-right-to-bracket"></i>
               Entrar
             </a>
-            <button class="btn btn-secondary hidden" type="button" id="checkout-edit-customer">
-              <i class="fa-solid fa-pen"></i>
-              Alterar dados
-            </button>
           </div>
         </div>
 
         <form id="payment-form" class="checkout-form checkout-pro">
           <div class="customer-fields" id="customer-fields">
+            <div class="payment-note-box payment-note-large">
+              <strong>Taxa de entrega de R$ 3,00 adicionada ao valor final.</strong>
+              <p>Entrega grátis em pedidos acima de R$ 50,00. Na compra de um gás, você ganha um brinde especial.</p>
+            </div>
+            <div class="form-group customer-switch">
+              <label>
+                <input id="order-for-other" type="checkbox">
+                Pedido para outra pessoa
+              </label>
+            </div>
+            <div class="profile-info-box hidden" id="checkout-profile-box">
+              <p>Usando seus dados de login para preencher o pedido.</p>
+              <button class="btn btn-secondary" type="button" id="checkout-edit-customer">Alterar destinatário</button>
+            </div>
             <div class="form-grid-2">
               <div class="form-group">
                 <label for="payment-name">Nome do cliente</label>
@@ -100,16 +110,11 @@
 
           <div class="payment-method-card">
             <span class="eyebrow">Forma de pagamento</span>
+            <div class="payment-note-box">
+              <strong>Taxa de entrega de R$ 3,00 será adicionada ao total no fechamento do pedido.</strong>
+            </div>
             <div class="payment-tabs" role="tablist" aria-label="Escolha a forma de pagamento">
-              <button class="payment-tab active" type="button" data-payment-option="pix">
-                <i class="fa-solid fa-qrcode"></i>
-                Pix pelo site
-              </button>
-              <button class="payment-tab" type="button" data-payment-option="card">
-                <i class="fa-solid fa-credit-card"></i>
-                Cartão pelo site
-              </button>
-              <button class="payment-tab" type="button" data-payment-option="delivery">
+              <button class="payment-tab active" type="button" data-payment-option="delivery">
                 <i class="fa-solid fa-hand-holding-dollar"></i>
                 Pagar na entrega
               </button>
@@ -119,77 +124,22 @@
               </button>
             </div>
 
-            <div class="payment-panel active" data-payment-panel="pix">
-              <div class="pix-layout">
-                <div class="pix-qr-box">
-                  <img id="pix-qr" alt="QR Code Pix Monte Sinai">
-                </div>
-                <div class="pix-copy-box">
-                  <h3>Pix copia e cola</h3>
-                  <p id="pix-status">O QR Code será atualizado automaticamente com o total do carrinho.</p>
-                  <textarea id="pix-code" readonly rows="4"></textarea>
-                  <button class="btn btn-secondary" type="button" id="copy-pix">
-                    <i class="fa-solid fa-copy"></i>
-                    Copiar código Pix
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="payment-panel" data-payment-panel="card">
-              <div class="secure-card-visual">
-                <div>
-                  <span>Monte Sinai</span>
-                  <strong id="card-preview-number">•••• •••• •••• ••••</strong>
-                </div>
-                <small>Pagamento seguro via gateway</small>
-              </div>
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="card-name">Nome impresso no cartão</label>
-                  <input id="card-name" type="text" autocomplete="cc-name" placeholder="Nome no cartão">
-                </div>
-                <div class="form-group">
-                  <label for="card-number">Número do cartão</label>
-                  <input id="card-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="19">
-                </div>
-              </div>
-              <div class="form-grid-3">
-                <div class="form-group">
-                  <label for="card-expiry">Validade</label>
-                  <input id="card-expiry" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5">
-                </div>
-                <div class="form-group">
-                  <label for="card-cvv">CVV</label>
-                  <input id="card-cvv" type="password" inputmode="numeric" autocomplete="cc-csc" placeholder="000" maxlength="4">
-                </div>
-                <div class="form-group">
-                  <label for="card-installments">Parcelas</label>
-                  <select id="card-installments">
-                    <option value="1">1x sem juros</option>
-                    <option value="2">2x</option>
-                    <option value="3">3x</option>
-                  </select>
-                </div>
-              </div>
-              <p class="form-help-text">Esta tela está pronta para integração com gateway. Nenhum dado de cartão é salvo no navegador.</p>
-            </div>
-
-            <div class="payment-panel" data-payment-panel="delivery">
+            <div class="payment-panel active" data-payment-panel="delivery">
               <div class="delivery-options">
                 <label class="radio-card">
-                  <input type="radio" name="delivery-payment" value="Pix na entrega" checked>
-                  <span><i class="fa-solid fa-qrcode"></i> Pix na entrega</span>
+                  <input type="radio" name="delivery-payment" value="Dinheiro na entrega" checked>
+                  <span><i class="fa-solid fa-money-bill-wave"></i> Dinheiro na entrega</span>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="delivery-payment" value="Pix na entrega">
+                  <span><i class="fa-solid fa-wallet"></i> Pix na entrega</span>
                 </label>
                 <label class="radio-card">
                   <input type="radio" name="delivery-payment" value="Cartão na entrega">
                   <span><i class="fa-solid fa-credit-card"></i> Cartão na entrega</span>
                 </label>
-                <label class="radio-card">
-                  <input type="radio" name="delivery-payment" value="Dinheiro na entrega">
-                  <span><i class="fa-solid fa-money-bill-wave"></i> Dinheiro na entrega</span>
-                </label>
               </div>
+              <p class="form-help-text">A taxa de entrega de R$ 3,00 é adicionada ao valor no momento da confirmação do pedido.</p>
             </div>
 
             <div class="payment-panel" data-payment-panel="whatsapp">

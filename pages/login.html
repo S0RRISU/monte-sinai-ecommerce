@@ -4,64 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar | Monte Sinai</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=20260519">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="../js/script.js"></script>
+  <script defer src="../js/script.js?v=20260519"></script>
 </head>
-<body>
-  <header class="navbar">
-    <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai">
-      </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
-    </div>
-  </header>
-
-  <div class="mobile-menu">
-    <a href="../index.html">Início</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="sobre.html">Sobre</a>
-    <a href="contato.html">Contato</a>
-  </div>
-
-  <main class="auth-page container">
-    <section class="auth-shell auth-shell-premium">
-      <div class="auth-visual">
-        <span class="eyebrow">Conta Monte Sinai</span>
-        <h1>Seu acesso rápido para comprar água, gás e limpeza.</h1>
-        <p>Entre ou crie sua conta para salvar os dados de entrega e seguir direto para os produtos.</p>
-        <div class="auth-stack">
-          <img src="../assets/produtos/agua-mineral-20l.png" alt="Água mineral 20L">
-          <img src="../assets/produtos/gas-p13.png" alt="Gás P13">
-          <img src="../assets/hero/cleaning-products.png" alt="Produtos de limpeza">
+<body class="auth-body">
+  <main class="auth-page auth-center-page">
+    <section class="auth-shell login-shell">
+      <div class="auth-brand">
+        <div class="brand-stack">
+          <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai">
+          <div>
+            <span class="eyebrow">Bem-vindo à Monte Sinai</span>
+            <h1>Login rápido para comprar água, gás e limpeza.</h1>
+            <p>Você pode continuar navegando normalmente. A conta serve apenas para salvar dados e pedidos.</p>
+          </div>
         </div>
       </div>
 
-      <section class="auth-card account-portal" aria-labelledby="account-title">
+      <section class="auth-card login-card" aria-labelledby="account-title">
         <div class="section-head">
-          <span class="eyebrow">Login e registro</span>
-          <h2 id="account-title">Acesse sua conta</h2>
-          <p id="account-status">Entre com o email e senha cadastrados para continuar comprando.</p>
+          <span class="eyebrow">Acesso ao cliente</span>
+          <h2 id="account-title">Entrar ou cadastrar</h2>
+          <p id="account-status">Entre ou crie sua conta para salvar endereço, telefone e agilizar seus pedidos.</p>
         </div>
 
-        <div class="auth-mode-tabs" role="tablist" aria-label="Escolha entre entrar ou criar conta">
-          <button class="auth-mode-tab active" type="button" data-auth-mode="login">
-            <i class="fa-solid fa-right-to-bracket"></i>
-            Entrar
-          </button>
-          <button class="auth-mode-tab" type="button" data-auth-mode="register">
-            <i class="fa-solid fa-user-plus"></i>
-            Criar conta
-          </button>
+        <div class="auth-mode-tabs" role="tablist" aria-label="Modo de acesso">
+          <button class="auth-mode-tab active" type="button" data-auth-mode="login">Entrar</button>
+          <button class="auth-mode-tab" type="button" data-auth-mode="register">Cadastrar</button>
         </div>
 
         <form class="checkout-form account-form" id="account-form" data-auth-mode="login" novalidate>
@@ -94,46 +64,10 @@
               <i class="fa-solid fa-user-check"></i>
               <span data-auth-submit-label>Entrar</span>
             </button>
-            <button class="btn btn-secondary" type="button" id="logout-account" data-current-account-only>
-              <i class="fa-solid fa-right-from-bracket"></i>
-              Sair da conta atual
-            </button>
           </div>
         </form>
-
-        <div class="auth-next-actions">
-          <a class="btn btn-secondary" href="produtos.html#todos-produtos">
-            <i class="fa-solid fa-basket-shopping"></i>
-            Ver produtos
-          </a>
-          <a class="btn btn-primary" href="pagamento.html">
-            <i class="fa-solid fa-lock"></i>
-            Ir para pagamento
-          </a>
-        </div>
       </section>
     </section>
   </main>
-
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <h3>Monte Sinai</h3>
-        <p>Água, gás e produtos de limpeza para sua casa.</p>
-      </div>
-      <div class="footer-links">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </div>
-      <div class="footer-social">
-        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-      </div>
-    </div>
-    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-  </footer>
 </body>
 </html>

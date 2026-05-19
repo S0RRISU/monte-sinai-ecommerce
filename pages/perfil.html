@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfil | Monte Sinai</title>
+  <link rel="stylesheet" href="../css/style.css?v=20260519">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script defer src="../js/script.js?v=20260519"></script>
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai">
+      </a>
+      <nav class="nav-menu" aria-label="Navegação principal">
+        <a href="../index.html">Início</a>
+        <a href="produtos.html">Produtos</a>
+        <a href="sobre.html">Sobre</a>
+        <a href="contato.html">Contato</a>
+      </nav>
+      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="mobile-menu">
+    <a href="../index.html">Início</a>
+    <a href="produtos.html">Produtos</a>
+    <a href="sobre.html">Sobre</a>
+    <a href="contato.html">Contato</a>
+  </div>
+
+  <main class="profile-page container" id="profile-page">
+    <section class="hero hero-small">
+      <div class="hero-copy">
+        <span class="eyebrow">Seu painel pessoal</span>
+        <h1>Perfil do cliente</h1>
+        <p>Veja seus dados, acompanhe suas preferências e acesse as configurações do site com um clique.</p>
+      </div>
+    </section>
+
+    <section class="section profile-grid">
+      <article class="profile-card profile-summary">
+        <div class="profile-avatar-circle" id="profile-avatar">U</div>
+        <div class="profile-headline">
+          <span class="eyebrow">Bem-vindo de volta</span>
+          <h2 id="profile-name">Usuário</h2>
+          <div class="profile-nick" id="profile-nick"></div>
+          <p id="profile-provider">Cadastro local</p>
+        </div>
+        <div class="profile-kpis" aria-label="Resumo da conta">
+          <div>
+            <span>Pedidos</span>
+            <strong data-profile-order-count>0</strong>
+          </div>
+          <div>
+            <span>No carrinho</span>
+            <strong data-profile-cart-count>0</strong>
+          </div>
+        </div>
+        <div class="profile-meta">
+          <div>
+            <span>Email</span>
+            <strong id="profile-email">example@dominio.com</strong>
+          </div>
+          <div>
+            <span>WhatsApp</span>
+            <strong id="profile-phone">(11) 99999-9999</strong>
+          </div>
+          <div>
+            <span>Endereço</span>
+            <strong id="profile-address">Rua, número, bairro e cidade</strong>
+          </div>
+        </div>
+        <div class="profile-actions" id="profile-actions">
+          <a class="btn btn-secondary" href="editar-perfil.html">
+            <i class="fa-solid fa-pen"></i>
+            Editar perfil
+          </a>
+          <a class="btn btn-secondary" href="configuracoes.html" id="profile-settings-link">
+            <i class="fa-solid fa-gear"></i>
+            Configurações do site
+          </a>
+          <button class="btn btn-primary" type="button" data-switch-account>
+            <i class="fa-solid fa-repeat"></i>
+            Trocar conta
+          </button>
+          <button class="btn btn-secondary" type="button" data-logout-account>
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Sair
+          </button>
+        </div>
+      </article>
+
+      <article class="profile-card profile-details" id="profile-details">
+        <div class="section-head">
+          <span class="eyebrow">Detalhes do perfil</span>
+          <h2>Informações do cliente</h2>
+          <p>Todos os dados são usados apenas para simplificar o pedido e a entrega.</p>
+        </div>
+        <div class="profile-feature-grid">
+          <div class="feature-item">
+            <i class="fa-solid fa-user"></i>
+            <div>
+              <h3>Dados pessoais</h3>
+              <p>Nome, email, telefone e endereço estão salvos aqui.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-basket-shopping"></i>
+            <div>
+              <h3>Pedidos futuros</h3>
+              <p>Use seu perfil para continuar comprando sem repetir informações.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-shield-halved"></i>
+            <div>
+              <h3>Privacidade</h3>
+              <p>Seus dados ficam no seu navegador e não são usados fora do pedido.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-comment-dots"></i>
+            <div>
+              <h3>Suporte direto</h3>
+              <p>Fale conosco a qualquer momento via WhatsApp.</p>
+            </div>
+          </div>
+        </div>
+        <div class="profile-orders" id="profile-orders" data-orders-container>
+          <div class="section-head">
+            <span class="eyebrow">Seus pedidos</span>
+            <h3>Controle de pedidos</h3>
+            <p>Aqui aparecem seus pedidos registrados neste navegador.</p>
+          </div>
+          <!-- orders rendered by JS -->
+        </div>
+      </article>
+
+      <article class="profile-card profile-empty hidden" id="profile-empty">
+        <div class="section-head">
+          <span class="eyebrow">Perfil não disponível</span>
+          <h2>Faça login para ver seus dados</h2>
+          <p>Entre com sua conta para acessar o perfil, alterar dados e usar o site com mais rapidez.</p>
+        </div>
+        <a class="btn btn-primary" href="login.html">Entrar ou cadastrar</a>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <h3>Monte Sinai</h3>
+        <p>Água, gás e produtos de limpeza para sua casa.</p>
+      </div>
+      <div class="footer-links">
+        <a href="../index.html">Início</a>
+        <a href="produtos.html">Produtos</a>
+        <a href="sobre.html">Sobre</a>
+        <a href="contato.html">Contato</a>
+      </div>
+      <div class="footer-social">
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+      </div>
+    </div>
+    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
+  </footer>
+</body>
+</html>

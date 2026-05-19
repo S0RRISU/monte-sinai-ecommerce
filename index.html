@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monte Sinai | Água, Gás e Limpeza</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260519">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="js/script.js"></script>
+  <script defer src="js/script.js?v=20260519"></script>
 </head>
 <body>
   <header class="navbar">
@@ -40,8 +40,13 @@
       <div class="container hero-home-grid">
         <div class="hero-home-content">
           <span class="eyebrow">Entrega rápida, segura e local</span>
-          <h1>Monte Sinai leva água, gás e limpeza até você.</h1>
-          <p>Escolha os produtos, monte o carrinho, entre com sua conta e finalize por Pix, cartão, pagamento na entrega ou WhatsApp.</p>
+          <h1>Monte Sinai leva água, gás e produtos de limpeza até você.</h1>
+          <p>Escolha os produtos, monte o carrinho, entre com sua conta e finalize com pagamento na entrega ou atendimento pelo WhatsApp.</p>
+          <form class="hero-search" role="search" data-site-search-form>
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" name="busca" data-site-search-input placeholder="Pesquisar água, gás, detergente...">
+            <button type="submit">Buscar</button>
+          </form>
           <div class="hero-actions">
             <a class="btn btn-primary" href="pages/produtos.html#todos-produtos">
               <i class="fa-solid fa-basket-shopping"></i>
@@ -54,8 +59,8 @@
           </div>
           <div class="trust-strip" aria-label="Diferenciais">
             <div class="trust-item"><i class="fa-solid fa-truck-fast"></i><span>Entrega local</span></div>
-            <div class="trust-item"><i class="fa-solid fa-qrcode"></i><span>Pix com QR Code</span></div>
-            <div class="trust-item"><i class="fa-solid fa-credit-card"></i><span>Cartão ou entrega</span></div>
+            <div class="trust-item"><i class="fa-solid fa-gift"></i><span>Brinde na compra de gás</span></div>
+            <div class="trust-item"><i class="fa-solid fa-star"></i><span>Frete grátis acima de R$ 50</span></div>
           </div>
         </div>
 
@@ -123,8 +128,8 @@
             <div class="product-icon"><i class="fa-solid fa-droplet"></i></div>
             <h3>Água mineral 20L</h3>
             <p>Galão retornável para manter sua casa abastecida.</p>
-            <strong>R$ 14,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Água mineral 20L" data-price="14">Adicionar</button>
+            <strong>R$ 15,00</strong>
+            <button class="btn btn-primary btn-add-cart" data-name="Água mineral 20L" data-price="15">Adicionar</button>
           </article>
 
           <article class="product-card rail-product is-recommended tilt-3d" data-name="Gás de cozinha P13">
@@ -134,9 +139,13 @@
             </div>
             <div class="product-icon"><i class="fa-solid fa-fire-flame-simple"></i></div>
             <h3>Gás de cozinha P13</h3>
-            <p>Botijão residencial para reposição segura.</p>
-            <strong>R$ 110,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Gás de cozinha P13" data-price="110">Adicionar</button>
+            <p>Escolha o tipo: Supergas R$ 125,00 ou Ultragas R$ 135,00.</p>
+            <select class="product-option" aria-label="Escolher tipo de gás">
+              <option value="Supergas" data-price="125">Supergas • R$ 125,00</option>
+              <option value="Ultragas" data-price="135">Ultragas • R$ 135,00</option>
+            </select>
+            <strong>R$ 125,00</strong>
+            <button class="btn btn-primary btn-add-cart" data-name="Gás de cozinha P13" data-price="125">Adicionar</button>
           </article>
 
           <article class="product-card rail-product tilt-3d" data-name="Detergente 2L">
@@ -156,9 +165,19 @@
             </div>
             <div class="product-icon"><i class="fa-solid fa-spray-can"></i></div>
             <h3>Desinfetante 2L</h3>
-            <p>Fragrâncias variadas para deixar a casa limpa.</p>
-            <strong>R$ 16,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Desinfetante 2L" data-price="16">Adicionar</button>
+            <p>Escolha a fragrância para perfumar a limpeza.</p>
+            <select class="product-option" aria-label="Escolher fragrância do desinfetante">
+              <option value="Kaialque" data-price="5">Kaialque</option>
+              <option value="Violeta" data-price="5">Violeta</option>
+              <option value="Eucalipto" data-price="5">Eucalipto</option>
+              <option value="Pinho" data-price="5">Pinho</option>
+              <option value="Jasmim" data-price="5">Jasmim</option>
+              <option value="Talco" data-price="5">Talco</option>
+              <option value="Dama da Noite" data-price="5">Dama da Noite</option>
+              <option value="Palmolive" data-price="5">Palmolive</option>
+            </select>
+            <strong>R$ 5,00</strong>
+            <button class="btn btn-primary btn-add-cart" data-name="Desinfetante 2L" data-price="5">Adicionar</button>
           </article>
 
           <article class="product-card rail-product tilt-3d" data-name="Vassoura">
@@ -200,11 +219,11 @@
       </article>
       <article class="info-card">
         <h3>Pagamento flexível</h3>
-        <p>Checkout preparado para Pix, cartão, pagamento na entrega e envio por WhatsApp.</p>
+        <p>Use pagamento na entrega ou WhatsApp, com frete grátis acima de R$ 50 e brinde na compra de gás.</p>
       </article>
       <article class="info-card">
-        <h3>Painel do lojista</h3>
-        <p>Área para acompanhar pedidos locais, configurar Pix e orientar integrações reais.</p>
+        <h3>Compra pelo celular</h3>
+        <p>Busca, carrinho e finalização foram pensados para pedido rápido em tela pequena.</p>
       </article>
     </section>
   </main>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 200" fill="none">
+  <defs>
+    <linearGradient id="broomGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F39C12"/>
+      <stop offset="100%" stop-color="#D68910"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="40" cy="195" rx="30" ry="5" fill="rgba(0,0,0,0.15)"/>
+  <rect x="36" y="20" width="8" height="140" fill="#8B4513"/>
+  <rect x="38" y="20" width="4" height="140" fill="#A0522D"/>
+  <path d="M15 155 Q40 145 65 155 Q70 180 40 195 Q10 180 15 155Z" fill="url(#broomGrad)"/>
+  <path d="M20 155 L20 185 M30 155 L30 190 M40 155 L40 195 M50 155 L50 190 M60 155 L60 185" stroke="#D68910" stroke-width="1.5"/>
+  <circle cx="40" cy="155" r="5" fill="#CD853F"/>
+</svg>

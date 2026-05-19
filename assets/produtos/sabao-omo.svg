@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 200" fill="none">
+  <defs>
+    <linearGradient id="omoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3498DB"/>
+      <stop offset="100%" stop-color="#2980B9"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="70" cy="190" rx="45" ry="8" fill="rgba(0,0,0,0.1)"/>
+  <rect x="25" y="30" width="90" height="155" rx="8" fill="url(#omoGrad)"/>
+  <rect x="30" y="25" width="80" height="20" rx="5" fill="#2980B9"/>
+  <rect x="50" y="18" width="40" height="12" rx="4" fill="#3498DB"/>
+  <rect x="35" y="60" width="70" height="90" rx="5" fill="white" opacity="0.95"/>
+  <text x="70" y="85" text-anchor="middle" font-family="Arial Black" font-size="20" fill="#3498DB">OMO</text>
+  <text x="70" y="105" text-anchor="middle" font-family="Arial" font-size="10" fill="#2980B9">LAVAGEM</text>
+  <text x="70" y="120" text-anchor="middle" font-family="Arial" font-size="10" fill="#2980B9">PERFEITA</text>
+  <text x="70" y="145" text-anchor="middle" font-family="Arial Black" font-size="16" fill="#E74C3C">2L</text>
+  <circle cx="55" cy="100" r="10" fill="#E74C3C" opacity="0.8"/>
+  <circle cx="85" cy="95" r="8" fill="#F39C12" opacity="0.8"/>
+</svg>
