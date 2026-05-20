@@ -282,19 +282,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
-    if (!client) return;
+    if (!client) {
+      console.warn('[Supabase] Cliente não encontrado. Usando produtos locais como fallback.');
+      return;
+    }
 
     try {
+      console.log('[Supabase] Buscando produtos na tabela "produtos"...');
       const { data, error } = await client
-        .from('produto')
+        .from('produtos')
         .select('nome, preco, imagem, categoria, descricao')
         .order('nome', { ascending: true });
 
       if (error) throw error;
-      setProductIndex(Array.isArray(data) ? data : []);
+      const products = Array.isArray(data) ? data : [];
+      console.log(`[Supabase] ${products.length} produto(s) carregado(s).`, products);
+      setProductIndex(products);
       renderSupabaseProducts();
     } catch (error) {
-      console.error('Não foi possível carregar produtos do Supabase:', error);
+      console.error('[Supabase] Erro ao carregar produtos:', error);
       if (currentPage() === 'produtos.html') {
         showToast('Não foi possível carregar os produtos do Supabase. Mantive o catálogo local.');
       }
