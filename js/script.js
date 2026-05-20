@@ -1582,10 +1582,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     matches.forEach(product => {
       const item = document.createElement('button');
+      const image = productAssetPath(product);
       item.className = 'search-suggestion-item';
       item.type = 'button';
       item.setAttribute('role', 'option');
       item.innerHTML = `
+        <span class="search-suggestion-media">
+          <img src="${escapeHTML(image)}" alt="${escapeHTML(product.name)}" loading="lazy">
+        </span>
         <span>
           <strong>${escapeHTML(product.name)}</strong>
           <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}${usingFallback ? ' - sugestao' : ''}</small>
@@ -1796,7 +1800,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="smart-search-result-grid">
           ${matches.map(product => `
             <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(product.name)}">
-              <span class="smart-search-product-icon"><i class="fa-solid ${smartProductIcon(product)}"></i></span>
+              <span class="smart-search-product-icon">
+                <img src="${escapeHTML(productAssetPath(product))}" alt="${escapeHTML(product.name)}" loading="lazy">
+              </span>
               <span class="smart-search-product-copy">
                 <strong>${escapeHTML(product.name)}</strong>
                 <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>

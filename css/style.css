@@ -12214,13 +12214,49 @@ body.light-mode .search-field .search-suggestions {
 }
 
 .search-suggestion-item {
+  display: grid !important;
+  grid-template-columns: 54px minmax(0, 1fr) 22px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 68px !important;
   border-radius: 12px !important;
+  padding: 8px 10px !important;
   transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease !important;
 }
 
 .search-suggestion-item:hover,
 .search-suggestion-item:focus-visible {
   transform: translateY(-1px) !important;
+}
+
+.search-suggestion-media {
+  display: grid !important;
+  width: 54px !important;
+  height: 54px !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line)) !important;
+  border-radius: 12px !important;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 212, 31, 0.20), transparent 58%),
+    color-mix(in srgb, var(--surface-soft) 72%, var(--surface)) !important;
+}
+
+.search-suggestion-media img,
+.smart-search-product-icon img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  padding: 5px !important;
+}
+
+.smart-search-product-icon {
+  overflow: hidden !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line)) !important;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(255, 212, 31, 0.20), transparent 58%),
+    color-mix(in srgb, var(--surface-soft) 72%, var(--surface)) !important;
 }
 
 @media (max-width: 760px) {
@@ -12240,7 +12276,7 @@ body.light-mode .search-field .search-suggestions {
 
   .hero-home-content > h1 {
     order: 3 !important;
-    margin-top: 0 !important;
+    margin-top: 22px !important;
   }
 
   .hero-home-content > p {
@@ -12273,7 +12309,7 @@ body.light-mode .search-field .search-suggestions {
   }
 
   .hero-search {
-    margin: 12px 0 16px !important;
+    margin: 14px 0 28px !important;
   }
 
   .catalog-search-form,
@@ -12338,6 +12374,23 @@ body.light-mode .search-field .search-suggestions {
     max-width: 100% !important;
     max-height: min(330px, calc(100dvh - 148px)) !important;
     border-radius: 16px !important;
+  }
+
+  .search-suggestion-item,
+  .nav-search .search-suggestions .search-suggestion-item,
+  .hero-search .search-suggestions .search-suggestion-item,
+  .catalog-search-form .search-suggestions .search-suggestion-item,
+  .search-field .search-suggestions .search-suggestion-item {
+    grid-template-columns: 48px minmax(0, 1fr) 20px !important;
+    min-height: 64px !important;
+    gap: 10px !important;
+    padding: 8px !important;
+  }
+
+  .search-suggestion-media {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 12px !important;
   }
 
   .smart-search {
