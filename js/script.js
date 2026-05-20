@@ -56,6 +56,17 @@ document.addEventListener('DOMContentLoaded', () => {
     { name: 'Vassoura', category: 'Utensílios', price: 12, terms: 'vassoura varrer casa quintal limpeza pa' }
   ];
   const SEARCH_EXPANSIONS = {
+    ada: 'agua mineral galao garrafao bebedouro',
+    agau: 'agua mineral galao garrafao bebedouro',
+    auga: 'agua mineral galao garrafao bebedouro',
+    agua: 'agua mineral galao garrafao bebedouro',
+    alcol: 'alcool perfumado higienizacao limpeza perfume',
+    alcool: 'alcool perfumado higienizacao limpeza perfume',
+    gaz: 'gas botijao cozinha p13 supergas ultragas fogao',
+    gas: 'gas botijao cozinha p13 supergas ultragas fogao',
+    detegente: 'detergente louca pia cozinha gordura',
+    deterg: 'detergente louca pia cozinha gordura',
+    candid: 'candida agua sanitaria cloro limpeza pesada',
     casa: 'agua gas vassoura rodo detergente desinfetante lixo limpeza',
     cozinha: 'gas detergente esponja louca rodinho pia aluminio panela agua',
     banheiro: 'desinfetante cloro candida escova vaso pedra sabonete rodo',
@@ -196,25 +207,110 @@ document.addEventListener('DOMContentLoaded', () => {
       .trim();
   }
 
+  function splitSearchTokens(value) {
+    return normalizeText(value).split(/[^a-z0-9]+/).filter(token => token.length > 1);
+  }
+
   function searchTokens(value) {
-    const tokens = normalizeText(value).split(/[^a-z0-9]+/).filter(token => token.length > 1);
-    const expanded = tokens.flatMap(token => normalizeText(SEARCH_EXPANSIONS[token] || '').split(/[^a-z0-9]+/).filter(Boolean));
-    return [...new Set([...tokens, ...expanded])];
+    const tokens = splitSearchTokens(value);
+    const expanded = tokens.flatMap(token => splitSearchTokens(SEARCH_EXPANSIONS[token] || ''));
+    const fuzzyExpanded = tokens.flatMap(token => {
+      if (token.length < 3) return [];
+
+      return Object.entries(SEARCH_EXPANSIONS).flatMap(([key, expansion]) => {
+        const keyScore = fuzzyTokenScore(token, key);
+        return keyScore >= 5 ? splitSearchTokens(expansion) : [];
+      });
+    });
+
+    return [...new Set([...tokens, ...expanded, ...fuzzyExpanded])];
+  }
+
+  function boundedLevenshtein(a, b, maxDistance) {
+    if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+    let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+
+    for (let i = 1; i <= a.length; i += 1) {
+      const current = [i];
+      let rowMin = current[0];
+
+      for (let j = 1; j <= b.length; j += 1) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        const value = Math.min(
+          previous[j] + 1,
+          current[j - 1] + 1,
+          previous[j - 1] + cost
+        );
+        current[j] = value;
+        rowMin = Math.min(rowMin, value);
+      }
+
+      if (rowMin > maxDistance) return maxDistance + 1;
+      previous = current;
+    }
+
+    return previous[b.length];
+  }
+
+  function fuzzyTokenScore(token, candidate) {
+    token = normalizeText(token);
+    candidate = normalizeText(candidate);
+    if (!token || !candidate) return 0;
+    if (token === candidate) return 12;
+    if (candidate.startsWith(token)) return token.length > 2 ? 9 : 4;
+    if (token.startsWith(candidate) && candidate.length > 2) return 6;
+    if (candidate.includes(token)) return token.length > 2 ? 6 : 2;
+
+    if (token.length < 3 || candidate.length < 3) return 0;
+
+    const maxDistance = token.length <= 3 ? 2 : token.length <= 6 ? 2 : 3;
+    const distance = boundedLevenshtein(token, candidate, maxDistance);
+    if (distance <= maxDistance) {
+      return Math.max(1, (maxDistance - distance + 1) * 2);
+    }
+
+    if (candidate.length > token.length) {
+      const prefix = candidate.slice(0, token.length);
+      const prefixDistance = boundedLevenshtein(token, prefix, maxDistance);
+      if (prefixDistance <= maxDistance) {
+        return Math.max(1, (maxDistance - prefixDistance + 1) * 2);
+      }
+    }
+
+    return 0;
+  }
+
+  function productSearchData(product) {
+    const normalizedName = normalizeText(product.name);
+    const normalizedCategory = normalizeText(product.category || '');
+    const blob = normalizeText(`${product.name} ${product.category || ''} ${product.terms || ''}`);
+
+    return {
+      normalizedName,
+      normalizedCategory,
+      blob,
+      tokens: splitSearchTokens(blob)
+    };
   }
 
   function productScore(product, query) {
     const normalizedQuery = normalizeText(query);
     if (!normalizedQuery) return 1;
 
-    const normalizedName = normalizeText(product.name);
-    const blob = normalizeText(`${product.name} ${product.category || ''} ${product.terms || ''}`);
-    let score = blob.includes(normalizedQuery) ? 12 : 0;
-    if (normalizedName.includes(normalizedQuery)) score += 18;
+    const data = productSearchData(product);
+    let score = data.blob.includes(normalizedQuery) ? 12 : 0;
+    if (data.normalizedName.includes(normalizedQuery)) score += 18;
+    if (data.normalizedName.startsWith(normalizedQuery)) score += 10;
 
     searchTokens(query).forEach(token => {
-      if (blob.includes(token)) score += token.length > 3 ? 4 : 2;
-      if (normalizedName.includes(token)) score += 3;
-      if (normalizeText(product.category || '').includes(token)) score += 2;
+      if (data.blob.includes(token)) score += token.length > 3 ? 4 : 2;
+      if (data.normalizedName.includes(token)) score += 5;
+      if (data.normalizedName.startsWith(token)) score += 6;
+      if (data.normalizedCategory.includes(token)) score += 3;
+
+      const bestFuzzy = data.tokens.reduce((best, candidate) => Math.max(best, fuzzyTokenScore(token, candidate)), 0);
+      if (bestFuzzy) score += bestFuzzy;
     });
 
     return score;
@@ -503,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateAccountUI() {
     const signed = Boolean(currentUser?.email);
+    const hasPhoto = signed && Boolean(currentUser?.photo);
     qsa('[data-account-label]').forEach(label => {
       label.textContent = label.closest('.mobile-quick-dock')
         ? 'Conta'
@@ -511,12 +608,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('[data-account-avatar]').forEach(avatar => {
       avatar.classList.toggle('signed-in', signed);
-      avatar.classList.toggle('has-photo', signed && Boolean(currentUser?.photo));
+      avatar.classList.toggle('has-photo', hasPhoto);
       avatar.innerHTML = accountAvatarHTML(signed);
     });
 
+    qsa('.nav-account-link').forEach(link => {
+      link.classList.toggle('has-photo', hasPhoto);
+    });
+
     qsa('[data-dock-section="account"]').forEach(link => {
-      link.classList.toggle('has-photo', signed && Boolean(currentUser?.photo));
+      link.classList.toggle('has-photo', hasPhoto);
     });
 
     qsa('.nav-account-link, [data-account-cta], [data-account-login]').forEach(link => {
@@ -596,6 +697,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const input = qs('[data-site-search-input]', form);
       const suggestions = ensureSearchSuggestions(form);
 
+      form.setAttribute('autocomplete', 'off');
+      input?.setAttribute('autocomplete', 'off');
+      input?.setAttribute('autocapitalize', 'none');
+      input?.setAttribute('autocorrect', 'off');
+      input?.setAttribute('spellcheck', 'false');
+
       input?.addEventListener('input', () => {
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
@@ -665,11 +772,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const matches = PRODUCT_INDEX
+    let matches = PRODUCT_INDEX
       .map(product => ({ ...product, score: productScore(product, term) }))
       .filter(product => product.score > 0)
       .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'))
       .slice(0, 5);
+
+    const usingFallback = !matches.length;
+    if (usingFallback) {
+      matches = smartSearchMatches('').slice(0, 4).map(product => ({ ...product, score: 0 }));
+    }
 
     suggestions.innerHTML = '';
 
@@ -692,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.innerHTML = `
         <span>
           <strong>${escapeHTML(product.name)}</strong>
-          <small>${escapeHTML(product.category)} • ${formatMoney(product.price)}</small>
+          <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}${usingFallback ? ' - sugestao' : ''}</small>
         </span>
         <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
       `;
