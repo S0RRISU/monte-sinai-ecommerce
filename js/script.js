@@ -3191,9 +3191,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!/^https?:$/.test(window.location.protocol)) return;
 
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(error => {
-        console.warn('[PWA] Nao foi possivel registrar o service worker.', error);
-      });
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          registration.update().catch(() => {});
+        })
+        .catch(error => {
+          console.warn('[PWA] Nao foi possivel registrar o service worker.', error);
+        });
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (sessionStorage.getItem('ms_sw_reloaded_v1') === 'true') return;
+      sessionStorage.setItem('ms_sw_reloaded_v1', 'true');
+      window.location.reload();
     });
   }
 
