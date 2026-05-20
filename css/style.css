@@ -10115,4 +10115,203 @@ body.light-mode .navbar {
     min-width: 0 !important;
     max-width: var(--dock-side-size) !important;
   }
+
+  .mobile-quick-dock .dock-cart.has-items {
+    border-color: color-mix(in srgb, var(--accent) 86%, #ffffff) !important;
+    background: linear-gradient(180deg, #ffec78 0%, var(--accent) 58%, #e5ac00 100%) !important;
+    color: #061b45 !important;
+    box-shadow: 0 14px 28px rgba(255, 213, 31, 0.38), 0 0 0 6px color-mix(in srgb, var(--surface) 96%, transparent) !important;
+  }
+
+  .mobile-quick-dock .dock-cart.has-items i,
+  .mobile-quick-dock .dock-cart.has-items span {
+    color: #061b45 !important;
+  }
+}
+
+/* Search suggestions must not inherit submit-button sizing inside search forms. */
+.nav-search .search-suggestions,
+.hero-search .search-suggestions,
+.catalog-search-form .search-suggestions,
+.search-field .search-suggestions {
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  left: 0 !important;
+  z-index: 900 !important;
+  display: none !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  max-height: min(360px, 48dvh) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line)) !important;
+  border-radius: 10px !important;
+  padding: 8px !important;
+  background: var(--surface) !important;
+  box-shadow: 0 22px 46px rgba(0, 10, 38, 0.28) !important;
+}
+
+.nav-search .search-suggestions.show,
+.hero-search .search-suggestions.show,
+.catalog-search-form .search-suggestions.show,
+.search-field .search-suggestions.show {
+  display: grid !important;
+  gap: 6px !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item,
+.hero-search .search-suggestions .search-suggestion-item,
+.catalog-search-form .search-suggestions .search-suggestion-item,
+.search-field .search-suggestions .search-suggestion-item {
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 58px !important;
+  max-height: none !important;
+  grid-column: auto !important;
+  grid-template-columns: minmax(0, 1fr) 22px !important;
+  align-items: center !important;
+  justify-content: stretch !important;
+  gap: 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+  font-size: 0.94rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  transform: none !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item::after,
+.hero-search .search-suggestions .search-suggestion-item::after,
+.catalog-search-form .search-suggestions .search-suggestion-item::after,
+.search-field .search-suggestions .search-suggestion-item::after {
+  content: none !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item:hover,
+.nav-search .search-suggestions .search-suggestion-item:focus-visible,
+.hero-search .search-suggestions .search-suggestion-item:hover,
+.hero-search .search-suggestions .search-suggestion-item:focus-visible,
+.catalog-search-form .search-suggestions .search-suggestion-item:hover,
+.catalog-search-form .search-suggestions .search-suggestion-item:focus-visible,
+.search-field .search-suggestions .search-suggestion-item:hover,
+.search-field .search-suggestions .search-suggestion-item:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--line)) !important;
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-soft)) !important;
+  outline: none !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item > span,
+.hero-search .search-suggestions .search-suggestion-item > span,
+.catalog-search-form .search-suggestions .search-suggestion-item > span,
+.search-field .search-suggestions .search-suggestion-item > span {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item strong,
+.nav-search .search-suggestions .search-suggestion-item small,
+.hero-search .search-suggestions .search-suggestion-item strong,
+.hero-search .search-suggestions .search-suggestion-item small,
+.catalog-search-form .search-suggestions .search-suggestion-item strong,
+.catalog-search-form .search-suggestions .search-suggestion-item small,
+.search-field .search-suggestions .search-suggestion-item strong,
+.search-field .search-suggestions .search-suggestion-item small {
+  display: block !important;
+  width: auto !important;
+  color: inherit !important;
+  overflow: hidden !important;
+  overflow-wrap: normal !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-item small,
+.hero-search .search-suggestions .search-suggestion-item small,
+.catalog-search-form .search-suggestions .search-suggestion-item small,
+.search-field .search-suggestions .search-suggestion-item small {
+  margin-top: 4px !important;
+  color: var(--muted) !important;
+  font-size: 0.78rem !important;
+}
+
+.nav-search .search-suggestions .search-suggestion-empty,
+.hero-search .search-suggestions .search-suggestion-empty,
+.catalog-search-form .search-suggestions .search-suggestion-empty,
+.search-field .search-suggestions .search-suggestion-empty {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 12px !important;
+  color: var(--text-soft) !important;
+}
+
+body.light-mode .nav-search .search-suggestions,
+body.light-mode .hero-search .search-suggestions,
+body.light-mode .catalog-search-form .search-suggestions,
+body.light-mode .search-field .search-suggestions {
+  background: #ffffff !important;
+  box-shadow: 0 20px 44px rgba(0, 58, 140, 0.18) !important;
+}
+
+/* Final Monte Sinai theme palette and native control theme. */
+:root {
+  color-scheme: dark;
+  --bg: #06142f;
+  --surface: #0b1c42;
+  --surface-soft: #102b62;
+  --surface-raised: #163875;
+  --text: #f8fbff;
+  --text-soft: #dbe9ff;
+  --muted: #9ebdeb;
+  --line: rgba(140, 184, 255, 0.22);
+  --primary: #096fe0;
+  --primary-strong: #0057b8;
+  --accent: #ffd41f;
+  --blue: #2ea7ff;
+  --shadow: 0 20px 52px rgba(0, 12, 48, 0.36);
+}
+
+body:not(.light-mode) {
+  color-scheme: dark;
+}
+
+body.light-mode {
+  color-scheme: light;
+  --bg: #edf5ff;
+  --surface: #ffffff;
+  --surface-soft: #e8f2ff;
+  --surface-raised: #f7fbff;
+  --text: #061b45;
+  --text-soft: #27416f;
+  --muted: #5975a2;
+  --line: rgba(0, 71, 165, 0.16);
+  --primary: #075fd0;
+  --primary-strong: #004aa6;
+  --accent: #f0bd00;
+  --blue: #1688f2;
+  --shadow: 0 18px 42px rgba(0, 58, 140, 0.14);
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(46, 167, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 88% 10%, rgba(255, 212, 31, 0.13), transparent 26%),
+    linear-gradient(180deg, color-mix(in srgb, var(--primary-strong) 18%, var(--bg)) 0%, var(--bg) 60%, #04102a 100%) !important;
+}
+
+body.light-mode {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(22, 136, 242, 0.12), transparent 28%),
+    radial-gradient(circle at 88% 10%, rgba(240, 189, 0, 0.20), transparent 26%),
+    linear-gradient(180deg, #fbfdff 0%, var(--bg) 52%, #e6f1ff 100%) !important;
 }

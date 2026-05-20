@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     accounts: 'ms_accounts_v1',
     orders: 'ms_orders_v1',
     owner: 'ms_owner_config_v1',
-    theme: 'ms_theme_v1'
+    theme: 'ms_theme_v2',
+    legacyTheme: 'ms_theme_v1'
   };
 
   const DEFAULT_OWNER = {
@@ -457,8 +458,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applySavedTheme() {
+    if (!localStorage.getItem(STORAGE.theme)) localStorage.removeItem(STORAGE.legacyTheme);
     const stored = localStorage.getItem(STORAGE.theme);
-    setTheme(stored || 'light', false);
+    setTheme(stored || preferredSystemTheme(), false);
+    bindSystemThemeSync();
+  }
+
+  function preferredSystemTheme() {
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function bindSystemThemeSync() {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!media || bindSystemThemeSync.bound) return;
+
+    bindSystemThemeSync.bound = true;
+    const syncTheme = event => {
+      if (localStorage.getItem(STORAGE.theme)) return;
+      setTheme(event.matches ? 'dark' : 'light', false);
+    };
+
+    if (media.addEventListener) media.addEventListener('change', syncTheme);
+    else media.addListener?.(syncTheme);
   }
 
   function setTheme(theme, persist = true) {
