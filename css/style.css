@@ -10315,3 +10315,32 @@ body.light-mode {
     radial-gradient(circle at 88% 10%, rgba(240, 189, 0, 0.20), transparent 26%),
     linear-gradient(180deg, #fbfdff 0%, var(--bg) 52%, #e6f1ff 100%) !important;
 }
+
+.profile-guest-mode .profile-avatar-circle {
+  background: linear-gradient(180deg, var(--accent), #e3ad00);
+  color: #061b45;
+}
+
+.profile-guest-actions {
+  align-content: flex-start;
+}
+
+.profile-register-action {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: linear-gradient(180deg, var(--accent), #e3ad00);
+  color: #061b45;
+}
+
+.profile-guest-note {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
+  border-radius: 8px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface-soft) 72%, var(--surface));
+  color: var(--text);
+}
+
+.profile-guest-note p {
+  color: var(--text-soft);
+}

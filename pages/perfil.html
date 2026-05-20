@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Perfil | Monte Sinai</title>
-  <link rel="stylesheet" href="../css/style.css?v=20260520-8">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-9">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="../js/script.js?v=20260520-8"></script>
+  <script defer src="../js/script.js?v=20260520-9"></script>
 </head>
 <body>
   <header class="navbar">
@@ -47,12 +47,12 @@
         <div class="profile-card-header">
           <div class="profile-avatar-stack">
             <div class="profile-avatar-circle" id="profile-avatar">U</div>
-            <a class="profile-mini-action profile-edit-action" href="editar-perfil.html">
+            <a class="profile-mini-action profile-edit-action" href="editar-perfil.html" data-auth-only>
               <i class="fa-solid fa-pen"></i>
               <span>Editar perfil</span>
             </a>
           </div>
-          <div class="profile-side-actions" id="profile-actions">
+          <div class="profile-side-actions" id="profile-actions" data-auth-only>
             <button class="profile-mini-action" type="button" data-switch-account>
               <i class="fa-solid fa-repeat"></i>
               <span>Trocar conta</span>
@@ -61,6 +61,16 @@
               <i class="fa-solid fa-right-from-bracket"></i>
               <span>Sair</span>
             </button>
+          </div>
+          <div class="profile-side-actions profile-guest-actions hidden" id="profile-guest-actions">
+            <a class="profile-mini-action" href="login.html?redirect=perfil.html" data-profile-login>
+              <i class="fa-solid fa-right-to-bracket"></i>
+              <span>Entrar</span>
+            </a>
+            <a class="profile-mini-action profile-register-action" href="login.html?mode=register&amp;redirect=perfil.html" data-profile-register>
+              <i class="fa-solid fa-user-plus"></i>
+              <span>Cadastrar</span>
+            </a>
           </div>
           <a class="profile-settings-icon" href="configuracoes.html" id="profile-settings-link" aria-label="Configuracoes do site">
             <i class="fa-solid fa-gear"></i>
@@ -100,7 +110,7 @@
 
       <article class="profile-card profile-details" id="profile-details">
         <div class="section-head">
-          <span class="eyebrow">Detalhes do perfil</span>
+          <span class="eyebrow" id="profile-details-eyebrow">Detalhes do perfil</span>
           <h2>Informações do cliente</h2>
           <p>Todos os dados são usados apenas para simplificar o pedido e a entrega.</p>
         </div>

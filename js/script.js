@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const actions = document.createElement('div');
       actions.className = 'nav-actions';
       actions.innerHTML = `
-        <a class="nav-pill nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" aria-label="Entrar ou cadastrar">
+        <a class="nav-pill nav-account-link" href="${profileHref()}" aria-label="Abrir perfil do cliente">
           <span class="nav-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span class="nav-account-label" data-account-label>Entrar ou cadastrar</span>
         </a>
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mobileMenu && !qs('[data-mobile-extra]', mobileMenu)) {
       mobileMenu.insertAdjacentHTML('beforeend', `
         <div class="mobile-menu-divider" data-mobile-extra></div>
-        <a class="mobile-only-link nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-mobile-extra>
+        <a class="mobile-only-link nav-account-link" href="${profileHref()}" data-mobile-extra>
           <span class="mobile-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span data-account-label>Entrar ou cadastrar</span>
         </a>
@@ -599,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Pesquisa</span>
         </button>
-        <a class="nav-account-link dock-profile-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-dock-section="account">
+        <a class="nav-account-link dock-profile-link" href="${profileHref()}" data-dock-section="account">
           <span class="dock-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span class="dock-profile-label" data-account-label>Perfil</span>
         </a>
@@ -641,17 +641,23 @@ document.addEventListener('DOMContentLoaded', () => {
       link.classList.toggle('has-photo', hasPhoto);
     });
 
-    qsa('.nav-account-link, [data-account-cta], [data-account-login]').forEach(link => {
+    qsa('.nav-account-link, [data-account-cta]').forEach(link => {
       if (!(link instanceof HTMLAnchorElement)) return;
-      link.href = signed ? profileHref() : loginHref({ redirect: currentLocationForRedirect() });
-      link.classList.toggle('active', signed && ['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(currentPage()));
-      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Entrar ou cadastrar');
+      link.href = profileHref();
+      link.classList.toggle('active', ['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(currentPage()));
+      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Abrir perfil do cliente');
 
       if (link.hasAttribute('data-account-cta')) {
         link.innerHTML = signed
           ? '<i class="fa-solid fa-user-gear"></i> Minha conta'
           : '<i class="fa-solid fa-user-check"></i> Entrar ou cadastrar';
       }
+    });
+
+    qsa('[data-account-login]').forEach(link => {
+      if (!(link instanceof HTMLAnchorElement)) return;
+      link.href = signed ? profileHref() : loginHref({ redirect: currentLocationForRedirect() });
+      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Entrar ou cadastrar');
     });
   }
 
@@ -1377,11 +1383,10 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = formatMoney(cartSubtotal());
     });
 
-    qsa('.cart-float').forEach(button => {
-      button.classList.toggle('is-empty', cart.length === 0);
-    });
-    qsa('.mobile-quick-dock .dock-cart').forEach(button => {
-      button.classList.toggle('has-items', cartCount() > 0);
+    qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart').forEach(button => {
+      const hasItems = cartCount() > 0;
+      button.classList.toggle('has-items', hasItems);
+      button.classList.toggle('is-empty', !hasItems);
     });
 
     const pageItems = qs('#cart-items');
@@ -1782,37 +1787,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initProfilePage() {
     if (!qs('#profile-page') || currentPage() !== 'perfil.html') return;
-    if (currentUser && !currentUser.email) currentUser = ensureCustomerProfile();
-
     const summary = qs('.profile-summary');
     const details = qs('#profile-details');
     const empty = qs('#profile-empty');
+    const guestActions = qs('#profile-guest-actions');
+    const authActions = qs('#profile-actions');
+    const authOnly = qsa('[data-auth-only]');
+    const loginUrl = loginHref({ redirect: 'perfil.html' });
+    const registerUrl = loginHref({ mode: 'register', redirect: 'perfil.html' });
+    const signed = Boolean(currentUser?.email);
 
-    if (!currentUser?.email) {
-      summary?.classList.add('hidden');
-      details?.classList.add('hidden');
-      empty?.classList.remove('hidden');
-      return;
-    }
-
+    document.body.classList.toggle('profile-guest-mode', !signed);
     empty?.classList.add('hidden');
     summary?.classList.remove('hidden');
     details?.classList.remove('hidden');
+    guestActions?.classList.toggle('hidden', signed);
+    authActions?.classList.toggle('hidden', !signed);
+    authOnly.forEach(item => item.classList.toggle('hidden', !signed));
+    qsa('[data-profile-login]').forEach(link => {
+      if (link instanceof HTMLAnchorElement) link.href = loginUrl;
+    });
+    qsa('[data-profile-register]').forEach(link => {
+      if (link instanceof HTMLAnchorElement) link.href = registerUrl;
+    });
 
     const avatar = qs('#profile-avatar');
     if (avatar) {
-      avatar.textContent = (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase();
-      if (currentUser.photo) {
+      avatar.textContent = signed
+        ? (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase()
+        : 'V';
+      if (signed && currentUser.photo) {
         avatar.innerHTML = `<img src="${escapeHTML(currentUser.photo)}" alt="">`;
       }
     }
 
-    setText('#profile-name', currentUser.name || 'Cliente Monte Sinai');
-    setText('#profile-nick', currentUser.nick ? `@${currentUser.nick}` : '');
-    setText('#profile-provider', currentUser.provider || 'Cadastro local');
-    setText('#profile-email', currentUser.email || 'Não informado');
-    setText('#profile-phone', currentUser.phone || 'Complete seu WhatsApp');
-    setText('#profile-address', currentUser.address || 'Complete seu endereço');
+    if (!currentUser) currentUser = {};
+
+    setText('#profile-name', signed ? (currentUser.name || 'Cliente Monte Sinai') : 'Cliente visitante');
+    setText('#profile-nick', signed && currentUser.nick ? `@${currentUser.nick}` : '');
+    setText('#profile-provider', signed ? (currentUser.provider || 'Cadastro local') : 'Entre ou cadastre-se para salvar seus dados');
+    setText('#profile-email', signed ? (currentUser.email || 'Não informado') : 'Disponível após entrar ou cadastrar');
+    setText('#profile-phone', signed ? (currentUser.phone || 'Complete seu WhatsApp') : 'Salve seu WhatsApp em uma conta');
+    setText('#profile-address', signed ? (currentUser.address || 'Complete seu endereço') : 'Salve seu endereço para pedidos rápidos');
+    setText('#profile-details-eyebrow', signed ? 'Detalhes do perfil' : 'Área do cliente');
+    setText('.profile-details .section-head h2', signed ? 'Informações do cliente' : 'Acesso e configurações');
+    setText('.profile-details .section-head p', signed
+      ? 'Todos os dados são usados apenas para simplificar o pedido e a entrega.'
+      : 'Você pode ajustar as configurações do site agora. Para editar perfil e salvar dados, entre ou cadastre-se.');
 
     qs('[data-switch-account]')?.addEventListener('click', () => {
       window.location.href = loginHref({ redirect: 'perfil.html' });
@@ -1821,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('[data-logout-account]')?.addEventListener('click', () => {
       saveUser(null);
       showToast('Você saiu da conta.');
-      setTimeout(() => window.location.href = loginHref(), 500);
+      setTimeout(() => window.location.href = profileHref(), 500);
     });
 
     renderOrdersEverywhere();
@@ -1831,7 +1852,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = qs('#profile-edit-form');
     if (!form) return;
 
-    currentUser = ensureCustomerProfile();
+    currentUser = loadJSON(STORAGE.user, null);
+    if (!currentUser?.email) {
+      showToast('Entre ou cadastre-se para editar o perfil.');
+      setTimeout(() => {
+        window.location.href = loginHref({ mode: 'register', redirect: 'editar-perfil.html' });
+      }, 500);
+      return;
+    }
 
     qs('#edit-name').value = currentUser.name || '';
     qs('#edit-nick').value = currentUser.nick || '';
@@ -1862,7 +1890,7 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', event => {
       event.preventDefault();
       const updated = {
-        ...ensureCustomerProfile(),
+        ...currentUser,
         name: qs('#edit-name')?.value.trim() || '',
         nick: qs('#edit-nick')?.value.trim() || '',
         phone: qs('#edit-phone')?.value.trim() || '',
@@ -2059,7 +2087,20 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = '';
 
     let visibleOrders = orders;
-    if (container.id === 'profile-orders' && currentUser?.email) {
+    if (container.id === 'profile-orders') {
+      if (!currentUser?.email) {
+        container.insertAdjacentHTML('beforeend', `
+          <div class="profile-guest-note">
+            <strong>Pedidos salvos aparecem depois do cadastro.</strong>
+            <p>Entre ou cadastre-se para vincular seus pedidos ao perfil deste aparelho.</p>
+            <div class="settings-actions">
+              <a class="btn btn-primary" href="${loginHref({ mode: 'register', redirect: 'perfil.html' })}">Cadastrar</a>
+              <a class="btn btn-secondary" href="${loginHref({ redirect: 'perfil.html' })}">Entrar</a>
+            </div>
+          </div>
+        `);
+        return;
+      }
       visibleOrders = orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone);
     }
 
