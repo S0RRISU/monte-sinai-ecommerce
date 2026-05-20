@@ -1557,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSearchSuggestions(form, suggestions, query) {
     const term = query.trim();
-    if (term.length < 2) {
+    if (term.length < 1) {
       suggestions.innerHTML = '';
       hideSearchSuggestions(suggestions);
       return;

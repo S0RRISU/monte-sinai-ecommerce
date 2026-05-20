@@ -12102,6 +12102,12 @@ textarea {
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease !important;
 }
 
+.hero-search,
+.catalog-search-form,
+.search-field {
+  isolation: isolate !important;
+}
+
 body.light-mode .nav-search,
 body.light-mode .hero-search,
 body.light-mode .catalog-search-form,
@@ -12115,8 +12121,11 @@ body.light-mode .search-field {
 .catalog-search-form:focus-within,
 .search-field:focus-within {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--primary)) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 99%, transparent) !important;
   box-shadow:
-    0 18px 38px rgba(0, 10, 38, 0.24),
+    0 20px 42px rgba(0, 10, 38, 0.28),
     0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent) !important;
 }
 
@@ -12182,6 +12191,8 @@ body.light-mode .search-field {
   padding: 8px !important;
   background: color-mix(in srgb, var(--surface) 99%, transparent) !important;
   box-shadow: 0 22px 48px rgba(0, 10, 38, 0.30) !important;
+  backdrop-filter: blur(16px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(135%) !important;
 }
 
 .search-suggestions.show,
@@ -12200,6 +12211,16 @@ body.light-mode .catalog-search-form .search-suggestions,
 body.light-mode .search-field .search-suggestions {
   background: #ffffff !important;
   box-shadow: 0 22px 48px rgba(0, 58, 140, 0.18) !important;
+}
+
+.search-suggestion-item {
+  border-radius: 12px !important;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease !important;
+}
+
+.search-suggestion-item:hover,
+.search-suggestion-item:focus-visible {
+  transform: translateY(-1px) !important;
 }
 
 @media (max-width: 760px) {
@@ -12237,12 +12258,18 @@ body.light-mode .search-field .search-suggestions {
   .hero-search,
   .catalog-search-form,
   .search-field {
+    position: sticky !important;
+    top: calc(var(--nav-height) + env(safe-area-inset-top) + 8px) !important;
+    z-index: 260 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-height: 54px !important;
     grid-template-columns: 22px minmax(0, 1fr) 78px !important;
     gap: 8px !important;
     padding: 5px 6px 5px 13px !important;
+    border-radius: 16px !important;
+    backdrop-filter: blur(18px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
   }
 
   .hero-search {
@@ -12252,6 +12279,20 @@ body.light-mode .search-field .search-suggestions {
   .catalog-search-form,
   .search-field {
     grid-template-columns: 22px minmax(0, 1fr) 46px !important;
+  }
+
+  .catalog-tools {
+    position: sticky !important;
+    top: calc(var(--nav-height) + env(safe-area-inset-top) + 8px) !important;
+    z-index: 255 !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+    padding: 8px 0 10px !important;
+    overflow: visible !important;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, transparent), color-mix(in srgb, var(--bg) 82%, transparent) 72%, transparent) !important;
+    backdrop-filter: blur(12px) saturate(125%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(125%) !important;
   }
 
   .hero-search button {
@@ -12326,6 +12367,9 @@ body.light-mode .search-field .search-suggestions {
     margin-bottom: 0 !important;
     border-radius: 14px !important;
     padding: 5px 6px 5px 13px !important;
+    box-shadow:
+      0 16px 34px rgba(0, 10, 38, 0.22),
+      0 0 0 4px color-mix(in srgb, var(--primary) 9%, transparent) !important;
   }
 
   .smart-search-form button {
@@ -12346,5 +12390,25 @@ body.light-mode .search-field .search-suggestions {
   .smart-search-result-head {
     margin-top: 0 !important;
     padding-top: 0 !important;
+  }
+}
+
+@media (min-width: 761px) {
+  .catalog-tools {
+    position: sticky !important;
+    top: calc(var(--nav-height) + 12px) !important;
+    z-index: 140 !important;
+    padding-block: 8px !important;
+    overflow: visible !important;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, transparent), color-mix(in srgb, var(--bg) 78%, transparent) 76%, transparent) !important;
+    backdrop-filter: blur(14px) saturate(125%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(125%) !important;
+  }
+
+  .hero-search {
+    position: sticky !important;
+    top: calc(var(--nav-height) + 12px) !important;
+    z-index: 80 !important;
   }
 }
