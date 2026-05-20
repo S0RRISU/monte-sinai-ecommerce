@@ -12957,3 +12957,379 @@ body.light-mode .search-field .search-suggestions {
     max-width: 108px !important;
   }
 }
+
+/* Admin redesign: clearer workflow, offer tools, kits and mobile-first controls. */
+.dashboard-page {
+  width: min(1380px, calc(100vw - 32px));
+}
+
+.admin-content {
+  gap: 24px !important;
+}
+
+.admin-command-center,
+.admin-products-section,
+.owner-orders,
+.owner-settings {
+  border-radius: 16px !important;
+}
+
+.admin-command-center {
+  order: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
+  border-radius: 16px;
+  padding: 20px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 13%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 18px 42px rgba(0, 10, 38, 0.12);
+}
+
+.admin-command-center h2,
+.admin-form-intro h3,
+.admin-offer-head h3 {
+  margin: 4px 0 6px;
+  color: var(--text);
+}
+
+.admin-command-center p,
+.admin-form-intro p,
+.admin-offer-head p {
+  color: var(--text-soft);
+}
+
+.dashboard-shortcuts {
+  justify-content: flex-end;
+}
+
+.admin-mobile-tabs {
+  display: none;
+  order: 3;
+  gap: 8px;
+}
+
+.admin-products-section {
+  order: 4;
+}
+
+.dashboard-layout {
+  order: 5;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dashboard-stat {
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent),
+    var(--surface-soft);
+}
+
+.admin-form-intro,
+.admin-offer-head,
+.admin-product-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-form-intro {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-soft) 76%, transparent);
+}
+
+.admin-offer-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: 16px;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 212, 31, 0.15), transparent 45%),
+    color-mix(in srgb, var(--surface-soft) 82%, transparent);
+}
+
+.admin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.admin-duration-actions,
+.admin-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-product-toolbar {
+  margin: 18px 0 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
+}
+
+.admin-product-toolbar .form-group {
+  min-width: min(360px, 100%);
+  margin: 0;
+}
+
+.admin-filter-buttons .btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #001a55;
+}
+
+.admin-image-preview {
+  min-height: 150px;
+  border-style: dashed;
+}
+
+.admin-image-preview img {
+  height: 150px;
+}
+
+.admin-products-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-product-card {
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: stretch;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 90%, transparent), var(--surface));
+}
+
+.admin-product-card.is-offer {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
+  box-shadow: 0 18px 38px rgba(255, 212, 31, 0.12);
+}
+
+.admin-product-card.is-kit {
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--line));
+}
+
+.admin-product-media {
+  width: 128px;
+  height: 128px;
+  border-radius: 14px;
+}
+
+.admin-product-info {
+  align-content: start;
+}
+
+.admin-product-actions {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  min-width: 0;
+}
+
+.admin-product-actions .btn {
+  min-height: 42px;
+  padding-inline: 10px;
+}
+
+.badge.is-kit {
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 13%, var(--surface));
+}
+
+.badge.is-offer,
+.badge.is-highlight {
+  color: #805600;
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+}
+
+.product-card.is-offer-product {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line)) !important;
+  box-shadow:
+    0 22px 48px rgba(255, 212, 31, 0.15),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent) !important;
+}
+
+.product-card.is-kit-product {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--line)) !important;
+}
+
+.offer-badge {
+  background: var(--accent) !important;
+  color: #001a55 !important;
+}
+
+.kit-badge {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface)) !important;
+  color: var(--primary-strong) !important;
+}
+
+.old-price {
+  color: var(--muted);
+  font-size: 0.85em;
+  text-decoration: line-through;
+}
+
+.kit-items {
+  border: 1px dashed color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1120px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-command-center {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shortcuts {
+    justify-content: flex-start;
+  }
+
+  .admin-products-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-page {
+    width: min(100% - 20px, 100%);
+    padding-bottom: 110px;
+  }
+
+  .dashboard-page .hero-small {
+    min-height: auto;
+    padding-block: 28px 18px;
+  }
+
+  .dashboard-page .hero-copy h1 {
+    font-size: clamp(2rem, 10vw, 3rem);
+    line-height: 1.05;
+  }
+
+  .admin-content {
+    gap: 14px !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .dashboard-stat {
+    padding: 14px !important;
+  }
+
+  .admin-command-center {
+    padding: 16px;
+  }
+
+  .dashboard-shortcuts {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-mobile-tabs {
+    position: sticky;
+    top: calc(var(--nav-height) + env(safe-area-inset-top) + 8px);
+    z-index: 240;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    box-shadow: 0 16px 36px rgba(0, 10, 38, 0.16);
+    backdrop-filter: blur(16px) saturate(135%);
+    -webkit-backdrop-filter: blur(16px) saturate(135%);
+  }
+
+  .admin-mobile-tabs .btn {
+    min-height: 44px;
+    padding: 8px 6px;
+    font-size: 0.82rem;
+  }
+
+  .admin-section-head,
+  .admin-form-intro,
+  .admin-offer-head,
+  .admin-product-toolbar,
+  .orders-toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-product-form,
+  .admin-offer-panel,
+  .admin-product-toolbar,
+  .settings-section {
+    border-radius: 14px !important;
+  }
+
+  .admin-product-toolbar .form-group,
+  .admin-filter-buttons .btn,
+  .admin-duration-actions .btn {
+    width: 100%;
+  }
+
+  .admin-filter-buttons,
+  .admin-duration-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-product-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .admin-product-media {
+    width: 100%;
+    height: 180px;
+  }
+
+  .admin-product-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-price-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-image-preview,
+  .admin-image-preview img {
+    min-height: 180px;
+    height: 180px;
+  }
+}

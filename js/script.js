@@ -73,6 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
+  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at';
+  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens`;
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -122,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let remoteOrdersLoaded = false;
   let adminProductsCache = [];
   let adminProfileCache = null;
+  let productExtendedColumnsReady = true;
   let activePayment = 'delivery';
   let activeSearchProduct = null;
   let productSearchResults = [];
@@ -314,6 +317,66 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function formatDateTimeLocalInput(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset();
+    const local = new Date(date.getTime() - offset * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+
+  function isoFromLocalInput(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  function addHoursLocalInput(hours = 24) {
+    const date = new Date(Date.now() + Number(hours || 0) * 60 * 60 * 1000);
+    return formatDateTimeLocalInput(date.toISOString());
+  }
+
+  function productOfferActive(product = {}) {
+    const enabled = Boolean(product.oferta_ativa ?? product.offerActive);
+    const promo = parsePrice(product.preco_promocional ?? product.promotionalPrice ?? product.promoPrice);
+    if (!enabled || promo <= 0) return false;
+
+    const now = Date.now();
+    const start = product.oferta_inicio || product.offerStartsAt;
+    const end = product.oferta_fim || product.offerEndsAt;
+    if (start && new Date(start).getTime() > now) return false;
+    if (end && new Date(end).getTime() < now) return false;
+    return true;
+  }
+
+  function offerCountdownText(value) {
+    if (!value) return 'Oferta por tempo limitado';
+    const end = new Date(value).getTime();
+    if (Number.isNaN(end)) return 'Oferta por tempo limitado';
+    const diff = end - Date.now();
+    if (diff <= 0) return 'Oferta encerrando';
+
+    const minutes = Math.ceil(diff / 60000);
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const mins = minutes % 60;
+    if (days > 0) return `Termina em ${days}d ${hours}h`;
+    if (hours > 0) return `Termina em ${hours}h ${mins}min`;
+    return `Termina em ${mins}min`;
+  }
+
+  function isMissingProductExtensionError(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return text.includes('preco_promocional')
+      || text.includes('oferta_ativa')
+      || text.includes('oferta_inicio')
+      || text.includes('oferta_fim')
+      || text.includes('kit_itens')
+      || text.includes('destaque')
+      || text.includes('tipo');
+  }
+
   function escapeHTML(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -391,20 +454,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const optionTerms = Array.isArray(product?.options)
       ? product.options.map(option => `${option.label || ''} ${option.value || ''}`).join(' ')
       : '';
-    return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.terms || ''} ${optionTerms}`;
+    return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.kitItems || ''} ${product?.terms || ''} ${optionTerms}`;
   }
 
   function isRecommendedProduct(product) {
     const blob = normalizeText(productTerms(product));
-    return Boolean(product?.recommended) || blob.includes('agua') || blob.includes('gas');
+    return Boolean(product?.recommended || product?.highlight || product?.offerActive || product?.isKit) || blob.includes('agua') || blob.includes('gas');
   }
 
   function normalizeProduct(raw = {}) {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const category = String(raw.categoria ?? raw.category ?? 'Produtos').trim() || 'Produtos';
     const description = String(raw.descricao ?? raw.description ?? '').trim();
-    const price = parsePrice(raw.preco ?? raw.price);
+    const originalPrice = parsePrice(raw.preco ?? raw.originalPrice ?? raw.price);
+    const promotionalPrice = parsePrice(raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice);
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name);
+    const type = String(raw.tipo ?? raw.type ?? '').trim() || (normalizeText(category).includes('kit') ? 'kit' : 'produto');
+    const offerActive = productOfferActive(raw);
+    const price = offerActive && promotionalPrice > 0 ? promotionalPrice : originalPrice;
+    const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
 
     return {
       name,
@@ -412,9 +480,18 @@ document.addEventListener('DOMContentLoaded', () => {
       categorySlug: categorySlug(category),
       description,
       price,
+      originalPrice,
+      promotionalPrice,
       image,
+      type,
+      isKit: type === 'kit',
+      highlight,
+      offerActive,
+      offerStartsAt: raw.oferta_inicio ?? raw.offerStartsAt ?? '',
+      offerEndsAt: raw.oferta_fim ?? raw.offerEndsAt ?? '',
+      kitItems: raw.kit_itens ?? raw.kitItems ?? '',
       options: Array.isArray(raw.options) ? raw.options : [],
-      recommended: Boolean(raw.recommended),
+      recommended: highlight,
       terms: `${name} ${category} ${description}`
     };
   }
@@ -673,14 +750,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       for (const tableName of tableNames) {
         console.log(`[Supabase] Buscando produtos na tabela "${tableName}"...`);
-        let query = client
-          .from(tableName)
-          .select(tableName === 'produtos' ? 'nome, preco, imagem, categoria, descricao, ativo' : 'nome, preco, imagem, categoria, descricao')
-          .order('nome', { ascending: true });
+        const selectColumns = tableName === 'produtos' && productExtendedColumnsReady
+          ? PRODUCT_EXTENDED_SELECT
+          : (tableName === 'produtos' ? PRODUCT_BASE_SELECT : 'nome, preco, imagem, categoria, descricao');
+        let query = client.from(tableName).select(selectColumns).order('nome', { ascending: true });
 
         if (tableName === 'produtos') query = query.eq('ativo', true);
 
-        const { data, error } = await query;
+        let { data, error } = await query;
+        if (error && tableName === 'produtos' && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+          productExtendedColumnsReady = false;
+          const fallback = await client.from(tableName).select(PRODUCT_BASE_SELECT).eq('ativo', true).order('nome', { ascending: true });
+          data = fallback.data;
+          error = fallback.error;
+        }
 
         if (!error) {
           products = Array.isArray(data) ? data : [];
@@ -2086,12 +2169,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const cardClass = [
       'product-card',
       mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
-      recommended ? 'is-recommended' : ''
+      recommended ? 'is-recommended' : '',
+      normalized.offerActive ? 'is-offer-product' : '',
+      normalized.isKit ? 'is-kit-product' : ''
     ].filter(Boolean).join(' ');
 
     return `
       <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}">
-        ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
+        ${normalized.offerActive
+          ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
+          : (normalized.isKit ? '<span class="recommended-badge kit-badge">Kit especial</span>' : (recommended ? '<span class="recommended-badge">Recomendado</span>' : ''))}
         <div class="product-media">
           ${image
             ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
@@ -2100,12 +2187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
         <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
+        ${normalized.kitItems ? `<p class="kit-items">${escapeHTML(normalized.kitItems)}</p>` : ''}
         ${hasOptions ? `
           <select class="product-option" aria-label="${escapeHTML(normalized.name.includes('Desinfetante') ? 'Escolher fragrância do desinfetante' : 'Escolher tipo do produto')}">
             ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
           </select>
         ` : ''}
-        <strong>${formatMoney(firstOption.price || normalized.price)}</strong>
+        <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
         <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}">Adicionar</button>
       </article>
     `;
@@ -2120,6 +2208,8 @@ document.addEventListener('DOMContentLoaded', () => {
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
       '<button class="filter-chip" type="button" data-filter="recommended">Recomendados</button>',
+      '<button class="filter-chip" type="button" data-filter="ofertas">Ofertas</button>',
+      '<button class="filter-chip" type="button" data-filter="kits">Kits</button>',
       ...categories.map(([slug, label]) => `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`)
     ].join('');
   }
@@ -2252,7 +2342,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const matchesProduct = searchProducts.some(product => cardMatchesCatalogProduct(card, product));
       const matchesCardText = !searchProducts.length && cardMatchesCatalogQuery(card, rawTerm, true);
       const matchesTerm = !term || matchesProduct || matchesCardText;
-      const matchesFilter = filter === 'all' || category === filter || (filter === 'recommended' && recommended);
+      const matchesFilter = filter === 'all'
+        || category === filter
+        || (filter === 'recommended' && recommended)
+        || (filter === 'ofertas' && card.classList.contains('is-offer-product'))
+        || (filter === 'kits' && card.classList.contains('is-kit-product'));
       const show = matchesTerm && matchesFilter;
       card.classList.toggle('hidden', !show);
       card.classList.toggle('is-related-result', false);
@@ -3824,11 +3918,16 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#refresh-orders')?.addEventListener('click', () => renderOrdersEverywhere({ force: true }));
     qs('#refresh-products')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
     qsa('[data-admin-create-product]').forEach(button => {
-      button.addEventListener('click', () => {
-        resetAdminProductForm();
-        qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        qs('#admin-product-name')?.focus();
-      });
+      button.addEventListener('click', () => startAdminProductForm('produto'));
+    });
+    qsa('[data-admin-create-kit]').forEach(button => {
+      button.addEventListener('click', () => startAdminProductForm('kit'));
+    });
+    qsa('[data-admin-create-offer]').forEach(button => {
+      button.addEventListener('click', () => startAdminOfferForm());
+    });
+    qsa('[data-offer-duration]').forEach(button => {
+      button.addEventListener('click', () => setAdminOfferDuration(Number(button.dataset.offerDuration || 24)));
     });
 
     qs('#export-orders')?.addEventListener('click', async () => {
@@ -3852,11 +3951,49 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = event.target.files?.[0];
       updateAdminProductPreview(file ? URL.createObjectURL(file) : qs('#admin-product-image')?.value.trim());
     });
+    qs('#admin-product-search')?.addEventListener('input', () => renderAdminProducts(adminProductsCache));
+    qsa('[data-admin-product-filter]').forEach(button => {
+      button.addEventListener('click', () => {
+        qsa('[data-admin-product-filter]').forEach(item => item.classList.toggle('active', item === button));
+        renderAdminProducts(adminProductsCache);
+      });
+    });
 
     document.body.addEventListener('click', handleAdminPanelClick);
     document.body.addEventListener('change', handleAdminPanelChange);
 
     if (dashboard) dashboard.dataset.adminBound = 'true';
+  }
+
+  function startAdminProductForm(type = 'produto') {
+    resetAdminProductForm();
+    const typeInput = qs('#admin-product-type');
+    const category = qs('#admin-product-category');
+    const title = qs('#admin-product-form-title');
+    if (typeInput) typeInput.value = type;
+    if (type === 'kit' && category && !category.value) category.value = 'Kits';
+    if (title) title.textContent = type === 'kit' ? 'Criar kit de produtos' : 'Criar produto';
+    qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    qs('#admin-product-name')?.focus();
+  }
+
+  function startAdminOfferForm() {
+    startAdminProductForm('produto');
+    const active = qs('#admin-product-offer-active');
+    const highlight = qs('#admin-product-highlight');
+    if (active) active.checked = true;
+    if (highlight) highlight.value = 'true';
+    setAdminOfferDuration(24);
+    qs('#admin-product-promo-price')?.focus();
+  }
+
+  function setAdminOfferDuration(hours = 24) {
+    const active = qs('#admin-product-offer-active');
+    const start = qs('#admin-product-offer-start');
+    const end = qs('#admin-product-offer-end');
+    if (active) active.checked = true;
+    if (start && !start.value) start.value = formatDateTimeLocalInput(new Date().toISOString());
+    if (end) end.value = addHoursLocalInput(hours);
   }
 
   async function handleAdminPanelClick(event) {
@@ -3878,6 +4015,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggle = event.target.closest('[data-admin-product-toggle]');
     if (toggle) {
       await toggleAdminProduct(toggle.dataset.adminProductToggle, toggle.dataset.productActive !== 'true');
+      return;
+    }
+
+    const highlight = event.target.closest('[data-admin-product-highlight]');
+    if (highlight) {
+      await toggleAdminProductHighlight(highlight.dataset.adminProductHighlight, highlight.dataset.productHighlighted !== 'true');
+      return;
+    }
+
+    const quickOffer = event.target.closest('[data-admin-product-quick-offer]');
+    if (quickOffer) {
+      await quickAdminProductOffer(quickOffer.dataset.adminProductQuickOffer);
+      return;
+    }
+
+    const duplicate = event.target.closest('[data-admin-product-duplicate]');
+    if (duplicate) {
+      duplicateAdminProduct(duplicate.dataset.adminProductDuplicate);
+      return;
+    }
+
+    const endOffer = event.target.closest('[data-admin-product-end-offer]');
+    if (endOffer) {
+      await endAdminProductOffer(endOffer.dataset.adminProductEndOffer);
       return;
     }
 
@@ -3925,10 +4086,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!client) return [];
     if (adminProductsCache.length && !force) return adminProductsCache;
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('produtos')
-      .select('id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at')
+      .select(productExtendedColumnsReady ? PRODUCT_EXTENDED_SELECT : PRODUCT_BASE_SELECT)
       .order('nome', { ascending: true });
+
+    if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+      productExtendedColumnsReady = false;
+      const fallback = await client
+        .from('produtos')
+        .select(PRODUCT_BASE_SELECT)
+        .order('nome', { ascending: true });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     adminProductsCache = data || [];
@@ -3941,8 +4112,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const products = await loadAdminProducts({ force });
       renderAdminProducts(products);
       setText('#dash-products-count', String(products.filter(product => product.ativo).length));
+      setText('#dash-offers-count', String(products.filter(product => productOfferActive(product)).length));
+      setText('#dash-kits-count', String(products.filter(product => productType(product) === 'kit').length));
       setProductIndex(products.filter(product => product.ativo));
-      setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} carregado${products.length === 1 ? '' : 's'} da tabela public.produtos.`);
+      const extra = productExtendedColumnsReady
+        ? 'Kits, destaques e ofertas com temporizador estao ativos.'
+        : 'Execute supabase/ofertas-kits-produtos.sql para liberar kits e ofertas completas.';
+      setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} carregado${products.length === 1 ? '' : 's'} da tabela public.produtos. ${extra}`);
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel carregar produtos administrativos.', error);
       setAdminProductsStatus('Nao foi possivel carregar os produtos do Supabase.');
@@ -3953,26 +4129,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setAdminProductsStatus(message = '') {
     setText('#admin-products-status', message);
+    setText('#admin-offer-status', productExtendedColumnsReady
+      ? 'Kits, destaques e ofertas serao salvos no Supabase.'
+      : 'Execute supabase/ofertas-kits-produtos.sql para salvar kits/ofertas completas.');
+  }
+
+  function productType(product = {}) {
+    return String(product.tipo || '').trim() || (normalizeText(product.categoria).includes('kit') ? 'kit' : 'produto');
+  }
+
+  function adminProductHighlighted(product = {}) {
+    return Boolean(product.destaque) || productOfferActive(product) || productType(product) === 'kit';
+  }
+
+  function currentAdminProductFilter() {
+    return qs('[data-admin-product-filter].active')?.dataset.adminProductFilter || 'all';
+  }
+
+  function filteredAdminProducts(products = []) {
+    const query = normalizeText(qs('#admin-product-search')?.value || '');
+    const filter = currentAdminProductFilter();
+
+    return products.filter(product => {
+      const blob = normalizeText(`${product.nome || ''} ${product.categoria || ''} ${product.descricao || ''} ${product.kit_itens || ''}`);
+      const matchesSearch = !query || blob.includes(query);
+      const active = product.ativo !== false;
+      const type = productType(product);
+      const offer = productOfferActive(product);
+
+      const matchesFilter = filter === 'all'
+        || (filter === 'active' && active)
+        || (filter === 'inactive' && !active)
+        || (filter === 'offer' && offer)
+        || (filter === 'kit' && type === 'kit');
+
+      return matchesSearch && matchesFilter;
+    });
   }
 
   function adminProductPayload() {
     const nome = qs('#admin-product-name')?.value.trim() || '';
     const preco = parsePrice(qs('#admin-product-price')?.value || 0);
     const categoria = qs('#admin-product-category')?.value.trim() || '';
+    const tipo = qs('#admin-product-type')?.value === 'kit' ? 'kit' : 'produto';
+    const promoPrice = parsePrice(qs('#admin-product-promo-price')?.value || 0);
+    const offerActive = Boolean(qs('#admin-product-offer-active')?.checked);
 
     if (!nome || !categoria || preco < 0) {
       showToast('Preencha nome, categoria e preco valido.');
       return null;
     }
 
-    return {
+    if (offerActive && promoPrice <= 0) {
+      showToast('Informe um preco promocional para ativar a oferta.');
+      return null;
+    }
+
+    if (offerActive && !qs('#admin-product-offer-end')?.value) {
+      showToast('Escolha quando a oferta termina.');
+      return null;
+    }
+
+    const payload = {
       nome,
       preco,
-      categoria,
+      categoria: tipo === 'kit' && !normalizeText(categoria).includes('kit') ? 'Kits' : categoria,
       imagem: qs('#admin-product-image')?.value.trim() || '',
       descricao: qs('#admin-product-description')?.value.trim() || '',
       ativo: qs('#admin-product-active')?.value !== 'false'
     };
+
+    if (productExtendedColumnsReady) {
+      payload.tipo = tipo;
+      payload.destaque = qs('#admin-product-highlight')?.value === 'true' || offerActive || tipo === 'kit';
+      payload.oferta_ativa = offerActive;
+      payload.preco_promocional = offerActive && promoPrice > 0 ? promoPrice : null;
+      payload.oferta_inicio = offerActive
+        ? (isoFromLocalInput(qs('#admin-product-offer-start')?.value || '') || new Date().toISOString())
+        : null;
+      payload.oferta_fim = offerActive ? isoFromLocalInput(qs('#admin-product-offer-end')?.value || '') : null;
+      payload.kit_itens = qs('#admin-product-kit-items')?.value.trim() || '';
+    }
+
+    return payload;
   }
 
   function productImageUploadStatus(message = '') {
@@ -4115,7 +4354,24 @@ document.addEventListener('DOMContentLoaded', () => {
       ? client.from('produtos').update(payload).eq('id', id)
       : client.from('produtos').insert(payload);
 
-    const { error } = await request;
+    let { error } = await request;
+    if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+      productExtendedColumnsReady = false;
+      const basePayload = {
+        nome: payload.nome,
+        preco: payload.preco,
+        categoria: payload.categoria,
+        imagem: payload.imagem,
+        descricao: payload.descricao,
+        ativo: payload.ativo
+      };
+      const fallback = id
+        ? await client.from('produtos').update(basePayload).eq('id', id)
+        : await client.from('produtos').insert(basePayload);
+      error = fallback.error;
+      showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
+    }
+
     if (error) {
       showToast('Nao consegui salvar o produto.');
       console.warn('[Supabase] Erro ao salvar produto.', error);
@@ -4136,6 +4392,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const file = qs('#admin-product-file');
     const description = qs('#admin-product-description');
     const active = qs('#admin-product-active');
+    const type = qs('#admin-product-type');
+    const highlight = qs('#admin-product-highlight');
+    const kitItems = qs('#admin-product-kit-items');
+    const offerActive = qs('#admin-product-offer-active');
+    const promoPrice = qs('#admin-product-promo-price');
+    const offerStart = qs('#admin-product-offer-start');
+    const offerEnd = qs('#admin-product-offer-end');
 
     if (id) id.value = product.id || '';
     if (name) name.value = product.nome || '';
@@ -4147,7 +4410,14 @@ document.addEventListener('DOMContentLoaded', () => {
     productImageUploadStatus('');
     if (description) description.value = product.descricao || '';
     if (active) active.value = product.ativo ? 'true' : 'false';
-    qs('#cancel-product-edit')?.classList.remove('hidden');
+    if (type) type.value = productType(product);
+    if (highlight) highlight.value = adminProductHighlighted(product) ? 'true' : 'false';
+    if (kitItems) kitItems.value = product.kit_itens || '';
+    if (offerActive) offerActive.checked = Boolean(product.oferta_ativa);
+    if (promoPrice) promoPrice.value = product.preco_promocional ? Number(product.preco_promocional).toFixed(2) : '';
+    if (offerStart) offerStart.value = formatDateTimeLocalInput(product.oferta_inicio);
+    if (offerEnd) offerEnd.value = formatDateTimeLocalInput(product.oferta_fim);
+    setText('#admin-product-form-title', productType(product) === 'kit' ? 'Editar kit' : 'Editar produto');
     qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -4156,12 +4426,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = qs('#admin-product-id');
     const active = qs('#admin-product-active');
     const file = qs('#admin-product-file');
+    const type = qs('#admin-product-type');
+    const highlight = qs('#admin-product-highlight');
     if (id) id.value = '';
     if (active) active.value = 'true';
     if (file) file.value = '';
+    if (type) type.value = 'produto';
+    if (highlight) highlight.value = 'false';
+    setText('#admin-product-form-title', 'Criar produto');
     updateAdminProductPreview('');
     productImageUploadStatus('');
-    qs('#cancel-product-edit')?.classList.add('hidden');
   }
 
   async function toggleAdminProduct(id, active) {
@@ -4177,6 +4451,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await refreshAdminProducts({ force: true });
     showToast(active ? 'Produto ativado.' : 'Produto desativado.');
+  }
+
+  async function toggleAdminProductHighlight(id, highlighted) {
+    const client = ordersClient();
+    if (!client || !id) return;
+    if (!productExtendedColumnsReady) {
+      showToast('Execute o SQL de kits/ofertas para usar destaques.');
+      return;
+    }
+
+    const { error } = await client.from('produtos').update({ destaque: highlighted }).eq('id', id);
+    if (error) {
+      showToast('Nao consegui alterar o destaque.');
+      console.warn('[Supabase] Erro ao destacar produto.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast(highlighted ? 'Produto destacado.' : 'Destaque removido.');
+  }
+
+  async function quickAdminProductOffer(id) {
+    const client = ordersClient();
+    const product = adminProductsCache.find(item => item.id === id);
+    if (!client || !id || !product) return;
+    if (!productExtendedColumnsReady) {
+      showToast('Execute o SQL de kits/ofertas para usar ofertas com tempo.');
+      return;
+    }
+
+    const price = Number(product.preco || 0);
+    const promo = Math.max(0, Number((price * 0.9).toFixed(2)));
+    const { error } = await client.from('produtos').update({
+      destaque: true,
+      oferta_ativa: true,
+      preco_promocional: promo,
+      oferta_inicio: new Date().toISOString(),
+      oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    }).eq('id', id);
+
+    if (error) {
+      showToast('Nao consegui criar a oferta rapida.');
+      console.warn('[Supabase] Erro ao criar oferta rapida.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast('Oferta de 24h criada.');
+  }
+
+  function duplicateAdminProduct(id) {
+    const product = adminProductsCache.find(item => item.id === id);
+    if (!product) return;
+
+    fillAdminProductForm({
+      ...product,
+      id: '',
+      nome: `${product.nome || 'Produto'} copia`,
+      oferta_ativa: false,
+      preco_promocional: null,
+      oferta_inicio: null,
+      oferta_fim: null
+    });
+    setText('#admin-product-form-title', productType(product) === 'kit' ? 'Duplicar kit' : 'Duplicar produto');
+    showToast('Produto duplicado no formulario. Revise e salve.');
+  }
+
+  async function endAdminProductOffer(id) {
+    const client = ordersClient();
+    if (!client || !id) return;
+    if (!productExtendedColumnsReady) {
+      showToast('Execute o SQL de kits/ofertas para alterar ofertas.');
+      return;
+    }
+
+    const { error } = await client.from('produtos').update({
+      oferta_ativa: false,
+      preco_promocional: null,
+      oferta_fim: new Date().toISOString()
+    }).eq('id', id);
+
+    if (error) {
+      showToast('Nao consegui encerrar a oferta.');
+      console.warn('[Supabase] Erro ao encerrar oferta.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast('Oferta encerrada.');
   }
 
   async function saveAdminProductPrice(id) {
@@ -4216,17 +4579,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = qs('#admin-products-list');
     if (!list) return;
     list.innerHTML = '';
+    const visibleProducts = filteredAdminProducts(products);
 
     if (!products.length) {
       list.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum produto cadastrado.</p>');
       return;
     }
 
-    products.forEach(product => {
+    if (!visibleProducts.length) {
+      list.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum produto encontrado neste filtro.</p>');
+      return;
+    }
+
+    visibleProducts.forEach(product => {
       const card = document.createElement('article');
       card.className = 'admin-product-card';
       const active = product.ativo !== false;
       const image = product.imagem ? assetHref(product.imagem) : '';
+      const type = productType(product);
+      const offer = productOfferActive(product);
+      const highlighted = adminProductHighlighted(product);
+      card.classList.toggle('is-offer', offer);
+      card.classList.toggle('is-kit', type === 'kit');
 
       card.innerHTML = `
         <div class="admin-product-media">
@@ -4236,9 +4610,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="admin-product-title">
             <strong>${escapeHTML(product.nome || '')}</strong>
             <span class="badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>
+            ${type === 'kit' ? '<span class="badge is-kit">Kit</span>' : ''}
+            ${offer ? '<span class="badge is-offer">Oferta</span>' : ''}
+            ${highlighted && !offer ? '<span class="badge is-highlight">Destaque</span>' : ''}
           </div>
           <p>${escapeHTML(product.categoria || 'Produtos')}</p>
           <small>${escapeHTML(product.descricao || 'Sem descricao')}</small>
+          ${product.kit_itens ? `<small><strong>Kit:</strong> ${escapeHTML(product.kit_itens)}</small>` : ''}
+          ${offer ? `<small><strong>${escapeHTML(offerCountdownText(product.oferta_fim))}</strong> - de ${formatMoney(product.preco)} por ${formatMoney(product.preco_promocional)}</small>` : ''}
           <div class="admin-price-row">
             <label for="product-price-${escapeHTML(product.id)}">Preco</label>
             <input id="product-price-${escapeHTML(product.id)}" type="number" min="0" step="0.01" value="${Number(product.preco || 0).toFixed(2)}" data-admin-product-price-input="${escapeHTML(product.id)}">
@@ -4252,6 +4631,24 @@ document.addEventListener('DOMContentLoaded', () => {
           <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
             <i class="fa-solid fa-pen"></i>
             Editar
+          </button>
+          <button class="btn btn-secondary" type="button" data-admin-product-highlight="${escapeHTML(product.id)}" data-product-highlighted="${highlighted ? 'true' : 'false'}">
+            <i class="fa-solid fa-star"></i>
+            ${highlighted ? 'Tirar destaque' : 'Destacar'}
+          </button>
+          <button class="btn btn-secondary" type="button" data-admin-product-quick-offer="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-bolt"></i>
+            Oferta 24h
+          </button>
+          ${offer ? `
+            <button class="btn btn-secondary" type="button" data-admin-product-end-offer="${escapeHTML(product.id)}">
+              <i class="fa-solid fa-hourglass-end"></i>
+              Encerrar oferta
+            </button>
+          ` : ''}
+          <button class="btn btn-secondary" type="button" data-admin-product-duplicate="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-copy"></i>
+            Duplicar
           </button>
           <button class="btn btn-secondary" type="button" data-admin-product-toggle="${escapeHTML(product.id)}" data-product-active="${active ? 'true' : 'false'}">
             <i class="fa-solid ${active ? 'fa-eye-slash' : 'fa-eye'}"></i>

@@ -25,10 +25,44 @@ create table if not exists public.produtos (
   imagem text not null default '',
   categoria text not null default 'Produtos',
   descricao text not null default '',
+  tipo text not null default 'produto',
+  destaque boolean not null default false,
+  oferta_ativa boolean not null default false,
+  preco_promocional numeric(10, 2),
+  oferta_inicio timestamptz,
+  oferta_fim timestamptz,
+  kit_itens text not null default '',
   ativo boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.produtos
+  add column if not exists tipo text not null default 'produto',
+  add column if not exists destaque boolean not null default false,
+  add column if not exists oferta_ativa boolean not null default false,
+  add column if not exists preco_promocional numeric(10, 2),
+  add column if not exists oferta_inicio timestamptz,
+  add column if not exists oferta_fim timestamptz,
+  add column if not exists kit_itens text not null default '';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'produtos_tipo_check'
+  ) then
+    alter table public.produtos
+      add constraint produtos_tipo_check check (tipo in ('produto', 'kit'));
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'produtos_preco_promocional_check'
+  ) then
+    alter table public.produtos
+      add constraint produtos_preco_promocional_check check (preco_promocional is null or preco_promocional >= 0);
+  end if;
+end;
+$$;
 
 create table if not exists public.enderecos (
   id uuid primary key default gen_random_uuid(),

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260520-7';
+const CACHE_VERSION = 'monte-sinai-20260520-8';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -8,8 +8,8 @@ const STATIC_ASSETS = [
   '/produtos',
   '/sobre',
   '/contato',
-  '/css/style.css?v=20260520-43',
-  '/js/script.js?v=20260520-36',
+  '/css/style.css?v=20260520-44',
+  '/js/script.js?v=20260520-37',
   '/js/supabase.js?v=20260520-3',
   '/site.webmanifest',
   '/assets/brand/monte-sinai-logo-3d.png',
