@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     'gas-de-cozinha-p13': ['Supergas', 'Ultragas'],
     'desinfetante-2l': ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive']
   };
+  const ORDER_STATUS_OPTIONS = ['Pedido enviado', 'Em preparo', 'Saiu para entrega', 'Entregue', 'Cancelado'];
+  const PRODUCT_IMAGE_BUCKET = 'produtos';
+  const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -114,6 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUser = loadJSON(STORAGE.user, null);
   if (currentUser?.provider !== 'Supabase Auth') currentUser = null;
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
+  let remoteOrdersCache = [];
+  let remoteOrdersLoaded = false;
+  let adminProductsCache = [];
+  let adminProfileCache = null;
   let activePayment = 'delivery';
   let activeSearchProduct = null;
   let productSearchResults = [];
@@ -146,6 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initOwnerDashboard();
   bindSubtleAnimations();
   loadProductsFromSupabase();
+  optimizeImageLoading();
+  registerServiceWorker();
 
   function qs(selector, scope = document) {
     return scope.querySelector(selector);
@@ -285,6 +294,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function formatDateTime(value) {
+    if (!value) return 'Sem data';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Sem data';
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
   function escapeHTML(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -292,6 +314,11 @@ document.addEventListener('DOMContentLoaded', () => {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
+  }
+
+  function escapeSelectorValue(value) {
+    if (window.CSS?.escape) return CSS.escape(String(value ?? ''));
+    return String(value ?? '').replace(/["\\]/g, '\\$&');
   }
 
   function normalizeText(value) {
@@ -534,6 +561,96 @@ document.addEventListener('DOMContentLoaded', () => {
     return candidates.find(client => client && typeof client.from === 'function') || null;
   }
 
+  function ordersClient() {
+    return supabaseProductClient();
+  }
+
+  async function currentAuthUser() {
+    const client = authClient();
+    if (!client?.auth) return null;
+    const { data, error } = await client.auth.getUser();
+    if (error) throw error;
+    return data?.user || null;
+  }
+
+  async function upsertProfileRecord(user = null, source = currentUser || {}) {
+    const client = ordersClient();
+    const authUser = user || await currentAuthUser();
+    if (!client || !authUser?.id) return null;
+
+    const profile = {
+      id: authUser.id,
+      email: authUser.email || source.email || '',
+      nome: source.name || '',
+      apelido: source.nick || '',
+      telefone: source.phone || '',
+      endereco: source.address || '',
+      foto: source.photo || ''
+    };
+
+    const columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
+    const { data: existing, error: lookupError } = await client
+      .from('profiles')
+      .select(columns)
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+    if (existing?.is_admin) return existing;
+
+    const query = existing
+      ? client.from('profiles').update(profile).eq('id', authUser.id)
+      : client.from('profiles').insert(profile);
+
+    const { data, error } = await query.select(columns).single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function upsertCheckoutAddress(userId, customer) {
+    const client = ordersClient();
+    if (!client || !userId || !customer?.address) return;
+
+    const { error } = await client
+      .from('enderecos')
+      .insert({
+        user_id: userId,
+        nome: customer.name,
+        telefone: customer.phone,
+        endereco: customer.address,
+        observacao: customer.note || '',
+        principal: true
+      });
+
+    if (error) console.warn('[Supabase] Nao foi possivel salvar endereco do pedido.', error);
+  }
+
+  async function currentAdminProfile({ force = false } = {}) {
+    if (adminProfileCache && !force) return adminProfileCache;
+
+    const client = ordersClient();
+    if (!client) return null;
+
+    await authReady.catch(() => null);
+    const authUser = await currentAuthUser().catch(() => null);
+    if (!authUser?.id) return null;
+
+    const { data, error } = await client
+      .from('profiles')
+      .select('id, email, nome, is_admin')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    adminProfileCache = data || await upsertProfileRecord(authUser, userFromAuthUser(authUser));
+    return adminProfileCache;
+  }
+
+  async function isCurrentUserAdmin() {
+    const profile = await currentAdminProfile({ force: true });
+    return Boolean(profile?.is_admin);
+  }
+
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
     if (!client) {
@@ -549,10 +666,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       for (const tableName of tableNames) {
         console.log(`[Supabase] Buscando produtos na tabela "${tableName}"...`);
-        const { data, error } = await client
+        let query = client
           .from(tableName)
-          .select('nome, preco, imagem, categoria, descricao')
+          .select(tableName === 'produtos' ? 'nome, preco, imagem, categoria, descricao, ativo' : 'nome, preco, imagem, categoria, descricao')
           .order('nome', { ascending: true });
+
+        if (tableName === 'produtos') query = query.eq('ativo', true);
+
+        const { data, error } = await query;
 
         if (!error) {
           products = Array.isArray(data) ? data : [];
@@ -580,6 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSupabaseProducts() {
     renderDynamicCatalog();
     renderDynamicProductRail();
+    optimizeImageLoading();
     applyCatalogFilters();
     renderSmartSearchResults(qs('[data-smart-search-input]')?.value || '');
   }
@@ -1084,11 +1206,19 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="product-search-more">
           <span>Outras sugestões</span>
           <div>
-            ${productSearchResults.map((result, index) => `
-              <button class="${normalizeText(result.name) === normalizeText(activeSearchProduct.name) ? 'active' : ''}" type="button" data-product-result-index="${index}">
-                ${escapeHTML(result.name)}
-              </button>
-            `).join('')}
+            ${productSearchResults.map((result, index) => {
+              const resultImage = assetHref(productAssetPath(result));
+              return `
+                <button class="${normalizeText(result.name) === normalizeText(activeSearchProduct.name) ? 'active' : ''}" type="button" data-product-result-index="${index}">
+                  <span class="product-search-more-thumb">
+                    ${resultImage
+                      ? `<img src="${escapeHTML(resultImage)}" alt="" loading="lazy" decoding="async">`
+                      : `<i class="fa-solid ${smartProductIcon(result)}" aria-hidden="true"></i>`}
+                  </span>
+                  <span>${escapeHTML(result.name)}</span>
+                </button>
+              `;
+            }).join('')}
           </div>
         </div>
       `
@@ -1096,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     content.innerHTML = `
       <div class="product-search-media">
-        ${image ? `<img src="${assetHref(image)}" alt="${escapeHTML(activeSearchProduct.name)}">` : `<i class="fa-solid ${smartProductIcon(activeSearchProduct)}"></i>`}
+        ${image ? `<img src="${assetHref(image)}" alt="${escapeHTML(activeSearchProduct.name)}" loading="lazy" decoding="async">` : `<i class="fa-solid ${smartProductIcon(activeSearchProduct)}"></i>`}
       </div>
       <div class="product-search-info">
         <span class="eyebrow">Produto encontrado</span>
@@ -1431,7 +1561,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function accountAvatarHTML(signed) {
     if (!signed) return '<i class="fa-solid fa-user" aria-hidden="true"></i>';
-    if (currentUser?.photo) return `<img src="${escapeHTML(currentUser.photo)}" alt="">`;
+    if (currentUser?.photo) return `<img src="${escapeHTML(currentUser.photo)}" alt="" loading="lazy" decoding="async">`;
     const initial = (currentUser?.name || currentUser?.email || 'U').trim().charAt(0).toUpperCase() || 'U';
     return `<span>${escapeHTML(initial)}</span>`;
   }
@@ -1636,12 +1766,15 @@ document.addEventListener('DOMContentLoaded', () => {
     matches.forEach(product => {
       const item = document.createElement('button');
       const image = productAssetPath(product);
+      const imageSrc = assetHref(image);
       item.className = 'search-suggestion-item';
       item.type = 'button';
       item.setAttribute('role', 'option');
       item.innerHTML = `
         <span class="search-suggestion-media">
-          <img src="${escapeHTML(image)}" alt="${escapeHTML(product.name)}" loading="lazy">
+          ${imageSrc
+            ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
+            : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`}
         </span>
         <span>
           <strong>${escapeHTML(product.name)}</strong>
@@ -1851,18 +1984,23 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       ${matches.length ? `
         <div class="smart-search-result-grid">
-          ${matches.map(product => `
-            <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(product.name)}">
-              <span class="smart-search-product-icon">
-                <img src="${escapeHTML(productAssetPath(product))}" alt="${escapeHTML(product.name)}" loading="lazy">
-              </span>
-              <span class="smart-search-product-copy">
-                <strong>${escapeHTML(product.name)}</strong>
-                <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>
-              </span>
-              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-            </button>
-          `).join('')}
+          ${matches.map(product => {
+            const imageSrc = assetHref(productAssetPath(product));
+            return `
+              <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(product.name)}">
+                <span class="smart-search-product-icon">
+                  ${imageSrc
+                    ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
+                    : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`}
+                </span>
+                <span class="smart-search-product-copy">
+                  <strong>${escapeHTML(product.name)}</strong>
+                  <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>
+                </span>
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </button>
+            `;
+          }).join('')}
         </div>
       ` : `
         <div class="smart-search-empty">
@@ -1907,7 +2045,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
         <div class="product-media">
           ${image
-            ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}">`
+            ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
             : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
@@ -2393,7 +2531,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearOrderHistory(showMessage = true) {
     if (showMessage && !confirm('Deseja limpar o histórico de pedidos deste navegador?')) return;
     saveJSON(STORAGE.orders, []);
-    renderOrdersEverywhere();
+    renderOrdersEverywhere({ force: true });
     if (showMessage) showToast('Histórico de pedidos limpo.');
   }
 
@@ -2482,7 +2620,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.innerHTML = `
         <div class="cart-item-left">
           <span class="cart-thumb">
-            ${item.image ? `<img class="cart-thumb-img" src="${assetHref(item.image)}" alt="">` : '<i class="fa-solid fa-box"></i>'}
+            ${item.image ? `<img class="cart-thumb-img" src="${assetHref(item.image)}" alt="" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
           </span>
           <span>
             <span class="cart-item-name">${escapeHTML(item.name)}</span>
@@ -2678,6 +2816,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           if (data.session?.user) {
             const user = userFromAuthUser(data.session.user);
+            await upsertProfileRecord(data.session.user, user);
             saveUser(user);
             finishLogin(user, 'Conta criada com sucesso.');
           } else {
@@ -2691,6 +2830,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) throw error;
         const user = userFromAuthUser(data.session?.user);
         if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
+        await upsertProfileRecord(data.session.user, user);
         saveUser(user);
         finishLogin(user, profileComplete(user) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.');
       } catch (error) {
@@ -2887,9 +3027,26 @@ document.addEventListener('DOMContentLoaded', () => {
     return customer;
   }
 
-  function finalizeOrder() {
+  async function finalizeOrder() {
     if (!cart.length) {
       showToast('Seu carrinho está vazio.');
+      return;
+    }
+
+    await authReady.catch(() => null);
+    const client = ordersClient();
+    let authUser = null;
+    try {
+      authUser = await currentAuthUser();
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel conferir usuario autenticado.', error);
+    }
+
+    if (!client || !authUser?.id) {
+      showToast('Entre ou cadastre-se para salvar o pedido com seguranca.');
+      setTimeout(() => {
+        window.location.href = loginHref({ redirect: 'pagamento.html' });
+      }, 600);
       return;
     }
 
@@ -2911,7 +3068,24 @@ document.addEventListener('DOMContentLoaded', () => {
       status: 'Pedido enviado'
     };
 
-    saveOrder(order);
+    const confirm = qs('#payment-confirm');
+    if (confirm) {
+      confirm.disabled = true;
+      confirm.classList.add('is-loading');
+    }
+
+    try {
+      await saveOrder(order, authUser);
+    } catch (error) {
+      console.error('[Supabase] Erro ao salvar pedido:', error);
+      showToast('Nao consegui salvar o pedido no Supabase. Tente novamente.');
+      if (confirm) {
+        confirm.disabled = false;
+        confirm.classList.remove('is-loading');
+      }
+      return;
+    }
+
     openWhatsAppOrder(order);
     cart = [];
     saveCart();
@@ -2935,7 +3109,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
 
-    renderOrdersEverywhere();
+    renderOrdersEverywhere({ force: true });
     showToast('Pedido finalizado.');
   }
 
@@ -2945,10 +3119,82 @@ document.addEventListener('DOMContentLoaded', () => {
     return `MS-${date}-${random}`;
   }
 
-  function saveOrder(order) {
+  async function saveOrder(order, authUser) {
+    const client = ordersClient();
+    if (!client) throw new Error('Cliente Supabase indisponivel.');
+
+    await upsertProfileRecord(authUser, {
+      ...currentUser,
+      name: order.customer.name,
+      phone: order.customer.phone,
+      address: order.customer.address
+    });
+
+    const { data: savedOrder, error: orderError } = await client
+      .from('pedidos')
+      .insert({
+        codigo: order.id,
+        user_id: authUser.id,
+        cliente_nome: order.customer.name,
+        cliente_email: order.customer.email || authUser.email || '',
+        cliente_telefone: order.customer.phone,
+        endereco_entrega: order.customer.address,
+        observacao: order.customer.note || '',
+        pagamento: order.payment,
+        status: order.status,
+        subtotal: order.subtotal,
+        entrega: order.delivery,
+        total: order.total,
+        brinde: order.gift,
+        whatsapp_enviado: true
+      })
+      .select('id')
+      .single();
+
+    if (orderError) throw orderError;
+
+    const rows = order.items.map(item => ({
+      pedido_id: savedOrder.id,
+      nome: item.name,
+      variacao: item.variant || '',
+      quantidade: Number(item.quantity || 1),
+      preco_unitario: Number(item.price || 0),
+      total: Number(item.price || 0) * Number(item.quantity || 1),
+      imagem: item.image || ''
+    }));
+
+    const { error: itemsError } = await client.from('pedido_itens').insert(rows);
+    if (itemsError) throw itemsError;
+
+    await upsertCheckoutAddress(authUser.id, order.customer);
+
     const orders = loadJSON(STORAGE.orders, []);
     orders.unshift(order);
-    saveJSON(STORAGE.orders, orders.slice(0, 100));
+    saveJSON(STORAGE.orders, orders.slice(0, 20));
+  }
+
+  function optimizeImageLoading() {
+    qsa('img').forEach((img, index) => {
+      const priority = img.classList.contains('brand-logo')
+        || img.classList.contains('hero-3d-product')
+        || img.classList.contains('hero-visual')
+        || index < 4;
+
+      if (!img.hasAttribute('decoding')) img.setAttribute('decoding', 'async');
+      if (!img.hasAttribute('loading')) img.setAttribute('loading', priority ? 'eager' : 'lazy');
+      if (priority && !img.hasAttribute('fetchpriority')) img.setAttribute('fetchpriority', 'high');
+    });
+  }
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    if (!/^https?:$/.test(window.location.protocol)) return;
+
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(error => {
+        console.warn('[PWA] Nao foi possivel registrar o service worker.', error);
+      });
+    });
   }
 
   function buildOrderMessage(order) {
@@ -3114,7 +3360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ? (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase()
         : 'V';
       if (signed && currentUser.photo) {
-        avatar.innerHTML = `<img src="${escapeHTML(currentUser.photo)}" alt="">`;
+        avatar.innerHTML = `<img src="${escapeHTML(currentUser.photo)}" alt="" loading="lazy" decoding="async">`;
       }
     }
 
@@ -3156,10 +3402,18 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => window.location.href = profileHref(), 500);
       });
 
+      document.body.addEventListener('click', async event => {
+        const button = event.target.closest('[data-order-whatsapp]');
+        if (!button) return;
+        const orders = await loadOrdersFromSupabase();
+        const order = orders.find(item => item.id === button.dataset.orderWhatsapp);
+        if (order) openWhatsAppOrder(order);
+      });
+
       document.body.dataset.profilePageBound = 'true';
     }
 
-    renderOrdersEverywhere();
+    renderOrdersEverywhere({ force: true });
   }
 
 
@@ -3242,6 +3496,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const savedUser = userFromAuthUser(data.user);
         if (!savedUser?.email) throw new Error('Perfil não retornado pelo Supabase.');
+        await upsertProfileRecord(data.user, savedUser);
         saveUser(savedUser);
         showToast('Perfil atualizado com segurança.');
         setTimeout(() => window.location.href = profileHref(), 500);
@@ -3333,7 +3588,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderOrdersEverywhere();
   }
 
-  function initOwnerDashboard() {
+  function initOwnerDashboardLegacy() {
     const form = qs('#owner-config-form');
     const ordersList = qs('#orders-list');
     if (!form && !ordersList) return;
@@ -3372,8 +3627,8 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(permission === 'granted' ? 'Notificações ativadas.' : 'Notificações não autorizadas.');
     });
 
-    qs('#export-orders')?.addEventListener('click', () => {
-      const orders = loadJSON(STORAGE.orders, []);
+    qs('#export-orders')?.addEventListener('click', async () => {
+      const orders = await loadOrdersFromSupabase({ force: true });
       const blob = new Blob([JSON.stringify(orders, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -3384,24 +3639,590 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     qs('#clear-orders')?.addEventListener('click', () => {
-      if (!confirm('Deseja limpar os pedidos salvos neste navegador?')) return;
+      if (!confirm('Deseja limpar apenas o cache local deste navegador? Os pedidos do Supabase continuam salvos.')) return;
       saveJSON(STORAGE.orders, []);
-      renderOrdersEverywhere();
+      renderOrdersEverywhere({ force: true });
       showToast('Pedidos removidos.');
     });
 
-    document.body.addEventListener('click', event => {
+    document.body.addEventListener('click', async event => {
       const button = event.target.closest('[data-order-whatsapp]');
       if (!button) return;
-      const order = loadJSON(STORAGE.orders, []).find(item => item.id === button.dataset.orderWhatsapp);
+      const orders = await loadOrdersFromSupabase();
+      const order = orders.find(item => item.id === button.dataset.orderWhatsapp);
       if (order) openWhatsAppOrder(order);
     });
 
     renderOrdersEverywhere();
   }
 
-  function renderOrdersEverywhere() {
-    const orders = loadJSON(STORAGE.orders, []);
+  async function initOwnerDashboard() {
+    const dashboard = qs('#admin-dashboard');
+    const form = qs('#owner-config-form');
+    const ordersList = qs('#orders-list');
+    const productsList = qs('#admin-products-list');
+    if (!dashboard && !form && !ordersList && !productsList) return;
+
+    const canAccess = await protectAdminDashboard();
+    if (!canAccess) return;
+
+    populateOwnerConfigForm();
+    bindAdminDashboardActions();
+    await Promise.all([
+      renderOrdersEverywhere({ force: true }),
+      refreshAdminProducts()
+    ]);
+  }
+
+  async function protectAdminDashboard() {
+    const access = qs('#admin-access-state');
+    const content = qs('[data-admin-content]');
+
+    const showGate = (title, message, icon = 'lock', showLogin = false) => {
+      content?.classList.add('hidden');
+      if (!access) return;
+      access.classList.remove('hidden');
+      access.innerHTML = `
+        <h2><i class="fa-solid fa-${icon}"></i> ${escapeHTML(title)}</h2>
+        <p>${escapeHTML(message)}</p>
+        <div class="settings-actions">
+          <a class="btn btn-primary ${showLogin ? '' : 'hidden'}" href="${loginHref({ redirect: 'painel.html' })}" data-admin-login>
+            <i class="fa-solid fa-right-to-bracket"></i>
+            Entrar como administrador
+          </a>
+          <a class="btn btn-secondary" href="${productHref()}">
+            <i class="fa-solid fa-basket-shopping"></i>
+            Voltar para a loja
+          </a>
+        </div>
+      `;
+    };
+
+    try {
+      await authReady.catch(() => null);
+      const authUser = await currentAuthUser().catch(() => null);
+      if (!authUser?.id) {
+        showGate('Acesso restrito', 'Entre com uma conta marcada como administradora para abrir o painel.', 'right-to-bracket', true);
+        return false;
+      }
+
+      const admin = await isCurrentUserAdmin();
+      if (!admin) {
+        showGate('Acesso negado', 'Sua conta existe, mas ainda nao esta marcada como administradora no Supabase.', 'shield-halved', false);
+        return false;
+      }
+
+      access?.classList.add('hidden');
+      content?.classList.remove('hidden');
+      return true;
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel validar admin.', error);
+      showGate('Painel indisponivel', 'Nao foi possivel validar suas permissoes agora. Tente entrar novamente.', 'triangle-exclamation', true);
+      return false;
+    }
+  }
+
+  function populateOwnerConfigForm() {
+    const fields = {
+      whatsapp: qs('#owner-whatsapp'),
+      pixKey: qs('#owner-pix-key'),
+      merchantName: qs('#owner-merchant-name'),
+      merchantCity: qs('#owner-merchant-city')
+    };
+
+    if (fields.whatsapp) fields.whatsapp.value = ownerConfig.whatsapp || '';
+    if (fields.pixKey) fields.pixKey.value = ownerConfig.pixKey || '';
+    if (fields.merchantName) fields.merchantName.value = ownerConfig.merchantName || DEFAULT_OWNER.merchantName;
+    if (fields.merchantCity) fields.merchantCity.value = ownerConfig.merchantCity || DEFAULT_OWNER.merchantCity;
+  }
+
+  function bindAdminDashboardActions() {
+    const dashboard = qs('#admin-dashboard');
+    if (dashboard?.dataset.adminBound === 'true') return;
+
+    qs('#owner-config-form')?.addEventListener('submit', event => {
+      event.preventDefault();
+      ownerConfig = {
+        whatsapp: qs('#owner-whatsapp')?.value.trim() || DEFAULT_OWNER.whatsapp,
+        pixKey: qs('#owner-pix-key')?.value.trim() || '',
+        merchantName: qs('#owner-merchant-name')?.value.trim() || DEFAULT_OWNER.merchantName,
+        merchantCity: qs('#owner-merchant-city')?.value.trim() || DEFAULT_OWNER.merchantCity,
+        savedAt: new Date().toISOString()
+      };
+      saveJSON(STORAGE.owner, ownerConfig);
+      showToast('Configuracao salva.');
+    });
+
+    qs('#request-notification')?.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        showToast('Este navegador nao suporta notificacoes.');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      showToast(permission === 'granted' ? 'Notificacoes ativadas.' : 'Notificacoes nao autorizadas.');
+    });
+
+    qs('#refresh-orders')?.addEventListener('click', () => renderOrdersEverywhere({ force: true }));
+    qs('#refresh-products')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
+
+    qs('#export-orders')?.addEventListener('click', async () => {
+      const orders = await loadOrdersFromSupabase({ force: true });
+      const blob = new Blob([JSON.stringify(orders, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pedidos-monte-sinai-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    qs('#admin-product-form')?.addEventListener('submit', saveAdminProduct);
+    qs('#admin-product-upload')?.addEventListener('click', uploadSelectedAdminProductImage);
+    qs('#cancel-product-edit')?.addEventListener('click', resetAdminProductForm);
+
+    document.body.addEventListener('click', handleAdminPanelClick);
+    document.body.addEventListener('change', handleAdminPanelChange);
+
+    if (dashboard) dashboard.dataset.adminBound = 'true';
+  }
+
+  async function handleAdminPanelClick(event) {
+    const whatsapp = event.target.closest('[data-order-whatsapp]');
+    if (whatsapp) {
+      const orders = await loadOrdersFromSupabase();
+      const order = orders.find(item => item.id === whatsapp.dataset.orderWhatsapp);
+      if (order) openWhatsAppOrder(order);
+      return;
+    }
+
+    const edit = event.target.closest('[data-admin-product-edit]');
+    if (edit) {
+      const product = adminProductsCache.find(item => item.id === edit.dataset.adminProductEdit);
+      if (product) fillAdminProductForm(product);
+      return;
+    }
+
+    const toggle = event.target.closest('[data-admin-product-toggle]');
+    if (toggle) {
+      await toggleAdminProduct(toggle.dataset.adminProductToggle, toggle.dataset.productActive !== 'true');
+      return;
+    }
+
+    const remove = event.target.closest('[data-admin-product-delete]');
+    if (remove) {
+      await deleteAdminProduct(remove.dataset.adminProductDelete);
+      return;
+    }
+
+    const price = event.target.closest('[data-admin-product-price-save]');
+    if (price) {
+      await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+    }
+  }
+
+  async function handleAdminPanelChange(event) {
+    const status = event.target.closest('[data-order-status]');
+    if (!status) return;
+    await updateOrderStatus(status.dataset.orderStatus, status.value);
+  }
+
+  async function updateOrderStatus(orderId, status) {
+    if (!orderId || !ORDER_STATUS_OPTIONS.includes(status)) return;
+    const client = ordersClient();
+    if (!client) return;
+
+    const { error } = await client
+      .from('pedidos')
+      .update({ status })
+      .eq('id', orderId);
+
+    if (error) {
+      showToast('Nao consegui atualizar o status.');
+      console.warn('[Supabase] Erro ao atualizar status do pedido.', error);
+      return;
+    }
+
+    remoteOrdersLoaded = false;
+    await renderOrdersEverywhere({ force: true });
+    showToast('Status do pedido atualizado.');
+  }
+
+  async function loadAdminProducts({ force = false } = {}) {
+    const client = ordersClient();
+    if (!client) return [];
+    if (adminProductsCache.length && !force) return adminProductsCache;
+
+    const { data, error } = await client
+      .from('produtos')
+      .select('id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at')
+      .order('nome', { ascending: true });
+
+    if (error) throw error;
+    adminProductsCache = data || [];
+    return adminProductsCache;
+  }
+
+  async function refreshAdminProducts({ force = true } = {}) {
+    try {
+      const products = await loadAdminProducts({ force });
+      renderAdminProducts(products);
+      setText('#dash-products-count', String(products.filter(product => product.ativo).length));
+      setProductIndex(products.filter(product => product.ativo));
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel carregar produtos administrativos.', error);
+      qs('#admin-products-list')?.replaceChildren();
+      qs('#admin-products-list')?.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nao foi possivel carregar os produtos.</p>');
+    }
+  }
+
+  function adminProductPayload() {
+    const nome = qs('#admin-product-name')?.value.trim() || '';
+    const preco = parsePrice(qs('#admin-product-price')?.value || 0);
+    const categoria = qs('#admin-product-category')?.value.trim() || '';
+
+    if (!nome || !categoria || preco < 0) {
+      showToast('Preencha nome, categoria e preco valido.');
+      return null;
+    }
+
+    return {
+      nome,
+      preco,
+      categoria,
+      imagem: qs('#admin-product-image')?.value.trim() || '',
+      descricao: qs('#admin-product-description')?.value.trim() || '',
+      ativo: qs('#admin-product-active')?.value !== 'false'
+    };
+  }
+
+  function productImageUploadStatus(message = '') {
+    const status = qs('#admin-product-upload-status');
+    if (status) status.textContent = message;
+  }
+
+  function storageSafeFileName(value) {
+    return normalizeText(value || 'produto')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 70) || 'produto';
+  }
+
+  function imageFileExtension(file) {
+    const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(fromName)) return fromName === 'jpeg' ? 'jpg' : fromName;
+    if (file?.type === 'image/jpeg') return 'jpg';
+    if (file?.type === 'image/png') return 'png';
+    if (file?.type === 'image/webp') return 'webp';
+    if (file?.type === 'image/svg+xml') return 'svg';
+    return 'png';
+  }
+
+  function imageContentType(file, extension) {
+    if (file?.type) return file.type;
+    if (extension === 'svg') return 'image/svg+xml';
+    if (extension === 'jpg') return 'image/jpeg';
+    return `image/${extension}`;
+  }
+
+  function selectedAdminProductImageFile() {
+    return qs('#admin-product-file')?.files?.[0] || null;
+  }
+
+  async function uploadSelectedAdminProductImage() {
+    const file = selectedAdminProductImageFile();
+    if (!file) {
+      showToast('Escolha uma imagem primeiro.');
+      return '';
+    }
+
+    if (!file.type?.startsWith('image/')) {
+      showToast('Escolha um arquivo de imagem.');
+      return '';
+    }
+
+    if (file.size > PRODUCT_IMAGE_MAX_SIZE) {
+      showToast('Use uma imagem de ate 5 MB.');
+      return '';
+    }
+
+    const client = ordersClient();
+    if (!client?.storage) {
+      showToast('Storage do Supabase indisponivel.');
+      return '';
+    }
+
+    const uploadButton = qs('#admin-product-upload');
+    const baseName = qs('#admin-product-name')?.value.trim() || file.name;
+    const extension = imageFileExtension(file);
+    const path = `${storageSafeFileName(baseName)}/${Date.now()}-${storageSafeFileName(file.name)}.${extension}`;
+
+    try {
+      if (uploadButton) {
+        uploadButton.disabled = true;
+        uploadButton.classList.add('is-loading');
+      }
+      productImageUploadStatus('Enviando imagem...');
+
+      const { error } = await client.storage
+        .from(PRODUCT_IMAGE_BUCKET)
+        .upload(path, file, {
+          cacheControl: '3600',
+          contentType: imageContentType(file, extension),
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data } = client.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+      const publicUrl = data?.publicUrl || '';
+      if (!publicUrl) throw new Error('URL publica nao retornada pelo Supabase.');
+
+      const imageInput = qs('#admin-product-image');
+      if (imageInput) imageInput.value = publicUrl;
+      const fileInput = qs('#admin-product-file');
+      if (fileInput) fileInput.value = '';
+      productImageUploadStatus('Imagem enviada.');
+      showToast('Imagem enviada para o Supabase Storage.');
+      return publicUrl;
+    } catch (error) {
+      console.warn('[Supabase Storage] Erro ao enviar imagem.', error);
+      productImageUploadStatus('Falha no upload.');
+      showToast('Nao consegui enviar a imagem.');
+      return '';
+    } finally {
+      if (uploadButton) {
+        uploadButton.disabled = false;
+        uploadButton.classList.remove('is-loading');
+      }
+    }
+  }
+
+  async function ensureAdminProductImageUploaded() {
+    const file = selectedAdminProductImageFile();
+    const imageInput = qs('#admin-product-image');
+    if (!file) return imageInput?.value.trim() || '';
+    return uploadSelectedAdminProductImage();
+  }
+
+  async function saveAdminProduct(event) {
+    event.preventDefault();
+    const uploadedUrl = await ensureAdminProductImageUploaded();
+    if (selectedAdminProductImageFile() && !uploadedUrl) return;
+
+    const payload = adminProductPayload();
+    if (!payload) return;
+
+    const id = qs('#admin-product-id')?.value || '';
+    const client = ordersClient();
+    if (!client) return;
+
+    const request = id
+      ? client.from('produtos').update(payload).eq('id', id)
+      : client.from('produtos').insert(payload);
+
+    const { error } = await request;
+    if (error) {
+      showToast('Nao consegui salvar o produto.');
+      console.warn('[Supabase] Erro ao salvar produto.', error);
+      return;
+    }
+
+    resetAdminProductForm();
+    await refreshAdminProducts({ force: true });
+    showToast(id ? 'Produto atualizado.' : 'Produto criado.');
+  }
+
+  function fillAdminProductForm(product) {
+    const id = qs('#admin-product-id');
+    const name = qs('#admin-product-name');
+    const price = qs('#admin-product-price');
+    const category = qs('#admin-product-category');
+    const image = qs('#admin-product-image');
+    const file = qs('#admin-product-file');
+    const description = qs('#admin-product-description');
+    const active = qs('#admin-product-active');
+
+    if (id) id.value = product.id || '';
+    if (name) name.value = product.nome || '';
+    if (price) price.value = Number(product.preco || 0).toFixed(2);
+    if (category) category.value = product.categoria || '';
+    if (image) image.value = product.imagem || '';
+    if (file) file.value = '';
+    productImageUploadStatus('');
+    if (description) description.value = product.descricao || '';
+    if (active) active.value = product.ativo ? 'true' : 'false';
+    qs('#cancel-product-edit')?.classList.remove('hidden');
+    qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function resetAdminProductForm() {
+    qs('#admin-product-form')?.reset();
+    const id = qs('#admin-product-id');
+    const active = qs('#admin-product-active');
+    const file = qs('#admin-product-file');
+    if (id) id.value = '';
+    if (active) active.value = 'true';
+    if (file) file.value = '';
+    productImageUploadStatus('');
+    qs('#cancel-product-edit')?.classList.add('hidden');
+  }
+
+  async function toggleAdminProduct(id, active) {
+    const client = ordersClient();
+    if (!client || !id) return;
+
+    const { error } = await client.from('produtos').update({ ativo: active }).eq('id', id);
+    if (error) {
+      showToast('Nao consegui alterar o status do produto.');
+      console.warn('[Supabase] Erro ao ativar/desativar produto.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast(active ? 'Produto ativado.' : 'Produto desativado.');
+  }
+
+  async function saveAdminProductPrice(id) {
+    const input = qs(`[data-admin-product-price-input="${escapeSelectorValue(id)}"]`);
+    const preco = parsePrice(input?.value || 0);
+    const client = ordersClient();
+    if (!client || !id || preco < 0) return;
+
+    const { error } = await client.from('produtos').update({ preco }).eq('id', id);
+    if (error) {
+      showToast('Nao consegui atualizar o preco.');
+      console.warn('[Supabase] Erro ao atualizar preco.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast('Preco atualizado.');
+  }
+
+  async function deleteAdminProduct(id) {
+    if (!id || !confirm('Deseja excluir este produto do Supabase?')) return;
+    const client = ordersClient();
+    if (!client) return;
+
+    const { error } = await client.from('produtos').delete().eq('id', id);
+    if (error) {
+      showToast('Nao consegui excluir o produto.');
+      console.warn('[Supabase] Erro ao excluir produto.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast('Produto excluido.');
+  }
+
+  function renderAdminProducts(products) {
+    const list = qs('#admin-products-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!products.length) {
+      list.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum produto cadastrado.</p>');
+      return;
+    }
+
+    products.forEach(product => {
+      const card = document.createElement('article');
+      card.className = 'admin-product-card';
+      const active = product.ativo !== false;
+      const image = product.imagem ? assetHref(product.imagem) : '';
+
+      card.innerHTML = `
+        <div class="admin-product-media">
+          ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
+        </div>
+        <div class="admin-product-info">
+          <div class="admin-product-title">
+            <strong>${escapeHTML(product.nome || '')}</strong>
+            <span class="badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>
+          </div>
+          <p>${escapeHTML(product.categoria || 'Produtos')}</p>
+          <small>${escapeHTML(product.descricao || 'Sem descricao')}</small>
+          <div class="admin-price-row">
+            <label for="product-price-${escapeHTML(product.id)}">Preco</label>
+            <input id="product-price-${escapeHTML(product.id)}" type="number" min="0" step="0.01" value="${Number(product.preco || 0).toFixed(2)}" data-admin-product-price-input="${escapeHTML(product.id)}">
+            <button class="btn btn-secondary" type="button" data-admin-product-price-save="${escapeHTML(product.id)}">
+              <i class="fa-solid fa-check"></i>
+              Salvar preco
+            </button>
+          </div>
+        </div>
+        <div class="admin-product-actions">
+          <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-pen"></i>
+            Editar
+          </button>
+          <button class="btn btn-secondary" type="button" data-admin-product-toggle="${escapeHTML(product.id)}" data-product-active="${active ? 'true' : 'false'}">
+            <i class="fa-solid ${active ? 'fa-eye-slash' : 'fa-eye'}"></i>
+            ${active ? 'Desativar' : 'Ativar'}
+          </button>
+          <button class="btn btn-secondary admin-danger" type="button" data-admin-product-delete="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-trash"></i>
+            Excluir
+          </button>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function mapSupabaseOrder(row) {
+    return {
+      id: row.codigo || row.id,
+      uuid: row.id,
+      createdAt: row.created_at,
+      customer: {
+        name: row.cliente_nome || '',
+        email: row.cliente_email || '',
+        phone: row.cliente_telefone || '',
+        address: row.endereco_entrega || '',
+        note: row.observacao || ''
+      },
+      items: (row.pedido_itens || []).map(item => ({
+        id: item.id,
+        name: item.nome,
+        variant: item.variacao || '',
+        quantity: item.quantidade,
+        price: item.preco_unitario,
+        image: item.imagem || ''
+      })),
+      subtotal: Number(row.subtotal || 0),
+      delivery: Number(row.entrega || 0),
+      total: Number(row.total || 0),
+      gift: Boolean(row.brinde),
+      payment: row.pagamento || '',
+      status: row.status || 'Pedido enviado'
+    };
+  }
+
+  async function loadOrdersFromSupabase({ force = false } = {}) {
+    const client = ordersClient();
+    if (!client) return loadJSON(STORAGE.orders, []);
+    if (remoteOrdersLoaded && !force) return remoteOrdersCache;
+
+    try {
+      await authReady.catch(() => null);
+      const { data, error } = await client
+        .from('pedidos')
+        .select('id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, subtotal, entrega, total, brinde, pedido_itens(id, nome, variacao, quantidade, preco_unitario, total, imagem)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      remoteOrdersCache = (data || []).map(mapSupabaseOrder);
+      remoteOrdersLoaded = true;
+      return remoteOrdersCache;
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel carregar pedidos. Usando cache local.', error);
+      return loadJSON(STORAGE.orders, []);
+    }
+  }
+
+  async function renderOrdersEverywhere(options = {}) {
+    const orders = await loadOrdersFromSupabase(options);
     const customerOrders = currentUser?.email
       ? orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone)
       : [];
@@ -3421,6 +4242,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderOrders(container, orders) {
     if (!container) return;
     const isProfileHistory = container.id === 'profile-orders';
+    const isAdminOrders = container.id === 'orders-list';
     container.innerHTML = '';
 
     if (isProfileHistory) {
@@ -3470,16 +4292,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('article');
       card.className = 'order-card';
       const items = (order.items || []).map(item => `<li>${escapeHTML(item.quantity)} x ${escapeHTML(item.name)}</li>`).join('');
+      const statusOptions = ORDER_STATUS_OPTIONS
+        .map(status => `<option value="${escapeHTML(status)}" ${status === order.status ? 'selected' : ''}>${escapeHTML(status)}</option>`)
+        .join('');
+      const statusControl = isAdminOrders && order.uuid
+        ? `<label class="admin-order-status">Status<select data-order-status="${escapeHTML(order.uuid)}">${statusOptions}</select></label>`
+        : `<span class="badge">${escapeHTML(order.status || 'Pedido enviado')}</span>`;
+
       card.innerHTML = `
         <header>
           <strong>${escapeHTML(order.id)}</strong>
-          <span class="badge">${escapeHTML(order.status || 'Pedido enviado')}</span>
+          ${statusControl}
         </header>
         <p>${escapeHTML(order.customer?.name || '')} - ${escapeHTML(order.customer?.phone || '')}</p>
+        ${isAdminOrders ? `<p>${escapeHTML(order.customer?.email || 'Cliente sem email')}</p>` : ''}
         <p>${escapeHTML(order.customer?.address || '')}</p>
         <ul>${items}</ul>
         <footer>
-          <strong>${formatMoney(order.total || 0)}</strong>
+          <div>
+            <strong>${formatMoney(order.total || 0)}</strong>
+            <small>${escapeHTML(formatDateTime(order.createdAt))}</small>
+          </div>
           <button class="btn btn-secondary" type="button" data-order-whatsapp="${escapeHTML(order.id)}">
             <i class="fa-brands fa-whatsapp"></i>
             Abrir WhatsApp

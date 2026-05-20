@@ -3,32 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp.">
+  <meta name="description" content="Painel administrativo Monte Sinai para gerenciar pedidos e produtos com Supabase.">
   <meta name="theme-color" content="#00061f">
   <meta name="color-scheme" content="dark light">
+  <meta name="robots" content="noindex, nofollow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Painel do Lojista | Monte Sinai">
-  <meta property="og:description" content="Acompanhe pedidos e configure dados comerciais da Monte Sinai.">
-  <meta property="og:image" content="../assets/hero/hero-banner.png">
-  <title>Painel do Lojista | Monte Sinai</title>
+  <meta property="og:title" content="Painel Administrativo | Monte Sinai">
+  <meta property="og:description" content="Gerencie pedidos, status e produtos da Monte Sinai.">
+  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/hero-banner.png">
+  <title>Painel Administrativo | Monte Sinai</title>
   <link rel="manifest" href="../site.webmanifest">
   <link rel="icon" type="image/png" href="../assets/brand/monte-sinai-logo-3d.png">
   <link rel="apple-touch-icon" href="../assets/brand/monte-sinai-logo-3d.png">
-  <link rel="stylesheet" href="../css/style.css?v=20260520-38">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-41">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-3"></script>
-  <script defer src="../js/script.js?v=20260520-30"></script>
+  <script defer src="../js/script.js?v=20260520-33"></script>
 </head>
 <body>
   <header class="navbar">
     <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai">
+      <a class="brand" href="../index.html" aria-label="Monte Sinai - inicio">
+        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
       </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
+      <nav class="nav-menu" aria-label="Navegacao principal">
+        <a href="../index.html">Inicio</a>
         <a href="produtos.html">Produtos</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
@@ -40,108 +44,190 @@
   </header>
 
   <div class="mobile-menu">
-    <a href="../index.html">Início</a>
+    <a href="../index.html">Inicio</a>
     <a href="produtos.html">Produtos</a>
     <a href="sobre.html">Sobre</a>
     <a href="contato.html">Contato</a>
   </div>
 
-  <main class="dashboard-page container">
+  <main class="dashboard-page container" id="admin-dashboard">
     <section class="hero hero-small">
       <div class="hero-copy">
-        <span class="eyebrow">Área do lojista</span>
-        <h1>Controle pedidos, Pix e atendimento</h1>
-        <p>Este painel organiza os pedidos criados neste navegador e deixa prontos os dados necessários para a integração real com pagamentos e notificações.</p>
+        <span class="eyebrow">Area administrativa</span>
+        <h1>Controle pedidos, produtos e atendimento</h1>
+        <p>Painel conectado ao Supabase para acompanhar pedidos, atualizar status e manter o catalogo da Monte Sinai.</p>
       </div>
     </section>
 
-    <section class="dashboard-grid">
-      <article class="stat-card dashboard-stat">
-        <span>Pedidos locais</span>
-        <h3 id="dash-orders-count">0</h3>
-      </article>
-      <article class="stat-card dashboard-stat">
-        <span>Total em pedidos</span>
-        <h3 id="dash-orders-total">R$ 0,00</h3>
-      </article>
-      <article class="stat-card dashboard-stat">
-        <span>Último pedido</span>
-        <h3 id="dash-last-order">Nenhum</h3>
-      </article>
+    <section class="settings-section admin-access-card" id="admin-access-state">
+      <h2><i class="fa-solid fa-lock"></i> Verificando acesso</h2>
+      <p>Conferindo sua conta no Supabase antes de carregar os dados administrativos.</p>
+      <div class="settings-actions">
+        <a class="btn btn-primary hidden" href="login.html?redirect=painel.html" data-admin-login>
+          <i class="fa-solid fa-right-to-bracket"></i>
+          Entrar como administrador
+        </a>
+        <a class="btn btn-secondary" href="produtos.html">
+          <i class="fa-solid fa-basket-shopping"></i>
+          Voltar para a loja
+        </a>
+      </div>
     </section>
 
-    <section class="dashboard-layout">
-      <article class="settings-section owner-settings">
-        <h2><i class="fa-solid fa-sliders"></i> Configuração do negócio</h2>
-        <p>Preencha os dados que o checkout usa para Pix, WhatsApp e identificação da loja.</p>
-        <form class="checkout-form" id="owner-config-form">
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="owner-whatsapp">WhatsApp de pedidos</label>
-              <input id="owner-whatsapp" type="tel" placeholder="5511960928234">
+    <div class="admin-content hidden" data-admin-content>
+      <section class="dashboard-grid">
+        <article class="stat-card dashboard-stat">
+          <span>Pedidos no Supabase</span>
+          <h3 id="dash-orders-count">0</h3>
+        </article>
+        <article class="stat-card dashboard-stat">
+          <span>Total em pedidos</span>
+          <h3 id="dash-orders-total">R$ 0,00</h3>
+        </article>
+        <article class="stat-card dashboard-stat">
+          <span>Produtos ativos</span>
+          <h3 id="dash-products-count">0</h3>
+        </article>
+      </section>
+
+      <section class="dashboard-layout">
+        <article class="settings-section owner-settings">
+          <h2><i class="fa-solid fa-sliders"></i> Configuracao do negocio</h2>
+          <p>Preencha os dados que o checkout usa para Pix, WhatsApp e identificacao da loja.</p>
+          <form class="checkout-form" id="owner-config-form">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="owner-whatsapp">WhatsApp de pedidos</label>
+                <input id="owner-whatsapp" type="tel" placeholder="5511960928234">
+              </div>
+              <div class="form-group">
+                <label for="owner-pix-key">Chave Pix</label>
+                <input id="owner-pix-key" type="text" placeholder="CPF, CNPJ, email, telefone ou chave aleatoria">
+              </div>
             </div>
-            <div class="form-group">
-              <label for="owner-pix-key">Chave Pix</label>
-              <input id="owner-pix-key" type="text" placeholder="CPF, CNPJ, email, telefone ou chave aleatória">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="owner-merchant-name">Nome no Pix</label>
+                <input id="owner-merchant-name" type="text" maxlength="25" placeholder="MONTE SINAI">
+              </div>
+              <div class="form-group">
+                <label for="owner-merchant-city">Cidade no Pix</label>
+                <input id="owner-merchant-city" type="text" maxlength="15" placeholder="SAO PAULO">
+              </div>
+            </div>
+            <div class="settings-actions">
+              <button class="btn btn-primary" type="submit">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Salvar configuracao
+              </button>
+              <button class="btn btn-secondary" type="button" id="request-notification">
+                <i class="fa-solid fa-bell"></i>
+                Ativar notificacoes
+              </button>
+            </div>
+          </form>
+        </article>
+
+        <article class="settings-section owner-orders">
+          <div class="admin-section-head">
+            <div>
+              <h2><i class="fa-solid fa-clipboard-list"></i> Pedidos recebidos</h2>
+              <p>Atualize o andamento do pedido e abra a mensagem do WhatsApp quando precisar.</p>
+            </div>
+            <div class="orders-toolbar">
+              <button class="btn btn-secondary" type="button" id="refresh-orders">
+                <i class="fa-solid fa-rotate"></i>
+                Atualizar
+              </button>
+              <button class="btn btn-secondary" type="button" id="export-orders">
+                <i class="fa-solid fa-file-export"></i>
+                Exportar
+              </button>
             </div>
           </div>
-          <div class="form-grid-2">
+          <div class="orders-list" id="orders-list"></div>
+        </article>
+      </section>
+
+      <section class="settings-section admin-products-section">
+        <div class="admin-section-head">
+          <div>
+            <h2><i class="fa-solid fa-boxes-stacked"></i> Produtos</h2>
+            <p>Crie, edite preco, ative ou desative itens do catalogo conectado ao Supabase.</p>
+          </div>
+          <button class="btn btn-secondary" type="button" id="refresh-products">
+            <i class="fa-solid fa-rotate"></i>
+            Atualizar produtos
+          </button>
+        </div>
+
+        <form class="checkout-form admin-product-form" id="admin-product-form">
+          <input type="hidden" id="admin-product-id">
+          <div class="form-grid-3">
             <div class="form-group">
-              <label for="owner-merchant-name">Nome no Pix</label>
-              <input id="owner-merchant-name" type="text" maxlength="25" placeholder="MONTE SINAI">
+              <label for="admin-product-name">Nome do produto</label>
+              <input id="admin-product-name" type="text" placeholder="Agua mineral 20L" required>
             </div>
             <div class="form-group">
-              <label for="owner-merchant-city">Cidade no Pix</label>
-              <input id="owner-merchant-city" type="text" maxlength="15" placeholder="SAO PAULO">
+              <label for="admin-product-price">Preco</label>
+              <input id="admin-product-price" type="number" min="0" step="0.01" placeholder="15,00" required>
             </div>
+            <div class="form-group">
+              <label for="admin-product-category">Categoria</label>
+              <input id="admin-product-category" type="text" placeholder="Agua, Gas, Limpeza" required>
+            </div>
+          </div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label for="admin-product-image">URL da imagem</label>
+              <input id="admin-product-image" type="text" placeholder="https://.../storage/v1/object/public/produtos/...">
+            </div>
+            <div class="form-group admin-upload-group">
+              <label for="admin-product-file">Upload da imagem</label>
+              <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+              <button class="btn btn-secondary" type="button" id="admin-product-upload">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                Enviar imagem
+              </button>
+              <small id="admin-product-upload-status"></small>
+            </div>
+            <div class="form-group">
+              <label for="admin-product-active">Status</label>
+              <select id="admin-product-active">
+                <option value="true">Produto ativo</option>
+                <option value="false">Produto desativado</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="admin-product-description">Descricao</label>
+            <textarea id="admin-product-description" rows="3" placeholder="Descricao curta exibida no catalogo"></textarea>
           </div>
           <div class="settings-actions">
             <button class="btn btn-primary" type="submit">
               <i class="fa-solid fa-floppy-disk"></i>
-              Salvar configuração
+              Salvar produto
             </button>
-            <button class="btn btn-secondary" type="button" id="request-notification">
-              <i class="fa-solid fa-bell"></i>
-              Ativar notificações
+            <button class="btn btn-secondary hidden" type="button" id="cancel-product-edit">
+              <i class="fa-solid fa-xmark"></i>
+              Cancelar edicao
             </button>
           </div>
         </form>
-      </article>
 
-      <article class="settings-section owner-orders">
-        <h2><i class="fa-solid fa-clipboard-list"></i> Pedidos recebidos</h2>
-        <div class="orders-toolbar">
-          <button class="btn btn-secondary" type="button" id="export-orders">
-            <i class="fa-solid fa-file-export"></i>
-            Exportar lista
-          </button>
-          <button class="btn btn-secondary" type="button" id="clear-orders">
-            <i class="fa-solid fa-trash"></i>
-            Limpar pedidos locais
-          </button>
-        </div>
-        <div class="orders-list" id="orders-list"></div>
-      </article>
-    </section>
-
-    <section class="settings-section launch-checklist">
-      <h2><i class="fa-solid fa-rocket"></i> Para vender online de verdade</h2>
-      <div class="settings-card-list">
-        <div class="feature-item"><i class="fa-solid fa-check"></i><span>Conta em um gateway de pagamento para Pix dinâmico, cartão e confirmação automática.</span></div>
-        <div class="feature-item"><i class="fa-solid fa-check"></i><span>Login real com provedor seguro usando Firebase, Auth0, Supabase ou backend próprio.</span></div>
-        <div class="feature-item"><i class="fa-solid fa-check"></i><span>Servidor para guardar pedidos, enviar notificações ao lojista e proteger dados de clientes.</span></div>
-      </div>
-    </section>
+        <div class="admin-products-list" id="admin-products-list"></div>
+      </section>
+    </div>
   </main>
 
   <footer class="footer">
     <div class="container footer-inner">
       <div>
         <h3>Monte Sinai</h3>
-        <p>Painel local para preparar a operação digital.</p>
+        <p>Painel administrativo conectado ao Supabase.</p>
       </div>
       <div class="footer-links">
-        <a href="../index.html">Início</a>
+        <a href="../index.html">Inicio</a>
         <a href="produtos.html">Produtos</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
@@ -152,7 +238,7 @@
         <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
       </div>
     </div>
-    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
+    <p class="footer-copy">&copy; 2026 Monte Sinai. Todos os direitos reservados.</p>
   </footer>
 </body>
 </html>
