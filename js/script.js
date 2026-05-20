@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let productSearchResults = [];
   let activeSearchSuggestionContext = null;
   let searchSuggestionFrame = 0;
+  let activePinnedSearch = null;
 
   applySavedTheme();
   upgradeProductImages();
@@ -1502,26 +1503,35 @@ document.addEventListener('DOMContentLoaded', () => {
       input?.setAttribute('spellcheck', 'false');
 
       input?.addEventListener('input', () => {
+        pinSearchForm(form, suggestions);
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
         scheduleSearchSuggestionsPosition(form, suggestions);
       });
       input?.addEventListener('focus', () => {
+        pinSearchForm(form, suggestions);
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
         scheduleSearchSuggestionsPosition(form, suggestions);
+      });
+      input?.addEventListener('blur', () => {
+        releaseSearchFormAfterBlur(form, suggestions);
       });
 
       form.addEventListener('submit', event => {
         event.preventDefault();
         const term = input?.value.trim() || '';
         hideSearchSuggestions(suggestions);
+        unpinSearchForm(form);
         openSearchProductFromQuery(term);
       });
     });
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') qsa('.search-suggestions').forEach(hideSearchSuggestions);
+      if (event.key === 'Escape') {
+        qsa('.search-suggestions').forEach(hideSearchSuggestions);
+        unpinActiveSearchForm();
+      }
     });
 
     qsa('[data-mobile-search]').forEach(button => {
@@ -1591,6 +1601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = qs('[data-site-search-input]', form);
         if (input) input.value = product.name;
         hideSearchSuggestions(suggestions);
+        unpinSearchForm(form);
         openProductSearchModal(product, matches, product.name);
       });
       suggestions.appendChild(item);
@@ -1603,6 +1614,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideSearchSuggestions(suggestions) {
     suggestions?.classList.remove('show');
     clearSearchSuggestionsPosition(suggestions);
+    if (activePinnedSearch?.suggestions === suggestions && !activePinnedSearch.form.contains(document.activeElement)) {
+      unpinActiveSearchForm();
+    }
   }
 
   function closeOtherSearchSuggestions(activeSuggestions) {
@@ -1622,6 +1636,47 @@ document.addEventListener('DOMContentLoaded', () => {
       suggestions.style.removeProperty(prop);
     });
     if (activeSearchSuggestionContext?.suggestions === suggestions) activeSearchSuggestionContext = null;
+  }
+
+  function pinSearchForm(form, suggestions) {
+    if (!isMobileSearchViewport() || !form) return;
+    if (activePinnedSearch?.form === form) {
+      scheduleSearchSuggestionsPosition(form, suggestions);
+      return;
+    }
+
+    unpinActiveSearchForm();
+    const rect = form.getBoundingClientRect();
+    const placeholder = document.createElement('div');
+    placeholder.className = 'search-pin-placeholder';
+    placeholder.style.setProperty('--search-pin-placeholder-height', `${Math.max(58, Math.round(rect.height))}px`);
+    form.insertAdjacentElement('afterend', placeholder);
+    form.classList.add('search-is-pinned');
+    document.body.classList.add('search-pin-active');
+    activePinnedSearch = { form, suggestions, placeholder };
+    scheduleSearchSuggestionsPosition(form, suggestions);
+  }
+
+  function unpinSearchForm(form) {
+    if (!activePinnedSearch || activePinnedSearch.form !== form) return;
+    unpinActiveSearchForm();
+  }
+
+  function unpinActiveSearchForm() {
+    if (!activePinnedSearch) return;
+    activePinnedSearch.form.classList.remove('search-is-pinned');
+    activePinnedSearch.placeholder?.remove();
+    activePinnedSearch = null;
+    document.body.classList.remove('search-pin-active');
+  }
+
+  function releaseSearchFormAfterBlur(form, suggestions) {
+    window.setTimeout(() => {
+      const focusedInside = form.contains(document.activeElement);
+      if (focusedInside) return;
+      hideSearchSuggestions(suggestions);
+      unpinSearchForm(form);
+    }, 180);
   }
 
   function scheduleSearchSuggestionsPosition(form, suggestions) {
@@ -1667,6 +1722,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const context = activeSearchSuggestionContext;
       if (context?.form && context?.suggestions) scheduleSearchSuggestionsPosition(context.form, context.suggestions);
     };
+
+    document.addEventListener('pointerdown', event => {
+      const pinned = activePinnedSearch;
+      if (!pinned) return;
+      if (pinned.form.contains(event.target)) return;
+      hideSearchSuggestions(pinned.suggestions);
+      unpinActiveSearchForm();
+    }, { passive: true });
 
     window.addEventListener('resize', refresh, { passive: true });
     window.addEventListener('scroll', refresh, { passive: true });
