@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let productSearchResults = [];
   let activeSearchSuggestionContext = null;
   let searchSuggestionFrame = 0;
-  let activePinnedSearch = null;
 
   applySavedTheme();
   upgradeProductImages();
@@ -1503,13 +1502,11 @@ document.addEventListener('DOMContentLoaded', () => {
       input?.setAttribute('spellcheck', 'false');
 
       input?.addEventListener('input', () => {
-        pinSearchForm(form, suggestions);
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
         scheduleSearchSuggestionsPosition(form, suggestions);
       });
       input?.addEventListener('focus', () => {
-        pinSearchForm(form, suggestions);
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
         scheduleSearchSuggestionsPosition(form, suggestions);
@@ -1522,7 +1519,6 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const term = input?.value.trim() || '';
         hideSearchSuggestions(suggestions);
-        unpinSearchForm(form);
         openSearchProductFromQuery(term);
       });
     });
@@ -1530,7 +1526,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
         qsa('.search-suggestions').forEach(hideSearchSuggestions);
-        unpinActiveSearchForm();
       }
     });
 
@@ -1601,7 +1596,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = qs('[data-site-search-input]', form);
         if (input) input.value = product.name;
         hideSearchSuggestions(suggestions);
-        unpinSearchForm(form);
         openProductSearchModal(product, matches, product.name);
       });
       suggestions.appendChild(item);
@@ -1614,9 +1608,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideSearchSuggestions(suggestions) {
     suggestions?.classList.remove('show');
     clearSearchSuggestionsPosition(suggestions);
-    if (activePinnedSearch?.suggestions === suggestions && !activePinnedSearch.form.contains(document.activeElement)) {
-      unpinActiveSearchForm();
-    }
   }
 
   function closeOtherSearchSuggestions(activeSuggestions) {
@@ -1638,44 +1629,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeSearchSuggestionContext?.suggestions === suggestions) activeSearchSuggestionContext = null;
   }
 
-  function pinSearchForm(form, suggestions) {
-    if (!isMobileSearchViewport() || !form) return;
-    if (activePinnedSearch?.form === form) {
-      scheduleSearchSuggestionsPosition(form, suggestions);
-      return;
-    }
-
-    unpinActiveSearchForm();
-    const rect = form.getBoundingClientRect();
-    const placeholder = document.createElement('div');
-    placeholder.className = 'search-pin-placeholder';
-    placeholder.style.setProperty('--search-pin-placeholder-height', `${Math.max(58, Math.round(rect.height))}px`);
-    form.insertAdjacentElement('afterend', placeholder);
-    form.classList.add('search-is-pinned');
-    document.body.classList.add('search-pin-active');
-    activePinnedSearch = { form, suggestions, placeholder };
-    scheduleSearchSuggestionsPosition(form, suggestions);
-  }
-
-  function unpinSearchForm(form) {
-    if (!activePinnedSearch || activePinnedSearch.form !== form) return;
-    unpinActiveSearchForm();
-  }
-
-  function unpinActiveSearchForm() {
-    if (!activePinnedSearch) return;
-    activePinnedSearch.form.classList.remove('search-is-pinned');
-    activePinnedSearch.placeholder?.remove();
-    activePinnedSearch = null;
-    document.body.classList.remove('search-pin-active');
-  }
-
   function releaseSearchFormAfterBlur(form, suggestions) {
     window.setTimeout(() => {
       const focusedInside = form.contains(document.activeElement);
       if (focusedInside) return;
       hideSearchSuggestions(suggestions);
-      unpinSearchForm(form);
     }, 180);
   }
 
@@ -1696,22 +1654,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const rect = form.getBoundingClientRect();
-    const viewport = window.visualViewport;
-    const viewportHeight = viewport?.height || window.innerHeight;
-    const safeGap = 12;
-    const dock = qs('.mobile-quick-dock');
-    const dockReserve = dock ? 104 : 18;
-    const left = Math.max(safeGap, Math.min(rect.left, window.innerWidth - 180));
-    const width = Math.max(220, Math.min(rect.width, window.innerWidth - left - safeGap));
-    const top = Math.max(safeGap, Math.min(rect.bottom + 8, viewportHeight - 156));
-    const maxHeight = Math.max(140, viewportHeight - top - dockReserve);
-
-    suggestions.style.setProperty('--suggestions-top', `${Math.round(top)}px`);
-    suggestions.style.setProperty('--suggestions-left', `${Math.round(left)}px`);
-    suggestions.style.setProperty('--suggestions-width', `${Math.round(width)}px`);
-    suggestions.style.setProperty('--suggestions-max-height', `${Math.round(maxHeight)}px`);
-    suggestions.classList.add('is-mobile-fixed');
+    clearSearchSuggestionsPosition(suggestions);
   }
 
   function bindSearchSuggestionViewportTracking() {
@@ -1722,14 +1665,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const context = activeSearchSuggestionContext;
       if (context?.form && context?.suggestions) scheduleSearchSuggestionsPosition(context.form, context.suggestions);
     };
-
-    document.addEventListener('pointerdown', event => {
-      const pinned = activePinnedSearch;
-      if (!pinned) return;
-      if (pinned.form.contains(event.target)) return;
-      hideSearchSuggestions(pinned.suggestions);
-      unpinActiveSearchForm();
-    }, { passive: true });
 
     window.addEventListener('resize', refresh, { passive: true });
     window.addEventListener('scroll', refresh, { passive: true });
