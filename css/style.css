@@ -10382,18 +10382,74 @@ body.light-mode {
 }
 
 @media (max-width: 900px) {
+  html,
   body {
+    width: 100% !important;
+    max-width: 100% !important;
     overflow-x: hidden !important;
+  }
+
+  main,
+  section,
+  .container,
+  .hero-home,
+  .hero-home-grid,
+  .hero-home-content,
+  .payment-page,
+  .checkout-layout,
+  .checkout-main-panel,
+  .checkout-order-panel,
+  .checkout-account-card,
+  .payment-method-card,
+  .hero-search,
+  .catalog-search-form,
+  .nav-search {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .container,
+  .payment-page,
+  .hero-home-grid {
+    width: min(100%, calc(100vw - 16px)) !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+  }
+
+  .hero-home h1,
+  .hero-home p,
+  .payment-page h1,
+  .payment-page p {
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .hero-home-grid,
+  .checkout-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .hero-3d-showcase {
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .hero-search,
+  .catalog-search-form,
+  .nav-search {
+    width: 100% !important;
   }
 
   .mobile-quick-dock {
     --dock-cart-size: clamp(56px, 15.6vw, 62px);
     --dock-center-gap: calc((var(--dock-cart-size) / 2) + 11px);
-    right: max(8px, env(safe-area-inset-right)) !important;
+    right: auto !important;
     left: max(8px, env(safe-area-inset-left)) !important;
-    width: auto !important;
+    width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
     min-width: 0 !important;
-    max-width: none !important;
+    max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
     height: calc(76px + env(safe-area-inset-bottom)) !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--dock-cart-size) minmax(0, 1fr) minmax(0, 1fr) !important;
