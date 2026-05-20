@@ -288,15 +288,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      console.log('[Supabase] Buscando produtos na tabela "produto"...');
-      const { data, error } = await client
-        .from('produto')
-        .select('nome, preco, imagem, categoria, descricao')
-        .order('nome', { ascending: true });
+      const tableNames = ['produtos', 'produto'];
+      let products = [];
+      let loadedTable = '';
+      let lastError = null;
 
-      if (error) throw error;
-      const products = Array.isArray(data) ? data : [];
-      console.log(`[Supabase] ${products.length} produto(s) carregado(s).`, products);
+      for (const tableName of tableNames) {
+        console.log(`[Supabase] Buscando produtos na tabela "${tableName}"...`);
+        const { data, error } = await client
+          .from(tableName)
+          .select('nome, preco, imagem, categoria, descricao')
+          .order('nome', { ascending: true });
+
+        if (!error) {
+          products = Array.isArray(data) ? data : [];
+          loadedTable = tableName;
+          break;
+        }
+
+        lastError = error;
+        if (error.code !== 'PGRST205') throw error;
+        console.warn(`[Supabase] Tabela "${tableName}" não encontrada. Tentando próxima opção...`);
+      }
+
+      if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
+      console.log(`[Supabase] ${products.length} produto(s) carregado(s) da tabela "${loadedTable}".`, products);
       setProductIndex(products);
       renderSupabaseProducts();
     } catch (error) {
