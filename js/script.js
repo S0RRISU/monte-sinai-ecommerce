@@ -1083,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function smartSearchMatches(query) {
-    return searchSuggestionProducts(query, query.trim() ? 5 : 6);
+    return searchSuggestionProducts(query, String(query ?? '').trim() ? 5 : 6);
   }
 
   function smartProductIcon(product) {
@@ -1427,6 +1427,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderCart() {
+    const hasItems = cartCount() > 0;
+    document.body.classList.toggle('cart-has-items', hasItems);
+
     qsa('[data-cart-count], #cart-count').forEach(el => {
       el.textContent = String(cartCount());
     });
@@ -1439,7 +1442,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach(button => {
-      const hasItems = cartCount() > 0;
       button.classList.toggle('has-items', hasItems);
       button.classList.toggle('is-empty', !hasItems);
     });
