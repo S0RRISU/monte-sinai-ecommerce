@@ -23,6 +23,49 @@ document.addEventListener('DOMContentLoaded', () => {
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
   let productIndex = [];
+  const CATALOG_CATEGORY_ORDER = ['agua', 'gas', 'limpeza', 'lavanderia', 'higiene', 'banheiro', 'cozinha', 'utensilios', 'organizacao'];
+  const CATALOG_SECTION_META = {
+    recommended: {
+      eyebrow: 'Recomendados',
+      title: 'Água e gás mais pedidos'
+    },
+    agua: {
+      eyebrow: 'Água mineral',
+      title: 'Galões para abastecer sua casa'
+    },
+    gas: {
+      eyebrow: 'Gás de cozinha',
+      title: 'Botijões para sua cozinha'
+    },
+    limpeza: {
+      eyebrow: 'Líquidos e químicos',
+      title: 'Produtos de limpeza'
+    },
+    lavanderia: {
+      eyebrow: 'Cuidado das roupas',
+      title: 'Lavanderia'
+    },
+    higiene: {
+      eyebrow: 'Cuidado pessoal',
+      title: 'Higiene'
+    },
+    banheiro: {
+      eyebrow: 'Banheiro',
+      title: 'Itens para banheiro'
+    },
+    cozinha: {
+      eyebrow: 'Cozinha',
+      title: 'Louças, pia e fogão'
+    },
+    utensilios: {
+      eyebrow: 'Utensílios e acessórios',
+      title: 'Itens para limpeza e organização'
+    },
+    organizacao: {
+      eyebrow: 'Organização',
+      title: 'Apoio para o dia a dia'
+    }
+  };
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -202,6 +245,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeText(value || 'produtos');
     if (normalized.includes('utens')) return 'utensilios';
     return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function categoryOrderIndex(slug) {
+    const index = CATALOG_CATEGORY_ORDER.indexOf(slug);
+    return index === -1 ? CATALOG_CATEGORY_ORDER.length : index;
+  }
+
+  function orderedCategoryEntries(products = productIndex) {
+    const categories = new Map();
+
+    products.forEach(product => {
+      const slug = product.categorySlug || categorySlug(product.category);
+      if (!categories.has(slug)) categories.set(slug, product.category || 'Produtos');
+    });
+
+    return [...categories.entries()].sort(([slugA, labelA], [slugB, labelB]) => {
+      const orderA = categoryOrderIndex(slugA);
+      const orderB = categoryOrderIndex(slugB);
+      if (orderA !== orderB) return orderA - orderB;
+      return String(labelA).localeCompare(String(labelB), 'pt-BR');
+    });
+  }
+
+  function catalogSectionMeta(slug, label) {
+    return CATALOG_SECTION_META[slug] || {
+      eyebrow: label || 'Produtos',
+      title: label || 'Produtos disponíveis'
+    };
   }
 
   function productTerms(product) {
@@ -1601,16 +1672,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterBar = qs('.filter-chips');
     if (!filterBar || !productIndex.length) return;
 
-    const categories = [...new Map(productIndex.map(product => [
-      product.categorySlug || categorySlug(product.category),
-      product.category || 'Produtos'
-    ])).entries()];
+    const categories = orderedCategoryEntries();
 
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
       '<button class="filter-chip" type="button" data-filter="recommended">Recomendados</button>',
       ...categories.map(([slug, label]) => `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`)
     ].join('');
+  }
+
+  function catalogProductGroups() {
+    const recommended = productIndex.filter(product => isRecommendedProduct(product));
+    const recommendedNames = new Set(recommended.map(product => normalizeText(product.name)));
+    const remaining = productIndex.filter(product => !recommendedNames.has(normalizeText(product.name)));
+    const groups = [];
+
+    if (recommended.length) {
+      groups.push({
+        slug: 'recommended',
+        products: recommended,
+        ...CATALOG_SECTION_META.recommended
+      });
+    }
+
+    orderedCategoryEntries(remaining).forEach(([slug, label]) => {
+      const products = remaining.filter(product => (product.categorySlug || categorySlug(product.category)) === slug);
+      if (!products.length) return;
+
+      groups.push({
+        slug,
+        products,
+        ...catalogSectionMeta(slug, label)
+      });
+    });
+
+    return groups;
   }
 
   function renderDynamicCatalog() {
@@ -1632,27 +1728,33 @@ document.addEventListener('DOMContentLoaded', () => {
       catalog.appendChild(empty);
     }
 
-    const head = document.createElement('div');
-    head.className = 'section-head';
-    head.innerHTML = `
-      <span class="eyebrow">Catálogo atualizado</span>
-      <h2>Produtos cadastrados no Supabase</h2>
-    `;
+    catalogProductGroups().forEach(group => {
+      const head = document.createElement('div');
+      head.className = 'section-head';
+      head.dataset.catalogSection = group.slug;
+      head.innerHTML = `
+        <span class="eyebrow">${escapeHTML(group.eyebrow)}</span>
+        <h2>${escapeHTML(group.title)}</h2>
+      `;
 
-    const grid = document.createElement('div');
-    grid.className = 'grid-produtos';
-    grid.dataset.dynamicCatalog = '';
-    grid.innerHTML = productIndex.map(product => productCardHTML(product, 'catalog')).join('');
+      const grid = document.createElement('div');
+      grid.className = 'grid-produtos';
+      grid.dataset.dynamicCatalog = '';
+      grid.dataset.catalogSection = group.slug;
+      grid.innerHTML = group.products.map(product => productCardHTML(product, 'catalog')).join('');
 
-    catalog.insertBefore(head, empty);
-    catalog.insertBefore(grid, empty);
+      catalog.insertBefore(head, empty);
+      catalog.insertBefore(grid, empty);
+    });
   }
 
   function renderDynamicProductRail() {
     const rail = qs('[data-product-rail]');
     if (!rail || !productIndex.length) return;
 
-    const featured = productIndex.slice(0, 6);
+    const recommended = productIndex.filter(product => isRecommendedProduct(product));
+    const recommendedNames = new Set(recommended.map(product => normalizeText(product.name)));
+    const featured = [...recommended, ...productIndex.filter(product => !recommendedNames.has(normalizeText(product.name)))].slice(0, 6);
     rail.innerHTML = `
       ${featured.map(product => productCardHTML(product, 'rail')).join('')}
       <a class="more-card rail-product more-card-3d tilt-3d" href="${productHref()}" aria-label="Ver mais produtos">
