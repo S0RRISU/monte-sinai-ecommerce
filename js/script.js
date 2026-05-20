@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem(key, JSON.stringify(value));
       return true;
     } catch (_error) {
-      showToast('Nao foi possivel salvar. Tente remover a foto ou usar uma imagem menor.');
+      showToast('Não foi possível salvar. Tente remover a foto ou usar uma imagem menor.');
       return false;
     }
   }
@@ -1300,8 +1300,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <header class="smart-search-head">
           <div>
             <span class="eyebrow">Busca inteligente</span>
-            <h2>O que voce precisa hoje?</h2>
-            <p>Digite do seu jeito: banheiro, lavar roupa, tirar gordura, gas ou agua.</p>
+            <h2>O que você precisa hoje?</h2>
+            <p>Digite do seu jeito: banheiro, lavar roupa, tirar gordura, gás ou água.</p>
           </div>
           <button class="smart-search-close" type="button" data-close-search aria-label="Fechar busca">
             <i class="fa-solid fa-xmark"></i>
@@ -1310,7 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <form class="smart-search-form" data-smart-search-form role="search">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-          <input data-smart-search-input type="search" autocomplete="off" placeholder="Ex: limpar banheiro, lavar roupa, gas...">
+          <input data-smart-search-input type="search" autocomplete="off" placeholder="Ex: limpar banheiro, lavar roupa, gás...">
           <button type="submit">Buscar</button>
         </form>
 
@@ -1423,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="smart-search-empty">
           <i class="fa-solid fa-sparkles" aria-hidden="true"></i>
           <strong>Nenhum produto exato ainda</strong>
-          <span>Tente procurar por banheiro, roupa, cozinha, quintal, gas, agua ou cheiro bom.</span>
+          <span>Tente procurar por banheiro, roupa, cozinha, quintal, gás, água ou cheiro bom.</span>
         </div>
       `}
     `;
@@ -2412,7 +2412,7 @@ document.addEventListener('DOMContentLoaded', () => {
           preview.src = photo;
           preview.classList.remove('hidden');
         }
-      }).catch(() => showToast('Nao consegui carregar esta foto. Tente outra imagem.'));
+      }).catch(() => showToast('Não consegui carregar esta foto. Tente outra imagem.'));
     });
 
     qs('[data-cancel-edit]')?.addEventListener('click', () => {
@@ -2622,18 +2622,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isProfileHistory) {
       container.insertAdjacentHTML('beforeend', `
         <div class="section-head">
-          <span class="eyebrow">Historico de pedidos</span>
+          <span class="eyebrow">Histórico de pedidos</span>
           <h3>Pedidos salvos neste navegador</h3>
-          <p>Acompanhe os pedidos ja enviados e limpe o historico quando quiser.</p>
+          <p>Acompanhe os pedidos já enviados e limpe o histórico quando quiser.</p>
         </div>
         <div class="settings-actions profile-history-actions">
           <button class="btn btn-secondary" type="button" data-clear-order-history>
             <i class="fa-solid fa-clock-rotate-left"></i>
-            Limpar historico
+            Limpar histórico
           </button>
           <button class="btn btn-secondary" type="button" data-clear-cache-orders>
             <i class="fa-solid fa-broom"></i>
-            Limpar cache e historico
+            Limpar cache e histórico
           </button>
         </div>
       `);

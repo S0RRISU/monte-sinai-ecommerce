@@ -3902,12 +3902,21 @@ body.light-mode .nav-icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
     transition: none !important;
     animation: none !important;
+  }
+
+  .reveal-on-scroll {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
