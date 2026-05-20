@@ -18,6 +18,20 @@ Site estático para venda local de água, gás e produtos de limpeza.
 - Faça um pedido de teste com Pix, pagamento na entrega e WhatsApp.
 - O login atual é local do navegador. Para autenticação real com servidor, integre um provedor como Supabase, Firebase, Auth0 ou backend próprio.
 
+## Produtos pelo Supabase
+
+O catálogo pode carregar produtos da tabela `produto` no Supabase. Preencha `js/supabase.js` com a URL do projeto e a chave pública `anon`.
+
+Colunas esperadas:
+
+- `nome`
+- `preco`
+- `imagem`
+- `categoria`
+- `descricao`
+
+Quando o Supabase estiver configurado, a página de produtos e a vitrine da página inicial são montadas automaticamente com esses registros. Se a conexão falhar, o site mantém os cards locais como fallback.
+
 ## Assets 3D
 
 O projeto já inclui imagens 3D em `assets/hero`, `assets/brand` e `assets/produtos`. Para regerar banners e peças de divulgação locais, rode:

@@ -587,6 +587,11 @@ p {
   transition: transform 0.18s ease;
 }
 
+.product-media > i {
+  color: var(--accent);
+  font-size: 3rem;
+}
+
 .product-card:hover .product-image {
   transform: scale(1.035);
 }

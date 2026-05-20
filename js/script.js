@@ -22,40 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
-  const PRODUCT_INDEX = [
-    { name: 'Água mineral 20L', category: 'Água', price: 15, terms: 'agua mineral galao garrafao bebedouro cozinha casa reposicao entrega' },
-    { name: 'Gás de cozinha P13', category: 'Gás', price: 125, terms: 'gas botijao cozinha p13 supergas ultragas fogao entrega casa' },
-    { name: 'Álcool Perfumado 500ml', category: 'Limpeza', price: 5, terms: 'alcool higienizacao perfume cheiro limpeza banheiro cozinha superficie' },
-    { name: 'Amaciante 2L', category: 'Lavanderia', price: 10, terms: 'amaciante roupa roupas lavar lavanderia perfume macio' },
-    { name: 'Cândida 2L', category: 'Limpeza pesada', price: 5, terms: 'candida agua sanitaria cloro limpeza pesada banheiro piso quintal' },
-    { name: 'Cândida Colorida 2L', category: 'Lavanderia', price: 12, terms: 'candida colorida roupa roupas tecido lavar limpeza' },
-    { name: 'Cloro 1L', category: 'Limpeza pesada', price: 7.5, terms: 'cloro agua sanitaria banheiro piscina piso quintal higienizar' },
-    { name: 'Cloro 2L', category: 'Limpeza pesada', price: 12, terms: 'cloro agua sanitaria banheiro piscina piso quintal higienizar rendimento' },
-    { name: 'Detergente 2L', category: 'Cozinha', price: 10, terms: 'detergente louca pia cozinha prato copo gordura limpeza' },
-    { name: 'Desinfetante 2L', category: 'Limpeza', price: 5, terms: 'desinfetante banheiro piso cheiro perfume eucalipto pinho limpeza casa' },
-    { name: 'Limpa Alumínio 500ml', category: 'Limpeza', price: 5, terms: 'limpa aluminio panela brilho metal cozinha limpeza' },
-    { name: 'Limpa Pedra 2L', category: 'Limpeza pesada', price: 12, terms: 'limpa pedra quintal area externa piso pesado limpeza' },
-    { name: 'Limpa Pedra 500ml', category: 'Limpeza pesada', price: 5, terms: 'limpa pedra quintal area externa piso limpeza manutencao' },
-    { name: 'Sabão de Coco 2L', category: 'Lavanderia', price: 12, terms: 'sabao coco roupa roupas lavanderia lavar suave' },
-    { name: 'Sabão Omo 2L', category: 'Lavanderia', price: 22, terms: 'sabao omo roupa roupas lavanderia lavar liquido' },
-    { name: 'Sabonete Líquido 500ml', category: 'Higiene', price: 6, terms: 'sabonete liquido higiene maos banheiro pia lavar' },
-    { name: 'Escova de Roupa', category: 'Utensílios', price: 5, terms: 'escova roupa lavar esfregar lavanderia limpeza' },
-    { name: 'Escova de Vaso Sanitário', category: 'Banheiro', price: 8.5, terms: 'escova vaso sanitario banheiro privada limpeza' },
-    { name: 'Esponja de Aço', category: 'Cozinha', price: 4.9, terms: 'esponja aco panela bombril cozinha louca brilho' },
-    { name: 'Esponja de Louça', category: 'Cozinha', price: 2, terms: 'esponja louca pia cozinha prato copo limpeza' },
-    { name: 'Esponjão', category: 'Limpeza pesada', price: 9.9, terms: 'esponjao esponja pesada limpeza piso parede quintal' },
-    { name: 'Bombril', category: 'Cozinha', price: 3, terms: 'bombril esponja aco panela brilho cozinha' },
-    { name: 'Pá', category: 'Utensílios', price: 7.5, terms: 'pa lixo varrer vassoura limpeza casa' },
-    { name: 'Pasta de Brilho', category: 'Limpeza', price: 6, terms: 'pasta brilho panela aluminio fogao limpeza' },
-    { name: 'Pedra de Vaso', category: 'Banheiro', price: 2.5, terms: 'pedra vaso banheiro perfume sanitário privada' },
-    { name: 'Prendedor de Madeira', category: 'Lavanderia', price: 3.2, terms: 'prendedor madeira roupa varal lavanderia' },
-    { name: 'Prendedor Plástico', category: 'Lavanderia', price: 3.6, terms: 'prendedor plastico roupa varal lavanderia' },
-    { name: 'Rodo Grande', category: 'Utensílios', price: 9.9, terms: 'rodo grande piso puxar agua quintal limpeza' },
-    { name: 'Rodo Pequeno', category: 'Utensílios', price: 7.99, terms: 'rodo pequeno banheiro cozinha piso puxar agua' },
-    { name: 'Rodinho de Pia', category: 'Cozinha', price: 5, terms: 'rodinho pia cozinha agua limpeza seca' },
-    { name: 'Saco de Lixo', category: 'Organização', price: 6, terms: 'saco lixo descarte cozinha banheiro limpeza' },
-    { name: 'Vassoura', category: 'Utensílios', price: 12, terms: 'vassoura varrer casa quintal limpeza pa' }
-  ];
+  let productIndex = [];
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -106,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applySavedTheme();
   upgradeProductImages();
+  syncProductsFromRenderedCards();
   enhanceNavigation();
   bindMobileMenu();
   setActiveNavigation();
@@ -127,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsPage();
   initOwnerDashboard();
   bindSubtleAnimations();
+  loadProductsFromSupabase();
 
   function qs(selector, scope = document) {
     return scope.querySelector(selector);
@@ -216,6 +185,129 @@ document.addEventListener('DOMContentLoaded', () => {
     return normalizeText(value).split(/[^a-z0-9]+/).filter(token => token.length > 1);
   }
 
+  function parsePrice(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    const text = String(value ?? '').trim();
+    if (!text) return 0;
+
+    const clean = text.replace(/[^\d,.-]/g, '');
+    const normalized = clean.includes(',')
+      ? clean.replace(/\./g, '').replace(',', '.')
+      : clean;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function categorySlug(value) {
+    const normalized = normalizeText(value || 'produtos');
+    if (normalized.includes('utens')) return 'utensilios';
+    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function productTerms(product) {
+    return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.terms || ''}`;
+  }
+
+  function isRecommendedProduct(product) {
+    const blob = normalizeText(productTerms(product));
+    return Boolean(product?.recommended) || blob.includes('agua') || blob.includes('gas');
+  }
+
+  function normalizeProduct(raw = {}) {
+    const name = String(raw.nome ?? raw.name ?? '').trim();
+    const category = String(raw.categoria ?? raw.category ?? 'Produtos').trim() || 'Produtos';
+    const description = String(raw.descricao ?? raw.description ?? '').trim();
+    const price = parsePrice(raw.preco ?? raw.price);
+    const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name);
+
+    return {
+      name,
+      category,
+      categorySlug: categorySlug(category),
+      description,
+      price,
+      image,
+      recommended: Boolean(raw.recommended),
+      terms: `${name} ${category} ${description}`
+    };
+  }
+
+  function uniqueProductList(products) {
+    const seen = new Set();
+    return products
+      .map(normalizeProduct)
+      .filter(product => product.name)
+      .filter(product => {
+        const key = normalizeText(product.name);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function setProductIndex(products) {
+    productIndex = uniqueProductList(products);
+  }
+
+  function syncProductsFromRenderedCards() {
+    const products = qsa('.catalog-product, .rail-product')
+      .filter(card => card.querySelector('.btn-add-cart'))
+      .map(card => {
+        const button = card.querySelector('.btn-add-cart');
+        const name = button?.dataset.name || card.dataset.name || card.querySelector('h3')?.textContent || '';
+        const image = card.querySelector('.product-image')?.getAttribute('src') || button?.dataset.image || '';
+
+        return {
+          name,
+          category: card.dataset.category || card.querySelector('.eyebrow')?.textContent || 'Produtos',
+          price: button?.dataset.price || card.querySelector('strong')?.textContent || 0,
+          description: card.querySelector('p')?.textContent || '',
+          image,
+          recommended: card.dataset.recommended === 'true' || card.classList.contains('is-recommended')
+        };
+      });
+
+    if (products.length) setProductIndex(products);
+  }
+
+  function supabaseProductClient() {
+    const candidates = [
+      window.monteSinaiSupabase,
+      window.supabaseClient,
+      window.msSupabase
+    ];
+
+    return candidates.find(client => client && typeof client.from === 'function') || null;
+  }
+
+  async function loadProductsFromSupabase() {
+    const client = supabaseProductClient();
+    if (!client) return;
+
+    try {
+      const { data, error } = await client
+        .from('produto')
+        .select('nome, preco, imagem, categoria, descricao')
+        .order('nome', { ascending: true });
+
+      if (error) throw error;
+      setProductIndex(Array.isArray(data) ? data : []);
+      renderSupabaseProducts();
+    } catch (error) {
+      console.error('Não foi possível carregar produtos do Supabase:', error);
+      if (currentPage() === 'produtos.html') {
+        showToast('Não foi possível carregar os produtos do Supabase. Mantive o catálogo local.');
+      }
+    }
+  }
+
+  function renderSupabaseProducts() {
+    renderDynamicCatalog();
+    renderDynamicProductRail();
+    applyCatalogFilters();
+    renderSmartSearchResults(qs('[data-smart-search-input]')?.value || '');
+  }
+
   function searchTokens(value) {
     const tokens = splitSearchTokens(value);
     const expanded = tokens.flatMap(token => splitSearchTokens(SEARCH_EXPANSIONS[token] || ''));
@@ -289,7 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function productSearchData(product) {
     const normalizedName = normalizeText(product.name);
     const normalizedCategory = normalizeText(product.category || '');
-    const blob = normalizeText(`${product.name} ${product.category || ''} ${product.terms || ''}`);
+    const blob = normalizeText(productTerms(product));
 
     return {
       normalizedName,
@@ -323,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function cardSearchData(card) {
     const name = card.dataset.name || card.querySelector('h3')?.textContent || '';
-    const match = PRODUCT_INDEX.find(product => normalizeText(product.name) === normalizeText(name) || normalizeText(name).includes(normalizeText(product.name)));
+    const match = productIndex.find(product => normalizeText(product.name) === normalizeText(name) || normalizeText(name).includes(normalizeText(product.name)));
     return {
       name,
       category: card.dataset.category || match?.category || '',
@@ -358,9 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function featuredSearchProducts(limit = 6) {
     const featured = ['agua mineral', 'gas de cozinha', 'detergente', 'desinfetante', 'sabao omo', 'vassoura'];
-    return featured
-      .map(term => PRODUCT_INDEX.find(product => normalizeText(product.name).includes(term)))
+    const highlighted = featured
+      .map(term => productIndex.find(product => normalizeText(product.name).includes(term)))
       .filter(Boolean)
+      .slice(0, limit);
+
+    return uniqueProductList([...highlighted, ...productIndex])
       .slice(0, limit);
   }
 
@@ -369,10 +464,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!term) return [];
 
     const normalizedTerm = normalizeText(term);
-    const exact = PRODUCT_INDEX.find(product => normalizeText(product.name) === normalizedTerm);
+    const exact = productIndex.find(product => normalizeText(product.name) === normalizedTerm);
     if (exact) return [exact];
 
-    const scored = PRODUCT_INDEX
+    const scored = productIndex
       .map(product => ({ ...product, score: productScore(product, term) }))
       .filter(product => product.score > 0)
       .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'));
@@ -395,10 +490,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const normalizedTerm = normalizeText(term);
     const queryTokens = splitSearchTokens(term);
-    const exact = PRODUCT_INDEX.filter(product => normalizeText(product.name) === normalizedTerm);
+    const exact = productIndex.filter(product => normalizeText(product.name) === normalizedTerm);
     if (exact.length) return exact.slice(0, limit);
 
-    const phraseMatches = PRODUCT_INDEX
+    const phraseMatches = productIndex
       .filter(product => {
         const productName = normalizeText(product.name);
         return productName.includes(normalizedTerm) || normalizedTerm.includes(productName);
@@ -407,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (phraseMatches.length) return phraseMatches.slice(0, limit);
 
-    const scored = PRODUCT_INDEX
+    const scored = productIndex
       .map(product => {
         const data = productSearchData(product);
         const nameTokens = splitSearchTokens(product.name);
@@ -504,8 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeText(value);
     if (!normalized) return null;
 
-    return PRODUCT_INDEX.find(product => normalizeText(product.name) === normalized)
-      || PRODUCT_INDEX.find(product => {
+    return productIndex.find(product => normalizeText(product.name) === normalized)
+      || productIndex.find(product => {
         const productName = normalizeText(product.name);
         return productName.includes(normalized) || normalized.includes(productName);
       })
@@ -530,11 +625,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .find(card => cardMatchesCatalogProduct(card, product));
   }
 
-  function productAssetPath(product, card = productCatalogCard(product)) {
-    const cardImage = card?.querySelector('.product-image')?.getAttribute('src');
-    if (cardImage) return canonicalAssetPath(cardImage);
-
-    const name = normalizeText(product.name);
+  function productAssetFallback(productName) {
+    const name = normalizeText(productName);
     const images = [
       ['agua', 'assets/produtos/agua-mineral-20l.png'],
       ['gas', 'assets/produtos/gas-p13.png'],
@@ -573,6 +665,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return images.find(([term]) => name.includes(term))?.[1] || '';
   }
 
+  function productAssetPath(product, card = productCatalogCard(product)) {
+    const productImage = resolveProductImagePath(product?.image || '', product?.name || '');
+    if (productImage) return productImage;
+
+    const cardImage = card?.querySelector('.product-image')?.getAttribute('src');
+    if (cardImage) return canonicalAssetPath(cardImage);
+
+    return productAssetFallback(product?.name || '');
+  }
+
   function productDescription(product, card = productCatalogCard(product)) {
     return card?.querySelector('p')?.textContent?.trim()
       || `Produto de ${product.category || 'catálogo'} pronto para adicionar ao seu pedido.`;
@@ -586,19 +688,6 @@ document.addEventListener('DOMContentLoaded', () => {
         value: option.value || option.textContent.trim(),
         price: Number(option.dataset.price || product.price || 0)
       }));
-    }
-
-    const name = normalizeText(product.name);
-    if (name.includes('gas')) {
-      return [
-        { label: 'Supergas - R$ 125,00', value: 'Supergas', price: 125 },
-        { label: 'Ultragas - R$ 135,00', value: 'Ultragas', price: 135 }
-      ];
-    }
-
-    if (name.includes('desinfetante')) {
-      return ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive']
-        .map(label => ({ label, value: label, price: Number(product.price || 5) }));
     }
 
     return [{ label: 'Padrão', value: '', price: Number(product.price || 0) }];
@@ -884,6 +973,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const clean = src.replaceAll('\\', '/');
     const index = clean.indexOf('assets/');
     return index >= 0 ? clean.slice(index) : clean.replace(/^\.\.\//, '').replace(/^\.\//, '');
+  }
+
+  function resolveProductImagePath(src, productName = '') {
+    if (!src) return '';
+    if (/^(https?:|data:|blob:)/.test(src)) return src;
+
+    const clean = String(src).trim().replaceAll('\\', '/').replace(/^\/+/, '');
+    if (!clean) return '';
+    if (clean.includes('assets/')) return canonicalAssetPath(clean);
+    if (clean.startsWith('produtos/')) return `assets/${clean}`;
+    if (clean.startsWith('site/')) return `assets/produtos/${clean}`;
+    if (/\.(png|jpe?g|webp|svg|gif)$/i.test(clean)) return `assets/produtos/${clean}`;
+
+    const fallback = productAssetFallback(productName || clean);
+    return fallback || clean;
   }
 
   function assetHref(src) {
@@ -1434,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function smartProductIcon(product) {
-    const blob = normalizeText(`${product.name} ${product.category}`);
+    const blob = normalizeText(productTerms(product));
     if (blob.includes('gas')) return 'fa-fire-flame-simple';
     if (blob.includes('agua')) return 'fa-droplet';
     if (blob.includes('roupa') || blob.includes('lavanderia') || blob.includes('sabao') || blob.includes('amaciante')) return 'fa-shirt';
@@ -1444,11 +1548,104 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'fa-spray-can-sparkles';
   }
 
-  function bindCatalog() {
-    const products = qsa('.catalog-product');
-    if (!products.length) return;
+  function productCardHTML(product, mode = 'catalog') {
+    const normalized = normalizeProduct(product);
+    const recommended = isRecommendedProduct(normalized);
+    const image = productAssetPath(normalized);
+    const cardClass = [
+      'product-card',
+      mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
+      recommended ? 'is-recommended' : ''
+    ].filter(Boolean).join(' ');
 
+    return `
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}">
+        ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
+        <div class="product-media">
+          ${image
+            ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}">`
+            : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`}
+        </div>
+        <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
+        <h3>${escapeHTML(normalized.name)}</h3>
+        <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
+        <strong>${formatMoney(normalized.price)}</strong>
+        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(normalized.price)}" data-image="${escapeHTML(image)}">Adicionar</button>
+      </article>
+    `;
+  }
+
+  function renderDynamicFilters() {
+    const filterBar = qs('.filter-chips');
+    if (!filterBar || !productIndex.length) return;
+
+    const categories = [...new Map(productIndex.map(product => [
+      product.categorySlug || categorySlug(product.category),
+      product.category || 'Produtos'
+    ])).entries()];
+
+    filterBar.innerHTML = [
+      '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
+      '<button class="filter-chip" type="button" data-filter="recommended">Recomendados</button>',
+      ...categories.map(([slug, label]) => `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`)
+    ].join('');
+  }
+
+  function renderDynamicCatalog() {
+    const catalog = qs('#todos-produtos > div');
+    if (!catalog) return;
+
+    renderDynamicFilters();
+
+    [...catalog.children].forEach(child => {
+      if (child.matches('.section-head, .grid-produtos')) child.remove();
+    });
+
+    let empty = qs('#catalog-empty', catalog);
+    if (!empty) {
+      empty = document.createElement('p');
+      empty.id = 'catalog-empty';
+      empty.className = 'empty-cart hidden';
+      empty.textContent = 'Nenhum produto encontrado com esse filtro.';
+      catalog.appendChild(empty);
+    }
+
+    const head = document.createElement('div');
+    head.className = 'section-head';
+    head.innerHTML = `
+      <span class="eyebrow">Catálogo atualizado</span>
+      <h2>Produtos cadastrados no Supabase</h2>
+    `;
+
+    const grid = document.createElement('div');
+    grid.className = 'grid-produtos';
+    grid.dataset.dynamicCatalog = '';
+    grid.innerHTML = productIndex.map(product => productCardHTML(product, 'catalog')).join('');
+
+    catalog.insertBefore(head, empty);
+    catalog.insertBefore(grid, empty);
+  }
+
+  function renderDynamicProductRail() {
+    const rail = qs('[data-product-rail]');
+    if (!rail || !productIndex.length) return;
+
+    const featured = productIndex.slice(0, 6);
+    rail.innerHTML = `
+      ${featured.map(product => productCardHTML(product, 'rail')).join('')}
+      <a class="more-card rail-product more-card-3d tilt-3d" href="${productHref()}" aria-label="Ver mais produtos">
+        <div class="product-icon"><i class="fa-solid fa-arrow-right"></i></div>
+        <h3>Ver mais produtos</h3>
+        <p>Abra o catálogo completo com todos os produtos cadastrados.</p>
+        <span class="btn btn-secondary">Ver catálogo completo</span>
+      </a>
+    `;
+    qsa('.rail-product', rail).forEach((card, index) => card.classList.toggle('is-center', index === 0));
+  }
+
+  function bindCatalog() {
     const input = qs('[data-catalog-search]');
+    const filterBar = qs('.filter-chips');
     const params = new URLSearchParams(location.search);
     const initialQuery = params.get('q') || '';
     if (input && initialQuery) input.value = initialQuery;
@@ -1459,11 +1656,11 @@ document.addEventListener('DOMContentLoaded', () => {
       applyCatalogFilters();
     });
 
-    qsa('[data-filter]').forEach(chip => {
-      chip.addEventListener('click', () => {
-        qsa('[data-filter]').forEach(item => item.classList.toggle('active', item === chip));
-        applyCatalogFilters();
-      });
+    filterBar?.addEventListener('click', event => {
+      const chip = event.target.closest('[data-filter]');
+      if (!chip) return;
+      qsa('[data-filter]').forEach(item => item.classList.toggle('active', item === chip));
+      applyCatalogFilters();
     });
 
     applyCatalogFilters();
@@ -1474,7 +1671,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyCatalogFilters() {
     const products = qsa('.catalog-product');
-    if (!products.length) return;
 
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
