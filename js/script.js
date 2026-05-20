@@ -352,6 +352,90 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${pageHref('produtos.html')}${search}#todos-produtos`;
   }
 
+  function featuredSearchProducts(limit = 6) {
+    const featured = ['agua mineral', 'gas de cozinha', 'detergente', 'desinfetante', 'sabao omo', 'vassoura'];
+    return featured
+      .map(term => PRODUCT_INDEX.find(product => normalizeText(product.name).includes(term)))
+      .filter(Boolean)
+      .slice(0, limit);
+  }
+
+  function directSearchProducts(query, limit = 5) {
+    const term = String(query ?? '').trim();
+    if (!term) return [];
+
+    const normalizedTerm = normalizeText(term);
+    const exact = PRODUCT_INDEX.find(product => normalizeText(product.name) === normalizedTerm);
+    if (exact) return [exact];
+
+    const scored = PRODUCT_INDEX
+      .map(product => ({ ...product, score: productScore(product, term) }))
+      .filter(product => product.score > 0)
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'));
+    const hasStrongMatches = scored.some(product => product.score >= 6);
+
+    return scored
+      .filter(product => hasStrongMatches ? product.score >= 6 : product.score > 0)
+      .slice(0, limit);
+  }
+
+  function searchSuggestionProducts(query, limit = 5) {
+    const direct = directSearchProducts(query, limit);
+    if (direct.length) return direct;
+    return String(query ?? '').trim() ? featuredSearchProducts(Math.min(limit, 4)) : featuredSearchProducts(limit);
+  }
+
+  function cardMatchesCatalogProduct(card, product) {
+    const cardName = normalizeText(card.dataset.name || card.querySelector('h3')?.textContent || '');
+    const productName = normalizeText(product.name);
+    return cardName === productName || cardName.includes(productName) || productName.includes(cardName);
+  }
+
+  function activateCatalogFilter(filter = 'all') {
+    qsa('[data-filter]').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.filter === filter);
+    });
+  }
+
+  function updateCatalogSearchURL(term) {
+    if (currentPage() !== 'produtos.html') return;
+
+    const url = new URL(location.href);
+    const value = String(term ?? '').trim();
+    if (value) url.searchParams.set('q', value);
+    else url.searchParams.delete('q');
+    url.hash = 'todos-produtos';
+    history.replaceState(null, '', url);
+  }
+
+  function scrollCatalogToTop(behavior = 'smooth') {
+    const target = qs('#todos-produtos') || qs('.catalog-tools');
+    if (!target) return;
+
+    const navHeight = qs('.navbar')?.getBoundingClientRect().height || 0;
+    const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - navHeight - 8);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top, behavior });
+    });
+  }
+
+  function runCatalogSearch(term, options = {}) {
+    const {
+      scroll = true,
+      syncURL = true,
+      resetFilter = true,
+      behavior = 'smooth'
+    } = options;
+    const value = String(term ?? '').trim();
+    const catalogInput = qs('[data-catalog-search]');
+
+    if (catalogInput) catalogInput.value = value;
+    if (resetFilter) activateCatalogFilter('all');
+    applyCatalogFilters();
+    if (syncURL) updateCatalogSearchURL(value);
+    if (scroll) scrollCatalogToTop(behavior);
+  }
+
   function loginHref(params = {}) {
     const query = new URLSearchParams(params).toString();
     return `${pageHref('login.html')}${query ? `?${query}` : ''}`;
@@ -749,22 +833,12 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const catalogInput = qs('[data-catalog-search]');
-        if (catalogInput && input !== catalogInput) catalogInput.value = term;
-        applyCatalogFilters();
-        qs('#todos-produtos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        runCatalogSearch(term);
       });
     });
 
-    document.addEventListener('click', event => {
-      if (event.target.closest('[data-site-search-form]')) return;
-      qsa('.search-suggestions').forEach(hideSearchSuggestions);
-    });
-    window.addEventListener('scroll', () => {
-      qsa('.search-suggestions').forEach(hideSearchSuggestions);
-    }, { passive: true });
-    window.addEventListener('resize', () => {
-      qsa('.search-suggestions').forEach(hideSearchSuggestions);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') qsa('.search-suggestions').forEach(hideSearchSuggestions);
     });
 
     qsa('[data-mobile-search]').forEach(button => {
@@ -774,7 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         qs('[data-catalog-search]')?.focus();
-        qs('#todos-produtos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollCatalogToTop();
       });
     });
   }
@@ -799,16 +873,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    let matches = PRODUCT_INDEX
-      .map(product => ({ ...product, score: productScore(product, term) }))
-      .filter(product => product.score > 0)
-      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'))
-      .slice(0, 5);
-
-    const usingFallback = !matches.length;
-    if (usingFallback) {
-      matches = smartSearchMatches('').slice(0, 4).map(product => ({ ...product, score: 0 }));
-    }
+    const matches = searchSuggestionProducts(term, 5);
+    const usingFallback = !directSearchProducts(term, 5).length;
 
     suggestions.innerHTML = '';
 
@@ -841,10 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideSearchSuggestions(suggestions);
 
         if (currentPage() === 'produtos.html') {
-          const catalogInput = qs('[data-catalog-search]');
-          if (catalogInput) catalogInput.value = product.name;
-          applyCatalogFilters();
-          qs('#todos-produtos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          runCatalogSearch(product.name);
         } else {
           window.location.href = productHref(product.name);
         }
@@ -970,11 +1033,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const term = query.trim();
 
     if (currentPage() === 'produtos.html') {
-      const catalogInput = qs('[data-catalog-search]');
-      if (catalogInput) catalogInput.value = term;
-      applyCatalogFilters();
       closeSmartSearch();
-      qs('#todos-produtos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      runCatalogSearch(term);
       return;
     }
 
@@ -1023,21 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function smartSearchMatches(query) {
-    if (!query.trim()) {
-      const featured = ['agua mineral', 'gas de cozinha', 'detergente', 'desinfetante', 'sabao omo', 'vassoura'];
-      return featured
-        .map(term => PRODUCT_INDEX.find(product => normalizeText(product.name).includes(term)))
-        .filter(Boolean);
-    }
-
-    const scored = PRODUCT_INDEX
-      .map(product => ({ ...product, score: productScore(product, query) }))
-      .filter(product => product.score > 0)
-      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'));
-    const hasStrongMatches = scored.some(product => product.score >= 6);
-    return scored
-      .filter(product => hasStrongMatches ? product.score >= 6 : product.score > 0)
-      .slice(0, 8);
+    return searchSuggestionProducts(query, query.trim() ? 5 : 6);
   }
 
   function smartProductIcon(product) {
@@ -1059,8 +1105,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(location.search);
     const initialQuery = params.get('q') || '';
     if (input && initialQuery) input.value = initialQuery;
+    if (initialQuery) activateCatalogFilter('all');
 
-    input?.addEventListener('input', applyCatalogFilters);
+    input?.addEventListener('input', () => {
+      if (input.value.trim()) activateCatalogFilter('all');
+      applyCatalogFilters();
+    });
 
     qsa('[data-filter]').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -1070,6 +1120,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     applyCatalogFilters();
+    if (initialQuery || location.hash === '#todos-produtos') {
+      setTimeout(() => scrollCatalogToTop('auto'), 80);
+    }
   }
 
   function applyCatalogFilters() {
@@ -1078,34 +1131,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
+    const searchProducts = term ? searchSuggestionProducts(rawTerm, 5) : [];
     const activeChip = qs('[data-filter].active');
     const filter = activeChip?.dataset.filter || 'all';
-    const scoredCards = products.map(card => ({
-      card,
-      score: productScore(cardSearchData(card), term)
-    }));
-    const hasStrongMatches = !term || scoredCards.some(item => item.score >= 6);
     let visible = 0;
 
-    scoredCards.forEach(({ card, score }) => {
+    products.forEach(card => {
       const category = card.dataset.category || '';
       const recommended = card.dataset.recommended === 'true' || card.classList.contains('is-recommended');
-      const matchesTerm = !term || (hasStrongMatches ? score >= 6 : score > 0);
+      const matchesTerm = !term || searchProducts.some(product => cardMatchesCatalogProduct(card, product));
       const matchesFilter = filter === 'all' || category === filter || (filter === 'recommended' && recommended);
       const show = matchesTerm && matchesFilter;
       card.classList.toggle('hidden', !show);
-      card.classList.toggle('is-related-result', Boolean(term && show && score < 6));
+      card.classList.toggle('is-related-result', false);
       if (show) visible += 1;
+    });
+
+    qsa('.grid-produtos').forEach(grid => {
+      const hasVisibleProducts = qsa('.catalog-product:not(.hidden)', grid).length > 0;
+      const sectionHead = grid.previousElementSibling?.classList.contains('section-head') ? grid.previousElementSibling : null;
+      const hideGroup = Boolean(term || filter !== 'all') && !hasVisibleProducts;
+      grid.classList.toggle('hidden', hideGroup);
+      sectionHead?.classList.toggle('hidden', hideGroup);
     });
 
     qs('#catalog-empty')?.classList.toggle('hidden', visible > 0);
     const result = qs('[data-catalog-results]');
     if (result) {
       const suffix = term ? ` para "${rawTerm.trim()}"` : '';
-      const related = term && !hasStrongMatches && visible
-        ? (visible === 1 ? ' relacionado' : ' relacionados')
-        : '';
-      result.textContent = `${visible} produto${visible === 1 ? '' : 's'}${related} encontrado${visible === 1 ? '' : 's'}${suffix}`;
+      const suggested = term && visible ? (visible === 1 ? ' sugerido' : ' sugeridos') : '';
+      result.textContent = `${visible} produto${visible === 1 ? '' : 's'}${suggested} encontrado${visible === 1 ? '' : 's'}${suffix}`;
     }
   }
 
@@ -1383,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = formatMoney(cartSubtotal());
     });
 
-    qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart').forEach(button => {
+    qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach(button => {
       const hasItems = cartCount() > 0;
       button.classList.toggle('has-items', hasItems);
       button.classList.toggle('is-empty', !hasItems);
