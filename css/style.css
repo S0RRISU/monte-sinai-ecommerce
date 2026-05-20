@@ -12785,3 +12785,175 @@ body.light-mode .search-field .search-suggestions {
     z-index: 80 !important;
   }
 }
+
+/* Desktop navigation organization: keep logo, menu, search, account and cart in one clean row. */
+@media (min-width: 1021px) {
+  .navbar {
+    overflow: visible !important;
+  }
+
+  .navbar .nav-inner {
+    display: grid !important;
+    grid-template-columns: 176px minmax(470px, max-content) minmax(260px, 320px) max-content !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 16px !important;
+    width: min(1600px, calc(100vw - 56px)) !important;
+    min-height: 86px !important;
+  }
+
+  .navbar .brand {
+    width: 176px !important;
+    min-width: 176px !important;
+    max-width: 176px !important;
+    min-height: 62px !important;
+    justify-self: start !important;
+    overflow: visible !important;
+  }
+
+  .navbar .brand::after {
+    display: none !important;
+  }
+
+  .navbar .brand-logo {
+    width: 176px !important;
+    height: 62px !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+  }
+
+  .navbar .brand-text {
+    display: none !important;
+  }
+
+  .navbar .nav-menu {
+    justify-self: center !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 54px !important;
+    padding: 6px !important;
+    overflow: visible !important;
+    border-radius: 12px !important;
+  }
+
+  .navbar .nav-menu a {
+    flex: 0 0 auto !important;
+    min-height: 42px !important;
+    max-width: 132px !important;
+    padding: 10px 15px !important;
+    border-radius: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.95rem !important;
+    line-height: 1 !important;
+  }
+
+  .navbar .nav-menu a[data-admin-panel-link] {
+    max-width: 142px !important;
+  }
+
+  .navbar .nav-search {
+    justify-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 320px !important;
+    min-height: 54px !important;
+    grid-template-columns: 22px minmax(0, 1fr) 48px !important;
+    gap: 10px !important;
+    padding: 4px 6px 4px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .navbar .nav-search input {
+    min-width: 0 !important;
+    font-size: 0.92rem !important;
+  }
+
+  .navbar .nav-search button {
+    width: 46px !important;
+    min-width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    border-radius: 12px !important;
+  }
+
+  .navbar .nav-actions {
+    justify-self: end !important;
+    display: flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-width: max-content !important;
+  }
+
+  .navbar .nav-pill {
+    min-width: 210px !important;
+    max-width: 240px !important;
+    min-height: 54px !important;
+    padding: 9px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .navbar .nav-account-avatar {
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .navbar .nav-account-label {
+    min-width: 0 !important;
+    max-width: 150px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .navbar .nav-cart-link {
+    width: 58px !important;
+    min-width: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    padding: 0 !important;
+    border-radius: 999px !important;
+  }
+}
+
+@media (min-width: 1021px) and (max-width: 1320px) {
+  .navbar .nav-inner {
+    grid-template-columns: 150px minmax(390px, max-content) minmax(220px, 1fr) max-content !important;
+    gap: 10px !important;
+    width: min(100% - 28px, 1280px) !important;
+  }
+
+  .navbar .brand,
+  .navbar .brand-logo {
+    width: 150px !important;
+    min-width: 150px !important;
+  }
+
+  .navbar .nav-menu a {
+    max-width: 112px !important;
+    padding-inline: 10px !important;
+    font-size: 0.88rem !important;
+  }
+
+  .navbar .nav-search {
+    max-width: 260px !important;
+  }
+
+  .navbar .nav-pill {
+    min-width: 170px !important;
+    max-width: 190px !important;
+  }
+
+  .navbar .nav-account-label {
+    max-width: 108px !important;
+  }
+}
