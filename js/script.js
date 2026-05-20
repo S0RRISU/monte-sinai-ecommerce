@@ -130,7 +130,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveJSON(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (_error) {
+      showToast('Nao foi possivel salvar. Tente remover a foto ou usar uma imagem menor.');
+      return false;
+    }
   }
 
   function loadCart() {
@@ -159,9 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveUser(user) {
     currentUser = user;
-    if (user) saveJSON(STORAGE.user, user);
+    let saved = true;
+    if (user) saved = saveJSON(STORAGE.user, user);
     else localStorage.removeItem(STORAGE.user);
     updateAccountUI();
+    return saved;
   }
 
   function formatMoney(value) {
@@ -271,6 +279,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function firstName(user = currentUser) {
     return String(user?.nick || user?.name || 'Cliente').split(' ')[0];
+  }
+
+  function ensureCustomerProfile() {
+    currentUser = loadJSON(STORAGE.user, null);
+    if (currentUser) {
+      if (!currentUser.email) {
+        currentUser.email = `cliente-${Date.now()}@monte-sinai.local`;
+        currentUser.provider = currentUser.provider || 'Cadastro local';
+        saveUser(currentUser);
+      }
+      return currentUser;
+    }
+
+    currentUser = {
+      email: `cliente-${Date.now()}@monte-sinai.local`,
+      name: '',
+      nick: '',
+      phone: '',
+      address: '',
+      provider: 'Cadastro local'
+    };
+    saveUser(currentUser);
+    return currentUser;
   }
 
   function cartSubtotal() {
@@ -434,38 +465,41 @@ document.addEventListener('DOMContentLoaded', () => {
       dock.className = 'mobile-quick-dock';
       dock.setAttribute('aria-label', 'Atalhos para celular');
       dock.innerHTML = `
-        <a href="${productHref()}">
+        <a href="${productHref()}" data-dock-section="store">
           <i class="fa-solid fa-store"></i>
           <span>Loja</span>
         </a>
-        <button type="button" data-open-search>
+        <button type="button" data-open-search data-dock-section="search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Buscar</span>
         </button>
-        <a class="nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}">
+        <button class="dock-cart" type="button" data-open-cart data-dock-section="cart">
+          <i class="fa-solid fa-bag-shopping"></i>
+          <span>Carrinho</span>
+          <strong data-cart-count>0</strong>
+        </button>
+        <a class="mobile-settings-link" href="${pageHref('configuracoes.html')}" data-dock-section="settings">
+          <i class="fa-solid fa-gear"></i>
+          <span>Ajustes</span>
+        </a>
+        <a class="nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-dock-section="account">
           <i class="fa-solid fa-user"></i>
           <span data-account-label>Conta</span>
         </a>
-        <a class="mobile-settings-link" href="${pageHref('configuracoes.html')}">
-          <i class="fa-solid fa-gear"></i>
-          <span>Config</span>
-        </a>
-        <button type="button" data-open-cart>
-          <i class="fa-solid fa-bag-shopping"></i>
-          <span>Sacola</span>
-          <strong data-cart-count>0</strong>
-        </button>
       `;
       document.body.appendChild(dock);
     }
 
     updateAccountUI();
+    updateDockActive();
   }
 
   function updateAccountUI() {
     const signed = Boolean(currentUser?.email);
     qsa('[data-account-label]').forEach(label => {
-      label.textContent = signed ? firstName() : (label.closest('.mobile-quick-dock') ? 'Conta' : 'Entrar ou cadastrar');
+      label.textContent = label.closest('.mobile-quick-dock')
+        ? 'Conta'
+        : (signed ? firstName() : 'Entrar ou cadastrar');
     });
 
     qsa('.nav-account-link, [data-account-cta], [data-account-login]').forEach(link => {
@@ -520,6 +554,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const linkPage = (link.getAttribute('href') || '').split(/[?#]/)[0].split('/').pop() || 'index.html';
       link.classList.toggle('active', linkPage === page);
     });
+    updateDockActive();
+  }
+
+  function updateDockActive() {
+    const page = currentPage();
+    const activeSection = (() => {
+      if (['index.html', 'produtos.html'].includes(page)) return 'store';
+      if (page === 'configuracoes.html') return 'settings';
+      if (['login.html', 'perfil.html', 'editar-perfil.html', 'criar.html'].includes(page)) return 'account';
+      return '';
+    })();
+
+    qsa('.mobile-quick-dock a, .mobile-quick-dock button').forEach(item => {
+      const isActive = item.dataset.dockSection === activeSection;
+      item.classList.toggle('active', isActive);
+      if (isActive) item.setAttribute('aria-current', 'page');
+      else item.removeAttribute('aria-current');
+    });
   }
 
   function bindSiteSearch() {
@@ -527,8 +579,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const input = qs('[data-site-search-input]', form);
       const suggestions = ensureSearchSuggestions(form);
 
-      input?.addEventListener('input', () => renderSearchSuggestions(form, suggestions, input.value));
-      input?.addEventListener('focus', () => renderSearchSuggestions(form, suggestions, input.value));
+      input?.addEventListener('input', () => {
+        closeOtherSearchSuggestions(suggestions);
+        renderSearchSuggestions(form, suggestions, input.value);
+      });
+      input?.addEventListener('focus', () => {
+        closeOtherSearchSuggestions(suggestions);
+        renderSearchSuggestions(form, suggestions, input.value);
+      });
 
       form.addEventListener('submit', event => {
         event.preventDefault();
@@ -549,6 +607,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('click', event => {
       if (event.target.closest('[data-site-search-form]')) return;
+      qsa('.search-suggestions').forEach(hideSearchSuggestions);
+    });
+    window.addEventListener('scroll', () => {
+      qsa('.search-suggestions').forEach(hideSearchSuggestions);
+    }, { passive: true });
+    window.addEventListener('resize', () => {
       qsa('.search-suggestions').forEach(hideSearchSuggestions);
     });
 
@@ -578,11 +642,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSearchSuggestions(form, suggestions, query) {
     const term = query.trim();
+    if (term.length < 2) {
+      suggestions.innerHTML = '';
+      hideSearchSuggestions(suggestions);
+      return;
+    }
+
     const matches = PRODUCT_INDEX
-      .map(product => ({ ...product, score: productScore(product, term || product.name) }))
-      .filter(product => !term || product.score > 0)
+      .map(product => ({ ...product, score: productScore(product, term) }))
+      .filter(product => product.score > 0)
       .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'))
-      .slice(0, term ? 6 : 4);
+      .slice(0, 5);
 
     suggestions.innerHTML = '';
 
@@ -631,6 +701,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function hideSearchSuggestions(suggestions) {
     suggestions?.classList.remove('show');
+  }
+
+  function closeOtherSearchSuggestions(activeSuggestions) {
+    qsa('.search-suggestions').forEach(suggestions => {
+      if (suggestions !== activeSuggestions) hideSearchSuggestions(suggestions);
+    });
   }
 
   function ensureSmartSearchShell() {
@@ -734,12 +810,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSmartSearchResults(seed);
     shell.classList.add('open');
     document.body.classList.add('smart-search-open');
+    qsa('.mobile-quick-dock [data-dock-section="search"]').forEach(button => button.classList.add('active'));
     setTimeout(() => input?.focus(), 80);
   }
 
   function closeSmartSearch() {
     qs('.smart-search')?.classList.remove('open');
     document.body.classList.remove('smart-search-open');
+    updateDockActive();
   }
 
   function navigateSmartSearch(query) {
@@ -963,8 +1041,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const cards = () => qsa('.rail-product', rail);
     let active = 0;
-    let autoTimer = null;
-    let autoPaused = false;
 
     const applyRailState = index => {
       const list = cards();
@@ -1001,20 +1077,9 @@ document.addEventListener('DOMContentLoaded', () => {
       scrollRailTo(active, behavior);
     };
 
-    const restartAuto = () => {
-      clearInterval(autoTimer);
-      autoTimer = setInterval(() => {
-        if (autoPaused || document.hidden) return;
-        const list = cards();
-        if (list.length < 2) return;
-        focusCard((active + 1) % list.length, 'smooth');
-      }, 4200);
-    };
-
     qsa('[data-rail-scroll]').forEach(button => {
       button.addEventListener('click', () => {
         focusCard(active + (button.dataset.railScroll === 'prev' ? -1 : 1));
-        restartAuto();
       });
     });
 
@@ -1029,7 +1094,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (index < 0) return;
 
       focusCard(index === active ? (active + 1) % list.length : index);
-      restartAuto();
     });
 
     rail.addEventListener('scroll', () => {
@@ -1052,27 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }, { passive: true });
 
-    rail.addEventListener('pointerenter', () => {
-      autoPaused = true;
-    });
-    rail.addEventListener('pointerleave', () => {
-      autoPaused = false;
-    });
-    rail.addEventListener('touchstart', () => {
-      autoPaused = true;
-    }, { passive: true });
-    rail.addEventListener('touchend', () => {
-      autoPaused = false;
-    }, { passive: true });
-    rail.addEventListener('focusin', () => {
-      autoPaused = true;
-    });
-    rail.addEventListener('focusout', () => {
-      autoPaused = false;
-    });
-
     window.requestAnimationFrame(() => applyRailState(0));
-    restartAuto();
   }
 
   function ensureCartShell() {
@@ -1173,11 +1217,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCart();
     qs('.cart-modal')?.classList.add('open');
     document.body.classList.add('cart-open');
+    qsa('.mobile-quick-dock .dock-cart').forEach(button => button.classList.add('active'));
   }
 
   function closeCartModal() {
     qs('.cart-modal')?.classList.remove('open');
     document.body.classList.remove('cart-open');
+    updateDockActive();
   }
 
   function renderCart() {
@@ -1194,6 +1240,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('.cart-float').forEach(button => {
       button.classList.toggle('is-empty', cart.length === 0);
+    });
+    qsa('.mobile-quick-dock .dock-cart').forEach(button => {
+      button.classList.toggle('has-items', cartCount() > 0);
     });
 
     const pageItems = qs('#cart-items');
@@ -1594,6 +1643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initProfilePage() {
     if (!qs('#profile-page') || currentPage() !== 'perfil.html') return;
+    if (currentUser && !currentUser.email) currentUser = ensureCustomerProfile();
 
     const summary = qs('.profile-summary');
     const details = qs('#profile-details');
@@ -1642,10 +1692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = qs('#profile-edit-form');
     if (!form) return;
 
-    if (!currentUser?.email) {
-      window.location.href = loginHref({ redirect: 'editar-perfil.html' });
-      return;
-    }
+    currentUser = ensureCustomerProfile();
 
     qs('#edit-name').value = currentUser.name || '';
     qs('#edit-nick').value = currentUser.nick || '';
@@ -1661,14 +1708,12 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#edit-photo')?.addEventListener('change', event => {
       const file = event.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      resizeProfilePhoto(file).then(photo => {
         if (preview) {
-          preview.src = reader.result;
+          preview.src = photo;
           preview.classList.remove('hidden');
         }
-      };
-      reader.readAsDataURL(file);
+      }).catch(() => showToast('Nao consegui carregar esta foto. Tente outra imagem.'));
     });
 
     qs('[data-cancel-edit]')?.addEventListener('click', () => {
@@ -1678,12 +1723,14 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', event => {
       event.preventDefault();
       const updated = {
-        ...currentUser,
-        name: qs('#edit-name').value.trim(),
-        nick: qs('#edit-nick').value.trim(),
-        phone: qs('#edit-phone').value.trim(),
-        address: qs('#edit-address').value.trim(),
-        photo: preview?.src?.startsWith('data:') ? preview.src : currentUser.photo
+        ...ensureCustomerProfile(),
+        name: qs('#edit-name')?.value.trim() || '',
+        nick: qs('#edit-nick')?.value.trim() || '',
+        phone: qs('#edit-phone')?.value.trim() || '',
+        address: qs('#edit-address')?.value.trim() || '',
+        photo: preview?.src?.startsWith('data:') ? preview.src : currentUser.photo,
+        provider: currentUser.provider || 'Cadastro local',
+        updatedAt: new Date().toISOString()
       };
 
       if (!updated.name || !updated.phone || !updated.address) {
@@ -1693,10 +1740,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const accounts = loadJSON(STORAGE.accounts, {});
       accounts[updated.email] = { ...(accounts[updated.email] || {}), ...updated };
-      saveJSON(STORAGE.accounts, accounts);
-      saveUser(updated);
-      showToast('Perfil atualizado.');
+      const accountSaved = saveJSON(STORAGE.accounts, accounts);
+      const profileSaved = saveUser(updated);
+      if (!accountSaved || !profileSaved) return;
+      showToast('Perfil atualizado e salvo.');
       setTimeout(() => window.location.href = profileHref(), 500);
+    });
+  }
+
+  function resizeProfilePhoto(file) {
+    return new Promise((resolve, reject) => {
+      if (!file.type?.startsWith('image/')) {
+        reject(new Error('Arquivo invalido'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const max = 420;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const width = Math.max(1, Math.round(img.width * scale));
+          const height = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(String(reader.result || ''));
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.78));
+        };
+        img.src = String(reader.result || '');
+      };
+      reader.readAsDataURL(file);
     });
   }
 
