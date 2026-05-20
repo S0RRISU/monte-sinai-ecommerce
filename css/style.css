@@ -12963,8 +12963,61 @@ body.light-mode .search-field .search-suggestions {
   width: min(1380px, calc(100vw - 32px));
 }
 
+.dashboard-page .hero-small {
+  min-height: 0 !important;
+  padding: 28px 0 16px !important;
+}
+
+.dashboard-page .hero-copy h1 {
+  font-size: clamp(2rem, 4.8vw, 4rem);
+}
+
+.dashboard-page .hero-copy p {
+  margin-bottom: 0;
+}
+
 .admin-content {
   gap: 24px !important;
+}
+
+.admin-content.is-tabbed [data-admin-tab-panel]:not(.active) {
+  display: none !important;
+}
+
+.admin-tab-list {
+  order: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 16px 36px rgba(0, 10, 38, 0.12);
+}
+
+.admin-tab-list button,
+.admin-function-item {
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.admin-tab-list button {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 12px;
+}
+
+.admin-tab-list button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #001a55;
 }
 
 .admin-command-center,
@@ -12987,6 +13040,50 @@ body.light-mode .search-field .search-suggestions {
     linear-gradient(135deg, color-mix(in srgb, var(--primary) 13%, transparent), transparent 46%),
     color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow: 0 18px 42px rgba(0, 10, 38, 0.12);
+}
+
+.admin-function-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-function-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+}
+
+.admin-function-item i {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary-strong);
+}
+
+.admin-function-item strong,
+.admin-function-item small {
+  display: block;
+}
+
+.admin-function-item small {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.admin-function-item:hover,
+.admin-function-item.active {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .admin-command-center h2,
@@ -13115,6 +13212,55 @@ body.light-mode .search-field .search-suggestions {
   height: 150px;
 }
 
+.admin-modal-open {
+  overflow: hidden;
+}
+
+.admin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.admin-modal.hidden {
+  display: none !important;
+}
+
+.admin-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 8, 30, 0.72);
+  cursor: pointer;
+}
+
+.admin-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, 100%);
+  max-height: min(860px, calc(100dvh - 28px));
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--line));
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 30px 90px rgba(0, 8, 30, 0.45);
+}
+
+.admin-modal-panel .admin-product-form {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.admin-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .admin-products-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -13218,6 +13364,71 @@ body.light-mode .search-field .search-suggestions {
 
   .admin-products-list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1020px) {
+  .dashboard-page {
+    width: min(100% - 24px, 100%);
+  }
+
+  .admin-tab-list {
+    position: sticky;
+    top: calc(var(--nav-height) + env(safe-area-inset-top) + 8px);
+    z-index: 260;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .admin-tab-list button,
+  .admin-function-item {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .admin-command-center {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-function-list,
+  .admin-product-actions,
+  .orders-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-shortcuts {
+    display: none !important;
+  }
+
+  .admin-product-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .admin-product-media {
+    width: 100%;
+    height: 180px;
+  }
+
+  .admin-price-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-modal {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .admin-modal-panel {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+
+  .admin-modal-panel .form-grid-2,
+  .admin-modal-panel .form-grid-3 {
+    grid-template-columns: 1fr !important;
   }
 }
 

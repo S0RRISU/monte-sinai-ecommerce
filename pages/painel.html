@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260520-44">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-45">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-3"></script>
-  <script defer src="../js/script.js?v=20260520-37"></script>
+  <script defer src="../js/script.js?v=20260520-38"></script>
 </head>
 <body>
   <header class="navbar">
@@ -75,6 +75,26 @@
     </section>
 
     <div class="admin-content hidden" data-admin-content>
+      <nav class="admin-tab-list" aria-label="Abas do painel administrativo">
+        <button class="active" type="button" data-admin-tab="overview">
+          <i class="fa-solid fa-gauge-high"></i>
+          Resumo
+        </button>
+        <button type="button" data-admin-tab="products">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          Produtos
+        </button>
+        <button type="button" data-admin-tab="orders">
+          <i class="fa-solid fa-clipboard-list"></i>
+          Pedidos
+        </button>
+        <button type="button" data-admin-tab="store">
+          <i class="fa-solid fa-sliders"></i>
+          Loja
+        </button>
+      </nav>
+
+      <section class="admin-tab-panel active" data-admin-tab-panel="overview">
       <section class="dashboard-grid">
         <article class="stat-card dashboard-stat">
           <span>Pedidos no Supabase</span>
@@ -104,11 +124,48 @@
           <h2>O que voce quer fazer agora?</h2>
           <p>Use os atalhos abaixo para criar produto, montar kit, colocar oferta com tempo ou acompanhar pedidos.</p>
         </div>
+        <div class="admin-function-list">
+          <button type="button" class="admin-function-item" data-admin-create-product>
+            <i class="fa-solid fa-plus"></i>
+            <span>
+              <strong>Criar produto</strong>
+              <small>Adicionar produto comum com preco, categoria e imagem.</small>
+            </span>
+          </button>
+          <button type="button" class="admin-function-item" data-admin-create-kit>
+            <i class="fa-solid fa-layer-group"></i>
+            <span>
+              <strong>Montar kit</strong>
+              <small>Criar pacote com varios itens para vender junto.</small>
+            </span>
+          </button>
+          <button type="button" class="admin-function-item" data-admin-create-offer>
+            <i class="fa-solid fa-bolt"></i>
+            <span>
+              <strong>Oferta com tempo</strong>
+              <small>Definir preco promocional e quando termina.</small>
+            </span>
+          </button>
+          <button type="button" class="admin-function-item" data-admin-tab="orders">
+            <i class="fa-solid fa-list-check"></i>
+            <span>
+              <strong>Ver pedidos</strong>
+              <small>Acompanhar pedidos e mudar status.</small>
+            </span>
+          </button>
+          <button type="button" class="admin-function-item" data-admin-tab="store">
+            <i class="fa-solid fa-gear"></i>
+            <span>
+              <strong>Configurar loja</strong>
+              <small>Editar WhatsApp, Pix e nome usado no checkout.</small>
+            </span>
+          </button>
+        </div>
         <div class="dashboard-shortcuts">
-          <a class="btn btn-primary" href="#admin-products">
+          <button class="btn btn-primary" type="button" data-admin-tab="products">
             <i class="fa-solid fa-boxes-stacked"></i>
             Gerenciar produtos
-          </a>
+          </button>
           <button class="btn btn-secondary" type="button" data-admin-create-product>
             <i class="fa-solid fa-plus"></i>
             Criar produto
@@ -121,30 +178,16 @@
             <i class="fa-solid fa-bolt"></i>
             Criar oferta
           </button>
-          <a class="btn btn-secondary" href="#orders-list">
+          <button class="btn btn-secondary" type="button" data-admin-tab="orders">
             <i class="fa-solid fa-clipboard-list"></i>
             Ver pedidos
-          </a>
+          </button>
         </div>
       </section>
-
-      <nav class="admin-mobile-tabs" aria-label="Navegacao rapida do painel">
-        <a class="btn btn-primary" href="#admin-products">
-          <i class="fa-solid fa-box"></i>
-          Produtos
-        </a>
-        <a class="btn btn-secondary" href="#orders-list">
-          <i class="fa-solid fa-list-check"></i>
-          Pedidos
-        </a>
-        <a class="btn btn-secondary" href="#owner-config-form">
-          <i class="fa-solid fa-gear"></i>
-          Loja
-        </a>
-      </nav>
+      </section>
 
       <section class="dashboard-layout">
-        <article class="settings-section owner-settings">
+        <article class="settings-section owner-settings admin-tab-panel" data-admin-tab-panel="store">
           <h2><i class="fa-solid fa-sliders"></i> Configuracao do negocio</h2>
           <p>Preencha os dados que o checkout usa para Pix, WhatsApp e identificacao da loja.</p>
           <form class="checkout-form" id="owner-config-form">
@@ -181,7 +224,7 @@
           </form>
         </article>
 
-        <article class="settings-section owner-orders">
+        <article class="settings-section owner-orders admin-tab-panel" data-admin-tab-panel="orders">
           <div class="admin-section-head">
             <div>
               <h2><i class="fa-solid fa-clipboard-list"></i> Pedidos recebidos</h2>
@@ -202,7 +245,7 @@
         </article>
       </section>
 
-      <section class="settings-section admin-products-section" id="admin-products">
+      <section class="settings-section admin-products-section admin-tab-panel" id="admin-products" data-admin-tab-panel="products">
         <div class="admin-section-head">
           <div>
             <h2><i class="fa-solid fa-boxes-stacked"></i> Produtos</h2>
@@ -221,123 +264,134 @@
         </div>
         <p class="admin-live-status" id="admin-products-status">Carregando produtos do Supabase...</p>
 
-        <form class="checkout-form admin-product-form" id="admin-product-form">
-          <input type="hidden" id="admin-product-id">
-          <div class="admin-form-intro">
-            <div>
-              <span class="eyebrow">Cadastro do catalogo</span>
-              <h3 id="admin-product-form-title">Criar produto</h3>
-              <p>Preencha os dados principais. Para kits e ofertas, use as opcoes abaixo.</p>
-            </div>
-            <button class="btn btn-secondary" type="button" id="cancel-product-edit">
-              <i class="fa-solid fa-xmark"></i>
-              Limpar formulario
-            </button>
-          </div>
-          <div class="form-grid-3">
-            <div class="form-group">
-              <label for="admin-product-name">Nome do produto</label>
-              <input id="admin-product-name" type="text" placeholder="Agua mineral 20L" required>
-            </div>
-            <div class="form-group">
-              <label for="admin-product-price">Preco</label>
-              <input id="admin-product-price" type="number" min="0" step="0.01" placeholder="15,00" required>
-            </div>
-            <div class="form-group">
-              <label for="admin-product-category">Categoria</label>
-              <input id="admin-product-category" type="text" placeholder="Agua, Gas, Limpeza" required>
-            </div>
-          </div>
-          <div class="form-grid-3">
-            <div class="form-group">
-              <label for="admin-product-type">Tipo</label>
-              <select id="admin-product-type">
-                <option value="produto">Produto comum</option>
-                <option value="kit">Kit de produtos</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="admin-product-active">Status</label>
-              <select id="admin-product-active">
-                <option value="true">Produto ativo</option>
-                <option value="false">Produto desativado</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="admin-product-highlight">Destaque na vitrine</label>
-              <select id="admin-product-highlight">
-                <option value="false">Normal</option>
-                <option value="true">Destacar produto</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="admin-product-image">URL da imagem</label>
-              <input id="admin-product-image" type="text" placeholder="https://.../storage/v1/object/public/produtos/...">
-            </div>
-            <div class="form-group admin-upload-group">
-              <label for="admin-product-file">Upload da imagem</label>
-              <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-              <div class="admin-image-preview" id="admin-product-image-preview">
-                <i class="fa-solid fa-image"></i>
+        <div class="admin-modal hidden" id="admin-product-modal" role="dialog" aria-modal="true" aria-labelledby="admin-product-form-title">
+          <button class="admin-modal-backdrop" type="button" aria-label="Fechar cadastro de produto" data-admin-modal-close="product"></button>
+          <div class="admin-modal-panel">
+            <form class="checkout-form admin-product-form" id="admin-product-form">
+              <input type="hidden" id="admin-product-id">
+              <div class="admin-form-intro">
+                <div>
+                  <span class="eyebrow">Cadastro do catalogo</span>
+                  <h3 id="admin-product-form-title">Criar produto</h3>
+                  <p>Preencha os dados principais. Para kits e ofertas, use as opcoes abaixo.</p>
+                </div>
+                <div class="admin-modal-actions">
+                  <button class="btn btn-secondary" type="button" id="cancel-product-edit">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    Limpar
+                  </button>
+                  <button class="btn btn-secondary" type="button" data-admin-modal-close="product">
+                    <i class="fa-solid fa-xmark"></i>
+                    Fechar
+                  </button>
+                </div>
               </div>
-              <button class="btn btn-secondary" type="button" id="admin-product-upload">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                Enviar imagem
-              </button>
-              <small id="admin-product-upload-status"></small>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="admin-product-description">Descricao</label>
-            <textarea id="admin-product-description" rows="3" placeholder="Descricao curta exibida no catalogo"></textarea>
-          </div>
-          <div class="form-group">
-            <label for="admin-product-kit-items">Itens do kit</label>
-            <textarea id="admin-product-kit-items" rows="3" placeholder="Ex: 1 Agua 20L + 1 Detergente 2L + 1 Esponja"></textarea>
-          </div>
-          <div class="admin-offer-panel">
-            <div class="admin-offer-head">
-              <div>
-                <span class="eyebrow">Oferta com temporizador</span>
-                <h3>Destacar promocao</h3>
-                <p>Defina preco promocional e ate quando a oferta fica em destaque para os clientes.</p>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="admin-product-name">Nome do produto</label>
+                  <input id="admin-product-name" type="text" placeholder="Agua mineral 20L" required>
+                </div>
+                <div class="form-group">
+                  <label for="admin-product-price">Preco</label>
+                  <input id="admin-product-price" type="number" min="0" step="0.01" placeholder="15,00" required>
+                </div>
+                <div class="form-group">
+                  <label for="admin-product-category">Categoria</label>
+                  <input id="admin-product-category" type="text" placeholder="Agua, Gas, Limpeza" required>
+                </div>
               </div>
-              <label class="admin-switch">
-                <input id="admin-product-offer-active" type="checkbox">
-                <span>Oferta ativa</span>
-              </label>
-            </div>
-            <div class="form-grid-3">
-              <div class="form-group">
-                <label for="admin-product-promo-price">Preco promocional</label>
-                <input id="admin-product-promo-price" type="number" min="0" step="0.01" placeholder="Ex: 12,90">
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="admin-product-type">Tipo</label>
+                  <select id="admin-product-type">
+                    <option value="produto">Produto comum</option>
+                    <option value="kit">Kit de produtos</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="admin-product-active">Status</label>
+                  <select id="admin-product-active">
+                    <option value="true">Produto ativo</option>
+                    <option value="false">Produto desativado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="admin-product-highlight">Destaque na vitrine</label>
+                  <select id="admin-product-highlight">
+                    <option value="false">Normal</option>
+                    <option value="true">Destacar produto</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="admin-product-image">URL da imagem</label>
+                  <input id="admin-product-image" type="text" placeholder="https://.../storage/v1/object/public/produtos/...">
+                </div>
+                <div class="form-group admin-upload-group">
+                  <label for="admin-product-file">Upload da imagem</label>
+                  <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                  <div class="admin-image-preview" id="admin-product-image-preview">
+                    <i class="fa-solid fa-image"></i>
+                  </div>
+                  <button class="btn btn-secondary" type="button" id="admin-product-upload">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    Enviar imagem
+                  </button>
+                  <small id="admin-product-upload-status"></small>
+                </div>
               </div>
               <div class="form-group">
-                <label for="admin-product-offer-start">Comeca em</label>
-                <input id="admin-product-offer-start" type="datetime-local">
+                <label for="admin-product-description">Descricao</label>
+                <textarea id="admin-product-description" rows="3" placeholder="Descricao curta exibida no catalogo"></textarea>
               </div>
               <div class="form-group">
-                <label for="admin-product-offer-end">Termina em</label>
-                <input id="admin-product-offer-end" type="datetime-local">
+                <label for="admin-product-kit-items">Itens do kit</label>
+                <textarea id="admin-product-kit-items" rows="3" placeholder="Ex: 1 Agua 20L + 1 Detergente 2L + 1 Esponja"></textarea>
               </div>
-            </div>
-            <div class="admin-duration-actions">
-              <button class="btn btn-secondary" type="button" data-offer-duration="2">2 horas</button>
-              <button class="btn btn-secondary" type="button" data-offer-duration="24">24 horas</button>
-              <button class="btn btn-secondary" type="button" data-offer-duration="72">3 dias</button>
-              <button class="btn btn-secondary" type="button" data-offer-duration="168">7 dias</button>
-            </div>
-            <small id="admin-offer-status">Para ofertas e kits completos, execute o SQL de kits/ofertas no Supabase.</small>
+              <div class="admin-offer-panel">
+                <div class="admin-offer-head">
+                  <div>
+                    <span class="eyebrow">Oferta com temporizador</span>
+                    <h3>Destacar promocao</h3>
+                    <p>Defina preco promocional e ate quando a oferta fica em destaque para os clientes.</p>
+                  </div>
+                  <label class="admin-switch">
+                    <input id="admin-product-offer-active" type="checkbox">
+                    <span>Oferta ativa</span>
+                  </label>
+                </div>
+                <div class="form-grid-3">
+                  <div class="form-group">
+                    <label for="admin-product-promo-price">Preco promocional</label>
+                    <input id="admin-product-promo-price" type="number" min="0" step="0.01" placeholder="Ex: 12,90">
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-product-offer-start">Comeca em</label>
+                    <input id="admin-product-offer-start" type="datetime-local">
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-product-offer-end">Termina em</label>
+                    <input id="admin-product-offer-end" type="datetime-local">
+                  </div>
+                </div>
+                <div class="admin-duration-actions">
+                  <button class="btn btn-secondary" type="button" data-offer-duration="2">2 horas</button>
+                  <button class="btn btn-secondary" type="button" data-offer-duration="24">24 horas</button>
+                  <button class="btn btn-secondary" type="button" data-offer-duration="72">3 dias</button>
+                  <button class="btn btn-secondary" type="button" data-offer-duration="168">7 dias</button>
+                </div>
+                <small id="admin-offer-status">Para ofertas e kits completos, execute o SQL de kits/ofertas no Supabase.</small>
+              </div>
+              <div class="settings-actions">
+                <button class="btn btn-primary" type="submit">
+                  <i class="fa-solid fa-floppy-disk"></i>
+                  Salvar produto
+                </button>
+              </div>
+            </form>
           </div>
-          <div class="settings-actions">
-            <button class="btn btn-primary" type="submit">
-              <i class="fa-solid fa-floppy-disk"></i>
-              Salvar produto
-            </button>
-          </div>
-        </form>
+        </div>
 
         <div class="admin-product-toolbar">
           <div class="form-group">

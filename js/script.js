@@ -3821,6 +3821,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     populateOwnerConfigForm();
     bindAdminDashboardActions();
+    initAdminTabs();
     await Promise.all([
       renderOrdersEverywhere({ force: true }),
       refreshAdminProducts()
@@ -3951,6 +3952,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = event.target.files?.[0];
       updateAdminProductPreview(file ? URL.createObjectURL(file) : qs('#admin-product-image')?.value.trim());
     });
+    qsa('[data-admin-modal-close]').forEach(button => {
+      button.addEventListener('click', () => closeAdminModal(button.dataset.adminModalClose));
+    });
     qs('#admin-product-search')?.addEventListener('input', () => renderAdminProducts(adminProductsCache));
     qsa('[data-admin-product-filter]').forEach(button => {
       button.addEventListener('click', () => {
@@ -3961,8 +3965,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('click', handleAdminPanelClick);
     document.body.addEventListener('change', handleAdminPanelChange);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeAdminModal();
+    });
 
     if (dashboard) dashboard.dataset.adminBound = 'true';
+  }
+
+  function initAdminTabs() {
+    const content = qs('[data-admin-content]');
+    if (!content || content.dataset.tabsBound === 'true') return;
+
+    content.classList.add('is-tabbed');
+    qsa('[data-admin-tab]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        setAdminTab(button.dataset.adminTab || 'overview');
+      });
+    });
+
+    setAdminTab(adminTabFromHash(location.hash));
+    content.dataset.tabsBound = 'true';
+  }
+
+  function adminTabFromHash(hash = '') {
+    const target = String(hash || '').replace('#', '');
+    if (target === 'admin-products' || target === 'products') return 'products';
+    if (target === 'orders-list' || target === 'orders') return 'orders';
+    if (target === 'owner-config-form' || target === 'store') return 'store';
+    return 'overview';
+  }
+
+  function setAdminTab(tab = 'overview') {
+    const target = ['overview', 'products', 'orders', 'store'].includes(tab) ? tab : 'overview';
+    qsa('[data-admin-tab]').forEach(button => {
+      const active = button.dataset.adminTab === target;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    qsa('[data-admin-tab-panel]').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.adminTabPanel === target);
+    });
+  }
+
+  function adminModalElement(name = 'product') {
+    return name === 'product' ? qs('#admin-product-modal') : null;
+  }
+
+  function openAdminModal(name = 'product') {
+    const modal = adminModalElement(name);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    document.body.classList.add('admin-modal-open');
+  }
+
+  function closeAdminModal(name = '') {
+    const modals = name ? [adminModalElement(name)] : qsa('.admin-modal');
+    modals.filter(Boolean).forEach(modal => modal.classList.add('hidden'));
+    document.body.classList.remove('admin-modal-open');
   }
 
   function startAdminProductForm(type = 'produto') {
@@ -3973,8 +4033,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeInput) typeInput.value = type;
     if (type === 'kit' && category && !category.value) category.value = 'Kits';
     if (title) title.textContent = type === 'kit' ? 'Criar kit de produtos' : 'Criar produto';
-    qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    qs('#admin-product-name')?.focus();
+    setAdminTab('products');
+    openAdminModal('product');
+    setTimeout(() => qs('#admin-product-name')?.focus(), 80);
   }
 
   function startAdminOfferForm() {
@@ -4379,6 +4440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     resetAdminProductForm();
+    closeAdminModal('product');
     await refreshAdminProducts({ force: true });
     showToast(id ? 'Produto atualizado.' : 'Produto criado.');
   }
@@ -4418,7 +4480,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (offerStart) offerStart.value = formatDateTimeLocalInput(product.oferta_inicio);
     if (offerEnd) offerEnd.value = formatDateTimeLocalInput(product.oferta_fim);
     setText('#admin-product-form-title', productType(product) === 'kit' ? 'Editar kit' : 'Editar produto');
-    qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setAdminTab('products');
+    openAdminModal('product');
   }
 
   function resetAdminProductForm() {
