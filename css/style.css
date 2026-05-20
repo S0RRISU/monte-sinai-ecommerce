@@ -9835,6 +9835,26 @@ body.light-mode .navbar {
     transform: none !important;
   }
 
+  .mobile-quick-dock [data-dock-section="home"] {
+    grid-column: 1 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="store"] {
+    grid-column: 2 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="cart"] {
+    grid-column: 3 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="search"] {
+    grid-column: 4 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="account"] {
+    grid-column: 5 !important;
+  }
+
   .mobile-quick-dock a.active,
   .mobile-quick-dock button.active {
     background: color-mix(in srgb, var(--primary) 17%, transparent) !important;
@@ -9930,6 +9950,11 @@ body.light-mode .navbar {
   }
 
   .mobile-quick-dock .dock-profile-link {
+    flex: 0 0 46px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 46px !important;
+    justify-self: stretch !important;
     padding-inline: 0 !important;
   }
 
@@ -10038,5 +10063,56 @@ body.light-mode .navbar {
     height: 36px !important;
     min-width: 36px !important;
     min-height: 36px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .mobile-quick-dock {
+    display: flex !important;
+    --dock-side-size: calc((100% - var(--dock-cart-size) - 16px) / 4);
+    width: min(380px, calc(100dvw - 16px)) !important;
+    max-width: min(380px, calc(100dvw - 16px)) !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="home"] {
+    order: 1 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="store"] {
+    order: 2 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="cart"] {
+    order: 3 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="search"] {
+    order: 4 !important;
+  }
+
+  .mobile-quick-dock [data-dock-section="account"] {
+    order: 5 !important;
+  }
+
+  .mobile-quick-dock a,
+  .mobile-quick-dock button:not(.dock-cart) {
+    flex: 0 0 var(--dock-side-size) !important;
+    width: var(--dock-side-size) !important;
+    min-width: 0 !important;
+    max-width: var(--dock-side-size) !important;
+  }
+
+  .mobile-quick-dock .dock-cart {
+    flex: 0 0 var(--dock-cart-size) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link {
+    flex: 0 0 var(--dock-side-size) !important;
+    width: var(--dock-side-size) !important;
+    min-width: 0 !important;
+    max-width: var(--dock-side-size) !important;
   }
 }
