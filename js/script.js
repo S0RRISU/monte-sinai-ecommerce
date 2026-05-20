@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cart: 'ms_cart_v2',
     legacyCart: 'ms_cart_v1',
     user: 'ms_customer_v2',
-    accounts: 'ms_accounts_v1',
     orders: 'ms_orders_v1',
     owner: 'ms_owner_config_v1',
     theme: 'ms_theme_v2',
@@ -113,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let cart = loadCart();
   let currentUser = loadJSON(STORAGE.user, null);
+  if (currentUser?.provider !== 'Supabase Auth') currentUser = null;
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
   let activePayment = 'delivery';
   let activeSearchProduct = null;
@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let searchSuggestionFrame = 0;
 
   applySavedTheme();
+  const authReady = initSupabaseAuth();
   upgradeProductImages();
   syncProductsFromRenderedCards();
   enhanceNavigation();
@@ -204,6 +205,77 @@ document.addEventListener('DOMContentLoaded', () => {
     else localStorage.removeItem(STORAGE.user);
     updateAccountUI();
     return saved;
+  }
+
+  function authClient() {
+    return supabaseProductClient();
+  }
+
+  function authMetadata(user = {}) {
+    return user.user_metadata || {};
+  }
+
+  function userFromAuthUser(user) {
+    if (!user) return null;
+    const meta = authMetadata(user);
+    return {
+      id: user.id || '',
+      email: user.email || '',
+      name: meta.name || meta.full_name || '',
+      nick: meta.nick || '',
+      phone: meta.phone || '',
+      address: meta.address || '',
+      photo: meta.photo || meta.avatar_url || '',
+      provider: 'Supabase Auth',
+      updatedAt: meta.updatedAt || user.updated_at || ''
+    };
+  }
+
+  function applyAuthSession(session) {
+    saveUser(session?.user ? userFromAuthUser(session.user) : null);
+    applyCheckoutProfile();
+    if (currentPage() === 'perfil.html') initProfilePage();
+  }
+
+  async function initSupabaseAuth() {
+    localStorage.removeItem('ms_accounts_v1');
+    const client = authClient();
+    if (!client?.auth) {
+      saveUser(null);
+      return;
+    }
+
+    try {
+      const { data, error } = await client.auth.getSession();
+      if (error) throw error;
+      applyAuthSession(data?.session || null);
+    } catch (error) {
+      console.warn('[Supabase Auth] Não foi possível restaurar a sessão.', error);
+      saveUser(null);
+    }
+
+    client.auth.onAuthStateChange((event, session) => {
+      applyAuthSession(session || null);
+      if (event === 'PASSWORD_RECOVERY') {
+        window.dispatchEvent(new CustomEvent('monte-sinai-password-recovery'));
+      }
+    });
+  }
+
+  function authFriendlyError(error, fallback = 'Não foi possível concluir. Tente novamente.') {
+    const message = normalizeText(error?.message || '');
+    if (message.includes('invalid login') || message.includes('invalid credentials')) return 'Email ou senha incorretos.';
+    if (message.includes('email not confirmed')) return 'Confirme seu email antes de entrar.';
+    if (message.includes('already registered') || message.includes('user already registered')) return 'Este email já está cadastrado. Tente entrar.';
+    if (message.includes('password') && message.includes('six')) return 'Use uma senha com pelo menos 6 caracteres.';
+    if (message.includes('rate limit')) return 'Muitas tentativas. Aguarde um pouco e tente novamente.';
+    return fallback;
+  }
+
+  function authRedirectUrl(page = 'login.html', params = {}) {
+    const url = new URL(pageHref(page), window.location.href);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    return url.href;
   }
 
   function formatMoney(value) {
@@ -1129,26 +1201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ensureCustomerProfile() {
-    currentUser = loadJSON(STORAGE.user, null);
-    if (currentUser) {
-      if (!currentUser.email) {
-        currentUser.email = `cliente-${Date.now()}@monte-sinai.local`;
-        currentUser.provider = currentUser.provider || 'Cadastro local';
-        saveUser(currentUser);
-      }
-      return currentUser;
-    }
-
-    currentUser = {
-      email: `cliente-${Date.now()}@monte-sinai.local`,
-      name: '',
-      nick: '',
-      phone: '',
-      address: '',
-      provider: 'Cadastro local'
-    };
-    saveUser(currentUser);
-    return currentUser;
+    return currentUser?.email ? currentUser : null;
   }
 
   function cartSubtotal() {
@@ -2455,35 +2508,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+
   function bindAccountPage() {
     const form = qs('#account-form');
     if (!form) return;
 
+    const client = authClient();
     const params = new URLSearchParams(location.search);
     const tabs = qsa('[data-auth-mode]');
     const submitLabel = qs('[data-auth-submit-label]');
     const status = qs('#account-status');
+    const title = qs('#account-title');
     const nameInput = qs('#login-name');
     const emailInput = qs('#login-email');
     const passInput = qs('#login-password');
     const confirmInput = qs('#login-password-confirm');
     const phoneInput = qs('#login-phone');
     const addressInput = qs('#login-address');
+    const passwordGroup = qs('[data-password-group]');
+    const confirmGroup = qs('[data-confirm-password-group]');
+    const submitButton = qs('button[type="submit"]', form);
 
     const setMode = mode => {
       form.dataset.authMode = mode;
       tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.authMode === mode));
       qsa('[data-register-only]').forEach(field => field.classList.toggle('hidden', mode !== 'register'));
-      if (submitLabel) submitLabel.textContent = mode === 'register' ? 'Cadastrar' : 'Entrar';
-      if (status) {
-        status.textContent = mode === 'register'
-          ? 'Crie sua conta local para salvar telefone e endereço neste aparelho.'
-          : 'Entre para usar seus dados salvos e finalizar pedidos mais rápido.';
+      passwordGroup?.classList.toggle('hidden', mode === 'reset-request');
+      confirmGroup?.classList.toggle('hidden', !['register', 'reset-password'].includes(mode));
+
+      if (submitLabel) {
+        submitLabel.textContent = {
+          register: 'Cadastrar',
+          'reset-request': 'Enviar link',
+          'reset-password': 'Salvar nova senha'
+        }[mode] || 'Entrar';
       }
-      passInput?.setAttribute('autocomplete', mode === 'register' ? 'new-password' : 'current-password');
+
+      if (title) {
+        title.textContent = {
+          register: 'Criar conta',
+          'reset-request': 'Recuperar senha',
+          'reset-password': 'Nova senha'
+        }[mode] || 'Entrar';
+      }
+
+      if (status) {
+        status.textContent = {
+          register: 'Crie sua conta segura com Supabase Auth para salvar telefone e endereço.',
+          'reset-request': 'Informe seu email para receber um link de recuperação de senha.',
+          'reset-password': 'Digite e confirme sua nova senha para finalizar a recuperação.'
+        }[mode] || 'Entre com Supabase Auth para usar seus dados salvos e finalizar pedidos mais rápido.';
+      }
+
+      passInput?.setAttribute('autocomplete', ['register', 'reset-password'].includes(mode) ? 'new-password' : 'current-password');
+      passInput?.setAttribute('placeholder', mode === 'reset-password' ? 'Nova senha' : 'Sua senha');
+      confirmInput?.setAttribute('placeholder', mode === 'reset-password' ? 'Repita a nova senha' : 'Repita a senha');
     };
 
     tabs.forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.authMode || 'login')));
+    window.addEventListener('monte-sinai-password-recovery', () => setMode('reset-password'));
 
     if (currentUser?.email) {
       emailInput.value = currentUser.email || '';
@@ -2492,30 +2575,53 @@ document.addEventListener('DOMContentLoaded', () => {
       addressInput.value = currentUser.address || '';
     }
 
-    form.addEventListener('submit', event => {
+    const setBusy = busy => {
+      if (!submitButton) return;
+      submitButton.disabled = busy;
+      submitButton.classList.toggle('is-loading', busy);
+    };
+
+    form.addEventListener('submit', async event => {
       event.preventDefault();
       const mode = form.dataset.authMode || 'login';
-      const accounts = loadJSON(STORAGE.accounts, {});
       const email = emailInput.value.trim().toLowerCase();
       const password = passInput.value;
 
-      if (!email || !password) {
-        showToast('Informe email e senha para continuar.');
+      if (!client?.auth) {
+        showToast('Autenticação indisponível agora. Tente novamente em alguns instantes.');
         return;
       }
 
-      if (mode === 'register') {
-        const name = nameInput.value.trim();
-        const phone = phoneInput.value.trim();
-        const address = addressInput.value.trim();
+      if (!email) {
+        showToast('Informe seu email para continuar.');
+        return;
+      }
 
-        if (!name || !phone || !address) {
-          showToast('Preencha nome, WhatsApp e endereço para cadastrar.');
-          return;
+      if (mode === 'reset-request') {
+        setBusy(true);
+        try {
+          const { error } = await client.auth.resetPasswordForEmail(email, {
+            redirectTo: authRedirectUrl('login.html', { mode: 'reset-password' })
+          });
+          if (error) throw error;
+          showToast('Enviamos um link de recuperação para seu email.');
+          if (status) status.textContent = 'Confira sua caixa de entrada e spam. O link leva você de volta para criar uma nova senha.';
+        } catch (error) {
+          showToast(authFriendlyError(error, 'Não consegui enviar o link. Confira o email e tente novamente.'));
+        } finally {
+          setBusy(false);
         }
+        return;
+      }
 
-        if (password.length < 4) {
-          showToast('Use uma senha com pelo menos 4 caracteres.');
+      if (!password) {
+        showToast('Informe sua senha para continuar.');
+        return;
+      }
+
+      if (['register', 'reset-password'].includes(mode)) {
+        if (password.length < 6) {
+          showToast('Use uma senha com pelo menos 6 caracteres.');
           return;
         }
 
@@ -2523,40 +2629,85 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('A confirmação da senha precisa ser igual.');
           return;
         }
+      }
 
-        const user = { email, password, name, phone, address, nick: '', provider: 'Cadastro local' };
-        accounts[email] = user;
-        saveJSON(STORAGE.accounts, accounts);
-        finishLogin(user, 'Conta criada com sucesso.');
+      if (mode === 'reset-password') {
+        setBusy(true);
+        try {
+          const { data: sessionData } = await client.auth.getSession();
+          if (!sessionData?.session) {
+            showToast('Abra o link recebido por email antes de salvar a nova senha.');
+            return;
+          }
+
+          const { data, error } = await client.auth.updateUser({ password });
+          if (error) throw error;
+          const user = userFromAuthUser(data.user);
+          if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
+          saveUser(user);
+          finishLogin(user, 'Senha atualizada com sucesso.');
+        } catch (error) {
+          showToast(authFriendlyError(error, 'Não consegui atualizar a senha. Tente abrir o link novamente.'));
+        } finally {
+          setBusy(false);
+        }
         return;
       }
 
-      const saved = accounts[email];
-      if (saved && saved.password !== password) {
-        showToast('Senha diferente da conta salva neste aparelho.');
-        return;
-      }
+      setBusy(true);
+      try {
+        if (mode === 'register') {
+          const name = nameInput.value.trim();
+          const phone = phoneInput.value.trim();
+          const address = addressInput.value.trim();
 
-      const user = saved || {
-        email,
-        password,
-        name: email.split('@')[0],
-        phone: '',
-        address: '',
-        nick: '',
-        provider: 'Login local'
-      };
-      accounts[email] = user;
-      saveJSON(STORAGE.accounts, accounts);
-      finishLogin(user, profileComplete(user) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.');
+          if (!name || !phone || !address) {
+            showToast('Preencha nome, WhatsApp e endereço para cadastrar.');
+            return;
+          }
+
+          const { data, error } = await client.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: authRedirectUrl('perfil.html'),
+              data: { name, phone, address, nick: '', photo: '' }
+            }
+          });
+          if (error) throw error;
+
+          if (data.session?.user) {
+            const user = userFromAuthUser(data.session.user);
+            saveUser(user);
+            finishLogin(user, 'Conta criada com sucesso.');
+          } else {
+            showToast('Conta criada. Confira seu email para confirmar o cadastro.');
+            setMode('login');
+          }
+          return;
+        }
+
+        const { data, error } = await client.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        const user = userFromAuthUser(data.session?.user);
+        if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
+        saveUser(user);
+        finishLogin(user, profileComplete(user) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.');
+      } catch (error) {
+        showToast(authFriendlyError(error, 'Não foi possível entrar. Confira os dados e tente novamente.'));
+      } finally {
+        setBusy(false);
+      }
     });
 
-    setMode(params.get('mode') === 'register' ? 'register' : 'login');
+    const initialMode = params.get('mode') === 'register'
+      ? 'register'
+      : (params.get('mode') === 'reset-password' || location.hash.includes('type=recovery') ? 'reset-password' : 'login');
+    setMode(initialMode);
   }
 
   function finishLogin(user, message) {
-    const { password: _password, ...safeUser } = user;
-    saveUser(safeUser);
+    if (user) saveUser(user);
     showToast(message);
 
     const params = new URLSearchParams(location.search);
@@ -2666,7 +2817,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyCheckoutProfile() {
-    currentUser = loadJSON(STORAGE.user, null);
     const form = qs('#payment-form');
     const profileBox = qs('#checkout-profile-box');
     const accountCard = qs('#checkout-account-card');
@@ -2860,7 +3010,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (action === 'privacy') {
-      return 'Seus dados ficam neste navegador. Você pode limpar cache, carrinho e histórico quando quiser.';
+      return 'Seus dados ficam na sua conta Supabase e são usados apenas para agilizar pedidos.';
     }
 
     if (action === 'support') {
@@ -2933,6 +3083,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initProfilePage() {
     if (!qs('#profile-page') || currentPage() !== 'perfil.html') return;
+    const firstBind = document.body.dataset.profilePageBound !== 'true';
     const summary = qs('.profile-summary');
     const details = qs('#profile-details');
     const empty = qs('#profile-empty');
@@ -2971,7 +3122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setText('#profile-name', signed ? (currentUser.name || 'Cliente Monte Sinai') : 'Cliente visitante');
     setText('#profile-nick', signed && currentUser.nick ? `@${currentUser.nick}` : '');
-    setText('#profile-provider', signed ? (currentUser.provider || 'Cadastro local') : 'Entre ou cadastre-se para salvar seus dados');
+    setText('#profile-provider', signed ? (currentUser.provider || 'Supabase Auth') : 'Entre ou cadastre-se para salvar seus dados');
     setText('#profile-email', signed ? (currentUser.email || 'Não informado') : 'Disponível após entrar ou cadastrar');
     setText('#profile-phone', signed ? (currentUser.phone || 'Complete seu WhatsApp') : 'Salve seu WhatsApp em uma conta');
     setText('#profile-address', signed ? (currentUser.address || 'Complete seu endereço') : 'Salve seu endereço para pedidos rápidos');
@@ -2982,34 +3133,42 @@ document.addEventListener('DOMContentLoaded', () => {
       : 'Você pode ajustar as configurações do site agora. Para editar perfil e salvar dados, entre ou cadastre-se.');
     updateProfileActionCards(signed);
 
-    qsa('[data-profile-tab]').forEach(tab => {
-      tab.addEventListener('click', () => {
-        const target = tab.dataset.profileTab || 'details';
-        qsa('[data-profile-tab]').forEach(item => item.classList.toggle('active', item === tab));
-        qsa('[data-profile-panel]').forEach(panel => {
-          panel.classList.toggle('hidden', panel.dataset.profilePanel !== target);
+    if (firstBind) {
+      qsa('[data-profile-tab]').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const target = tab.dataset.profileTab || 'details';
+          qsa('[data-profile-tab]').forEach(item => item.classList.toggle('active', item === tab));
+          qsa('[data-profile-panel]').forEach(panel => {
+            panel.classList.toggle('hidden', panel.dataset.profilePanel !== target);
+          });
         });
       });
-    });
 
-    qs('[data-switch-account]')?.addEventListener('click', () => {
-      window.location.href = loginHref({ redirect: 'perfil.html' });
-    });
+      qs('[data-switch-account]')?.addEventListener('click', () => {
+        window.location.href = loginHref({ redirect: 'perfil.html' });
+      });
 
-    qs('[data-logout-account]')?.addEventListener('click', () => {
-      saveUser(null);
-      showToast('Você saiu da conta.');
-      setTimeout(() => window.location.href = profileHref(), 500);
-    });
+      qs('[data-logout-account]')?.addEventListener('click', async () => {
+        const client = authClient();
+        if (client?.auth) await client.auth.signOut();
+        saveUser(null);
+        showToast('Você saiu da conta.');
+        setTimeout(() => window.location.href = profileHref(), 500);
+      });
+
+      document.body.dataset.profilePageBound = 'true';
+    }
 
     renderOrdersEverywhere();
   }
 
-  function initProfileEditPage() {
+
+  async function initProfileEditPage() {
     const form = qs('#profile-edit-form');
     if (!form) return;
 
-    currentUser = loadJSON(STORAGE.user, null);
+    await authReady.catch(() => null);
+
     if (!currentUser?.email) {
       showToast('Entre ou cadastre-se para editar o perfil.');
       setTimeout(() => {
@@ -3044,7 +3203,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.href = profileHref();
     });
 
-    form.addEventListener('submit', event => {
+    form.addEventListener('submit', async event => {
       event.preventDefault();
       const updated = {
         ...currentUser,
@@ -3053,7 +3212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         phone: qs('#edit-phone')?.value.trim() || '',
         address: qs('#edit-address')?.value.trim() || '',
         photo: preview?.src?.startsWith('data:') ? preview.src : currentUser.photo,
-        provider: currentUser.provider || 'Cadastro local',
+        provider: 'Supabase Auth',
         updatedAt: new Date().toISOString()
       };
 
@@ -3062,13 +3221,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const accounts = loadJSON(STORAGE.accounts, {});
-      accounts[updated.email] = { ...(accounts[updated.email] || {}), ...updated };
-      const accountSaved = saveJSON(STORAGE.accounts, accounts);
-      const profileSaved = saveUser(updated);
-      if (!accountSaved || !profileSaved) return;
-      showToast('Perfil atualizado e salvo.');
-      setTimeout(() => window.location.href = profileHref(), 500);
+      const client = authClient();
+      if (!client?.auth) {
+        showToast('Autenticação indisponível agora. Tente novamente.');
+        return;
+      }
+
+      try {
+        const { data, error } = await client.auth.updateUser({
+          data: {
+            name: updated.name,
+            nick: updated.nick,
+            phone: updated.phone,
+            address: updated.address,
+            photo: updated.photo || '',
+            updatedAt: updated.updatedAt
+          }
+        });
+        if (error) throw error;
+
+        const savedUser = userFromAuthUser(data.user);
+        if (!savedUser?.email) throw new Error('Perfil não retornado pelo Supabase.');
+        saveUser(savedUser);
+        showToast('Perfil atualizado com segurança.');
+        setTimeout(() => window.location.href = profileHref(), 500);
+      } catch (error) {
+        showToast(authFriendlyError(error, 'Não consegui salvar o perfil. Tente novamente.'));
+      }
     });
   }
 

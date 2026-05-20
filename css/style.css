@@ -3875,8 +3875,17 @@ body.light-mode .nav-icon {
   gap: 12px;
 }
 
-.account-form[data-auth-mode="login"] [data-register-only] {
+.account-form[data-auth-mode="login"] [data-register-only],
+.account-form[data-auth-mode="reset-request"] [data-register-only],
+.account-form[data-auth-mode="reset-password"] [data-register-only],
+.account-form[data-auth-mode="reset-request"] [data-password-group],
+.account-form[data-auth-mode="login"] [data-confirm-password-group],
+.account-form[data-auth-mode="reset-request"] [data-confirm-password-group] {
   display: none !important;
+}
+
+.auth-mode-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 @media (max-width: 760px) {
@@ -7854,6 +7863,24 @@ body:not(.light-mode) .login-shell .btn-primary {
   border-color: var(--primary-strong) !important;
   background: linear-gradient(180deg, var(--primary), var(--primary-strong)) !important;
   color: #ffffff !important;
+}
+
+.login-shell .auth-mode-tabs,
+body:not(.light-mode) .login-shell .auth-mode-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.login-shell .auth-mode-tab {
+  padding-inline: 6px;
+  line-height: 1.08;
+  text-align: center;
+}
+
+@media (max-width: 380px) {
+  .login-shell .auth-mode-tab {
+    font-size: 0.78rem;
+    padding-inline: 4px;
+  }
 }
 
 @media (max-width: 760px) {

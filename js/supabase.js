@@ -14,7 +14,13 @@
     return;
   }
 
-  window.monteSinaiSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.monteSinaiSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
   window.supabaseClient = window.monteSinaiSupabase;
   console.log('[Supabase] Cliente conectado:', SUPABASE_URL);
 })();
