@@ -66,6 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
       title: 'Apoio para o dia a dia'
     }
   };
+  const CATALOG_VARIANT_ORDER = {
+    'gas-de-cozinha-p13': ['Supergas', 'Ultragas'],
+    'desinfetante-2l': ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive']
+  };
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -276,7 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productTerms(product) {
-    return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.terms || ''}`;
+    const optionTerms = Array.isArray(product?.options)
+      ? product.options.map(option => `${option.label || ''} ${option.value || ''}`).join(' ')
+      : '';
+    return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.terms || ''} ${optionTerms}`;
   }
 
   function isRecommendedProduct(product) {
@@ -298,14 +305,114 @@ document.addEventListener('DOMContentLoaded', () => {
       description,
       price,
       image,
+      options: Array.isArray(raw.options) ? raw.options : [],
       recommended: Boolean(raw.recommended),
       terms: `${name} ${category} ${description}`
     };
   }
 
+  function productVariantInfo(product) {
+    const name = product.name || '';
+    const normalized = normalizeText(name);
+
+    if (normalized.startsWith('gas de cozinha p13')) {
+      const baseName = 'Gás de cozinha P13';
+      const variant = productVariantLabel(name, baseName, /^g[aá]s de cozinha p13\s*/i);
+      return {
+        baseName,
+        variant,
+        category: 'Gás',
+        description: 'Escolha o tipo: Supergas R$ 125,00 ou Ultragas R$ 135,00.'
+      };
+    }
+
+    if (normalized.startsWith('desinfetante 2l')) {
+      const baseName = 'Desinfetante 2L';
+      const variant = productVariantLabel(name, baseName, /^desinfetante 2l\s*/i);
+      return {
+        baseName,
+        variant,
+        category: 'Limpeza',
+        description: 'Escolha a fragrância de sua preferência para perfumar a limpeza.'
+      };
+    }
+
+    return null;
+  }
+
+  function variantOrderIndex(baseName, variant) {
+    const order = CATALOG_VARIANT_ORDER[categorySlug(baseName)] || [];
+    const index = order.findIndex(item => normalizeText(item) === normalizeText(variant));
+    return index === -1 ? order.length : index;
+  }
+
+  function productVariantLabel(name, baseName, prefixPattern) {
+    const order = CATALOG_VARIANT_ORDER[categorySlug(baseName)] || [];
+    const knownVariant = order.find(option => normalizeText(name).includes(normalizeText(option)));
+    if (knownVariant) return knownVariant;
+    return name.replace(prefixPattern, '').trim() || 'Padrão';
+  }
+
+  function groupProductVariants(products) {
+    const grouped = new Map();
+    const result = [];
+
+    products.forEach(product => {
+      const variantInfo = productVariantInfo(product);
+      if (!variantInfo) {
+        result.push(product);
+        return;
+      }
+
+      const key = normalizeText(variantInfo.baseName);
+      let group = grouped.get(key);
+
+      if (!group) {
+        group = {
+          ...product,
+          name: variantInfo.baseName,
+          category: variantInfo.category || product.category,
+          categorySlug: categorySlug(variantInfo.category || product.category),
+          description: variantInfo.description || product.description,
+          image: resolveProductImagePath(product.image || '', variantInfo.baseName),
+          options: [],
+          recommended: Boolean(product.recommended) || isRecommendedProduct(product),
+          terms: `${variantInfo.baseName} ${variantInfo.category || product.category} ${product.terms || ''}`
+        };
+        grouped.set(key, group);
+        result.push(group);
+      }
+
+      if (variantInfo.variant !== 'Padrão' && !group.options.some(option => normalizeText(option.value) === normalizeText(variantInfo.variant))) {
+        group.options.push({
+          label: `${variantInfo.variant} - ${formatMoney(product.price)}`,
+          value: variantInfo.variant,
+          price: Number(product.price || 0)
+        });
+      }
+
+      group.price = group.options[0]?.price ?? group.price;
+      group.terms = `${group.terms || ''} ${variantInfo.variant} ${product.description || ''}`;
+    });
+
+    result.forEach(product => {
+      if (product.options?.length > 1) {
+        product.options.sort((optionA, optionB) => {
+          const orderA = variantOrderIndex(product.name, optionA.value);
+          const orderB = variantOrderIndex(product.name, optionB.value);
+          if (orderA !== orderB) return orderA - orderB;
+          return String(optionA.value).localeCompare(String(optionB.value), 'pt-BR');
+        });
+        product.price = Number(product.options[0]?.price || product.price || 0);
+      }
+    });
+
+    return result;
+  }
+
   function uniqueProductList(products) {
     const seen = new Set();
-    return products
+    const unique = products
       .map(normalizeProduct)
       .filter(product => product.name)
       .filter(product => {
@@ -314,6 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
         seen.add(key);
         return true;
       });
+
+    return groupProductVariants(unique);
   }
 
   function setProductIndex(products) {
@@ -774,6 +883,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productOptions(product, card = productCatalogCard(product)) {
+    if (Array.isArray(product?.options) && product.options.length) {
+      return product.options.map(option => ({
+        label: option.label || option.value || 'Opção',
+        value: option.value || option.label || '',
+        price: Number(option.price || product.price || 0)
+      }));
+    }
+
     const select = card?.querySelector('.product-option');
     if (select) {
       return [...select.options].map(option => ({
@@ -1645,6 +1762,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const recommended = isRecommendedProduct(normalized);
     const image = productAssetPath(normalized);
+    const options = productOptions(normalized);
+    const hasOptions = options.length > 1;
+    const firstOption = options[0] || { price: normalized.price };
     const cardClass = [
       'product-card',
       mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
@@ -1662,8 +1782,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
         <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
-        <strong>${formatMoney(normalized.price)}</strong>
-        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(normalized.price)}" data-image="${escapeHTML(image)}">Adicionar</button>
+        ${hasOptions ? `
+          <select class="product-option" aria-label="${escapeHTML(normalized.name.includes('Desinfetante') ? 'Escolher fragrância do desinfetante' : 'Escolher tipo do produto')}">
+            ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+          </select>
+        ` : ''}
+        <strong>${formatMoney(firstOption.price || normalized.price)}</strong>
+        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}">Adicionar</button>
       </article>
     `;
   }
