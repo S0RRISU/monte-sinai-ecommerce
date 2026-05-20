@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260520-41">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-42">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-3"></script>
-  <script defer src="../js/script.js?v=20260520-35"></script>
+  <script defer src="../js/script.js?v=20260520-36"></script>
 </head>
 <body>
   <header class="navbar">
@@ -90,6 +90,21 @@
         </article>
       </section>
 
+      <section class="dashboard-shortcuts" aria-label="Atalhos do painel administrativo">
+        <a class="btn btn-primary" href="#admin-products">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          Gerenciar produtos
+        </a>
+        <button class="btn btn-secondary" type="button" data-admin-create-product>
+          <i class="fa-solid fa-plus"></i>
+          Criar produto
+        </button>
+        <a class="btn btn-secondary" href="#orders-list">
+          <i class="fa-solid fa-clipboard-list"></i>
+          Ver pedidos
+        </a>
+      </section>
+
       <section class="dashboard-layout">
         <article class="settings-section owner-settings">
           <h2><i class="fa-solid fa-sliders"></i> Configuracao do negocio</h2>
@@ -149,17 +164,24 @@
         </article>
       </section>
 
-      <section class="settings-section admin-products-section">
+      <section class="settings-section admin-products-section" id="admin-products">
         <div class="admin-section-head">
           <div>
             <h2><i class="fa-solid fa-boxes-stacked"></i> Produtos</h2>
-            <p>Crie, edite preco, ative ou desative itens do catalogo conectado ao Supabase.</p>
+            <p>Liste, crie, edite, exclua, ative/desative e envie imagens para o catalogo conectado ao Supabase.</p>
           </div>
-          <button class="btn btn-secondary" type="button" id="refresh-products">
-            <i class="fa-solid fa-rotate"></i>
-            Atualizar produtos
-          </button>
+          <div class="orders-toolbar">
+            <button class="btn btn-secondary" type="button" id="refresh-products">
+              <i class="fa-solid fa-rotate"></i>
+              Atualizar produtos
+            </button>
+            <button class="btn btn-secondary" type="button" data-admin-create-product>
+              <i class="fa-solid fa-plus"></i>
+              Novo produto
+            </button>
+          </div>
         </div>
+        <p class="admin-live-status" id="admin-products-status">Carregando produtos do Supabase...</p>
 
         <form class="checkout-form admin-product-form" id="admin-product-form">
           <input type="hidden" id="admin-product-id">
@@ -185,6 +207,9 @@
             <div class="form-group admin-upload-group">
               <label for="admin-product-file">Upload da imagem</label>
               <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+              <div class="admin-image-preview" id="admin-product-image-preview">
+                <i class="fa-solid fa-image"></i>
+              </div>
               <button class="btn btn-secondary" type="button" id="admin-product-upload">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 Enviar imagem

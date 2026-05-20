@@ -3823,6 +3823,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qs('#refresh-orders')?.addEventListener('click', () => renderOrdersEverywhere({ force: true }));
     qs('#refresh-products')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
+    qsa('[data-admin-create-product]').forEach(button => {
+      button.addEventListener('click', () => {
+        resetAdminProductForm();
+        qs('#admin-product-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        qs('#admin-product-name')?.focus();
+      });
+    });
 
     qs('#export-orders')?.addEventListener('click', async () => {
       const orders = await loadOrdersFromSupabase({ force: true });
@@ -3838,6 +3845,13 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#admin-product-form')?.addEventListener('submit', saveAdminProduct);
     qs('#admin-product-upload')?.addEventListener('click', uploadSelectedAdminProductImage);
     qs('#cancel-product-edit')?.addEventListener('click', resetAdminProductForm);
+    qs('#admin-product-image')?.addEventListener('input', event => {
+      updateAdminProductPreview(event.target.value);
+    });
+    qs('#admin-product-file')?.addEventListener('change', event => {
+      const file = event.target.files?.[0];
+      updateAdminProductPreview(file ? URL.createObjectURL(file) : qs('#admin-product-image')?.value.trim());
+    });
 
     document.body.addEventListener('click', handleAdminPanelClick);
     document.body.addEventListener('change', handleAdminPanelChange);
@@ -3923,15 +3937,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function refreshAdminProducts({ force = true } = {}) {
     try {
+      setAdminProductsStatus('Carregando produtos do Supabase...');
       const products = await loadAdminProducts({ force });
       renderAdminProducts(products);
       setText('#dash-products-count', String(products.filter(product => product.ativo).length));
       setProductIndex(products.filter(product => product.ativo));
+      setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} carregado${products.length === 1 ? '' : 's'} da tabela public.produtos.`);
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel carregar produtos administrativos.', error);
+      setAdminProductsStatus('Nao foi possivel carregar os produtos do Supabase.');
       qs('#admin-products-list')?.replaceChildren();
       qs('#admin-products-list')?.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nao foi possivel carregar os produtos.</p>');
     }
+  }
+
+  function setAdminProductsStatus(message = '') {
+    setText('#admin-products-status', message);
   }
 
   function adminProductPayload() {
@@ -3957,6 +3978,20 @@ document.addEventListener('DOMContentLoaded', () => {
   function productImageUploadStatus(message = '') {
     const status = qs('#admin-product-upload-status');
     if (status) status.textContent = message;
+  }
+
+  function updateAdminProductPreview(src = '') {
+    const preview = qs('#admin-product-image-preview');
+    if (!preview) return;
+
+    const clean = String(src || '').trim();
+    if (!clean) {
+      preview.innerHTML = '<i class="fa-solid fa-image"></i>';
+      return;
+    }
+
+    const href = assetHref(clean);
+    preview.innerHTML = `<img src="${escapeHTML(href)}" alt="Previa da imagem do produto" loading="lazy" decoding="async">`;
   }
 
   function storageSafeFileName(value) {
@@ -4038,6 +4073,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const imageInput = qs('#admin-product-image');
       if (imageInput) imageInput.value = publicUrl;
+      updateAdminProductPreview(publicUrl);
       const fileInput = qs('#admin-product-file');
       if (fileInput) fileInput.value = '';
       productImageUploadStatus('Imagem enviada.');
@@ -4107,6 +4143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (category) category.value = product.categoria || '';
     if (image) image.value = product.imagem || '';
     if (file) file.value = '';
+    updateAdminProductPreview(product.imagem || '');
     productImageUploadStatus('');
     if (description) description.value = product.descricao || '';
     if (active) active.value = product.ativo ? 'true' : 'false';
@@ -4122,6 +4159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (id) id.value = '';
     if (active) active.value = 'true';
     if (file) file.value = '';
+    updateAdminProductPreview('');
     productImageUploadStatus('');
     qs('#cancel-product-edit')?.classList.add('hidden');
   }
