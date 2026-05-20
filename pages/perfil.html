@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Perfil | Monte Sinai</title>
-  <link rel="stylesheet" href="../css/style.css?v=20260520-22">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-24">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="../js/script.js?v=20260520-17"></script>
+  <script defer src="../js/script.js?v=20260520-18"></script>
 </head>
 <body>
   <header class="navbar">
@@ -109,6 +109,11 @@
       </article>
 
       <article class="profile-card profile-details" id="profile-details">
+        <div class="profile-tabs" role="tablist" aria-label="Perfil do cliente">
+          <button class="active" type="button" data-profile-tab="details">Dados do perfil</button>
+          <button type="button" data-profile-tab="history">Historico de pedidos</button>
+        </div>
+        <div class="profile-tab-panel" data-profile-panel="details">
         <div class="section-head">
           <span class="eyebrow" id="profile-details-eyebrow">Detalhes do perfil</span>
           <h2>Informações do cliente</h2>
@@ -144,11 +149,22 @@
             </div>
           </div>
         </div>
-        <div class="profile-orders" id="profile-orders" data-orders-container>
+        </div>
+        <div class="profile-orders profile-tab-panel hidden" id="profile-orders" data-orders-container data-profile-panel="history">
           <div class="section-head">
-            <span class="eyebrow">Seus pedidos</span>
-            <h3>Controle de pedidos</h3>
-            <p>Aqui aparecem seus pedidos registrados neste navegador.</p>
+            <span class="eyebrow">Historico de pedidos</span>
+            <h3>Pedidos salvos neste navegador</h3>
+            <p>Acompanhe os pedidos ja enviados e limpe o historico quando quiser.</p>
+          </div>
+          <div class="settings-actions profile-history-actions">
+            <button class="btn btn-secondary" type="button" data-clear-order-history>
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              Limpar historico
+            </button>
+            <button class="btn btn-secondary" type="button" data-clear-cache-orders>
+              <i class="fa-solid fa-broom"></i>
+              Limpar cache e historico
+            </button>
           </div>
           <!-- orders rendered by JS -->
         </div>

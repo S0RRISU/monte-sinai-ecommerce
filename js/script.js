@@ -101,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUser = loadJSON(STORAGE.user, null);
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
   let activePayment = 'delivery';
+  let activeSearchProduct = null;
+  let productSearchResults = [];
 
   applySavedTheme();
   upgradeProductImages();
@@ -113,7 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
   bindProductRail();
   ensureCartShell();
   ensureSmartSearchShell();
+  ensureProductSearchModalShell();
   bindCartActions();
+  bindDataCleanupActions();
   bindSmartSearchPanel();
   renderCart();
   bindAccountPage();
@@ -493,6 +497,263 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     return nameMatches + contextMatches >= tokens.length && (nameMatches > 0 || allowContext);
+  }
+
+  function resolveSearchProduct(productOrName) {
+    const value = typeof productOrName === 'string' ? productOrName : productOrName?.name;
+    const normalized = normalizeText(value);
+    if (!normalized) return null;
+
+    return PRODUCT_INDEX.find(product => normalizeText(product.name) === normalized)
+      || PRODUCT_INDEX.find(product => {
+        const productName = normalizeText(product.name);
+        return productName.includes(normalized) || normalized.includes(productName);
+      })
+      || (typeof productOrName === 'object' ? productOrName : null);
+  }
+
+  function uniqueProducts(products) {
+    const seen = new Set();
+    return products
+      .map(resolveSearchProduct)
+      .filter(Boolean)
+      .filter(product => {
+        const key = normalizeText(product.name);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function productCatalogCard(product) {
+    return qsa('.catalog-product, .rail-product, .product-card')
+      .find(card => cardMatchesCatalogProduct(card, product));
+  }
+
+  function productAssetPath(product, card = productCatalogCard(product)) {
+    const cardImage = card?.querySelector('.product-image')?.getAttribute('src');
+    if (cardImage) return canonicalAssetPath(cardImage);
+
+    const name = normalizeText(product.name);
+    const images = [
+      ['agua', 'assets/produtos/agua-mineral-20l.png'],
+      ['gas', 'assets/produtos/gas-p13.png'],
+      ['alcool', 'assets/produtos/alcool-perfumado.png'],
+      ['amaciante', 'assets/produtos/amaciante-2l.png'],
+      ['candida colorida', 'assets/produtos/candida-colorida.png'],
+      ['candida', 'assets/produtos/candida-2l.png'],
+      ['cloro 1', 'assets/produtos/cloro-1l.png'],
+      ['cloro 2', 'assets/produtos/cloro-2l.png'],
+      ['detergente', 'assets/produtos/detergente-2l.png'],
+      ['desinfetante', 'assets/produtos/desinfetante-2l.png'],
+      ['limpa aluminio', 'assets/produtos/limpa-aluminio.png'],
+      ['limpa pedra 500', 'assets/produtos/limpa-pedra-500ml.png'],
+      ['limpa pedra', 'assets/produtos/limpa-pedra-2l.png'],
+      ['sabao de coco', 'assets/produtos/sabao-coco.png'],
+      ['sabao omo', 'assets/produtos/sabao-omo.png'],
+      ['sabonete', 'assets/produtos/sabonete-liquido.png'],
+      ['escova de roupa', 'assets/produtos/escova-roupa.png'],
+      ['escova de vaso', 'assets/produtos/escova-vaso.png'],
+      ['esponja de aco', 'assets/produtos/esponja-aco.png'],
+      ['esponja de louca', 'assets/produtos/esponja-louca.png'],
+      ['esponjao', 'assets/produtos/esponjao.png'],
+      ['bombril', 'assets/produtos/bombril.png'],
+      ['pasta de brilho', 'assets/produtos/pasta-brilho.png'],
+      ['pedra de vaso', 'assets/produtos/pedra-vaso.png'],
+      ['prendedor de madeira', 'assets/produtos/prendedor-madeira.png'],
+      ['prendedor plastico', 'assets/produtos/prendedor-plastico.png'],
+      ['rodo grande', 'assets/produtos/rodo-grande.png'],
+      ['rodo pequeno', 'assets/produtos/rodo-pequeno.png'],
+      ['rodinho', 'assets/produtos/rodinho-pia.png'],
+      ['saco de lixo', 'assets/produtos/saco-lixo.png'],
+      ['vassoura', 'assets/produtos/vassoura.png'],
+      ['pa', 'assets/produtos/pa.png']
+    ];
+
+    return images.find(([term]) => name.includes(term))?.[1] || '';
+  }
+
+  function productDescription(product, card = productCatalogCard(product)) {
+    return card?.querySelector('p')?.textContent?.trim()
+      || `Produto de ${product.category || 'catálogo'} pronto para adicionar ao seu pedido.`;
+  }
+
+  function productOptions(product, card = productCatalogCard(product)) {
+    const select = card?.querySelector('.product-option');
+    if (select) {
+      return [...select.options].map(option => ({
+        label: option.textContent.trim(),
+        value: option.value || option.textContent.trim(),
+        price: Number(option.dataset.price || product.price || 0)
+      }));
+    }
+
+    const name = normalizeText(product.name);
+    if (name.includes('gas')) {
+      return [
+        { label: 'Supergas - R$ 125,00', value: 'Supergas', price: 125 },
+        { label: 'Ultragas - R$ 135,00', value: 'Ultragas', price: 135 }
+      ];
+    }
+
+    if (name.includes('desinfetante')) {
+      return ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive']
+        .map(label => ({ label, value: label, price: Number(product.price || 5) }));
+    }
+
+    return [{ label: 'Padrão', value: '', price: Number(product.price || 0) }];
+  }
+
+  function openSearchProductFromQuery(query) {
+    const term = String(query ?? '').trim();
+    if (!term) {
+      showToast('Digite o produto que você quer encontrar.');
+      return;
+    }
+
+    const direct = directSearchProducts(term, 6);
+    const matches = direct.length ? direct : searchSuggestionProducts(term, 6);
+    if (!matches.length) {
+      showToast('Nenhum produto encontrado para essa busca.');
+      return;
+    }
+
+    openProductSearchModal(matches[0], matches, term);
+  }
+
+  function ensureProductSearchModalShell() {
+    if (qs('.product-search-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'product-search-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Produto pesquisado');
+    modal.innerHTML = `
+      <div class="product-search-backdrop" data-close-product-search></div>
+      <article class="product-search-panel">
+        <button class="icon-button product-search-close" type="button" data-close-product-search aria-label="Fechar produto">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="product-search-content" data-product-search-content></div>
+      </article>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-close-product-search]')) {
+        closeProductSearchModal();
+        return;
+      }
+
+      const resultButton = event.target.closest('[data-product-result-index]');
+      if (resultButton) {
+        const index = Number(resultButton.dataset.productResultIndex || 0);
+        const nextProduct = productSearchResults[index];
+        if (nextProduct) renderProductSearchModal(nextProduct);
+        return;
+      }
+
+      const addButton = event.target.closest('[data-add-search-product]');
+      if (!addButton || !activeSearchProduct) return;
+
+      const options = productOptions(activeSearchProduct);
+      const selectedIndex = Number(qs('[data-product-search-variant]', modal)?.value || 0);
+      const selected = options[selectedIndex] || options[0];
+      addToCart({
+        name: activeSearchProduct.name,
+        variant: selected?.value || '',
+        price: Number(selected?.price || activeSearchProduct.price || 0),
+        image: productAssetPath(activeSearchProduct)
+      });
+      closeProductSearchModal();
+    });
+  }
+
+  function openProductSearchModal(product, results = [], query = '') {
+    const resolved = resolveSearchProduct(product);
+    if (!resolved) {
+      showToast('Produto não encontrado.');
+      return;
+    }
+
+    productSearchResults = uniqueProducts(results.length ? results : [resolved]);
+    if (!productSearchResults.some(item => normalizeText(item.name) === normalizeText(resolved.name))) {
+      productSearchResults.unshift(resolved);
+    }
+
+    const modal = qs('.product-search-modal');
+    if (!modal) return;
+    modal.dataset.searchTerm = query;
+    renderProductSearchModal(resolved);
+    modal.classList.add('open');
+    document.body.classList.add('product-search-open');
+  }
+
+  function closeProductSearchModal() {
+    qs('.product-search-modal')?.classList.remove('open');
+    document.body.classList.remove('product-search-open');
+    activeSearchProduct = null;
+  }
+
+  function renderProductSearchModal(product) {
+    activeSearchProduct = resolveSearchProduct(product);
+    const content = qs('[data-product-search-content]');
+    if (!content || !activeSearchProduct) return;
+
+    const card = productCatalogCard(activeSearchProduct);
+    const image = productAssetPath(activeSearchProduct, card);
+    const description = productDescription(activeSearchProduct, card);
+    const options = productOptions(activeSearchProduct, card);
+    const firstOption = options[0] || { price: activeSearchProduct.price || 0 };
+    const resultButtons = productSearchResults.length > 1
+      ? `
+        <div class="product-search-more">
+          <span>Outras sugestões</span>
+          <div>
+            ${productSearchResults.map((result, index) => `
+              <button class="${normalizeText(result.name) === normalizeText(activeSearchProduct.name) ? 'active' : ''}" type="button" data-product-result-index="${index}">
+                ${escapeHTML(result.name)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `
+      : '';
+
+    content.innerHTML = `
+      <div class="product-search-media">
+        ${image ? `<img src="${assetHref(image)}" alt="${escapeHTML(activeSearchProduct.name)}">` : `<i class="fa-solid ${smartProductIcon(activeSearchProduct)}"></i>`}
+      </div>
+      <div class="product-search-info">
+        <span class="eyebrow">Produto encontrado</span>
+        <h2>${escapeHTML(activeSearchProduct.name)}</h2>
+        <p>${escapeHTML(description)}</p>
+        <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
+        ${options.length > 1 ? `
+          <label class="product-search-variant">
+            <span>Escolha uma opção</span>
+            <select data-product-search-variant>
+              ${options.map((option, index) => `<option value="${index}">${escapeHTML(option.label)}</option>`).join('')}
+            </select>
+          </label>
+        ` : ''}
+        ${resultButtons}
+        <div class="product-search-actions">
+          <button class="btn btn-primary" type="button" data-add-search-product>
+            <i class="fa-solid fa-cart-plus"></i>
+            Adicionar ao carrinho
+          </button>
+          <button class="btn btn-secondary" type="button" data-close-product-search>Agora não</button>
+        </div>
+      </div>
+    `;
+
+    qs('[data-product-search-variant]', content)?.addEventListener('change', event => {
+      const selected = options[Number(event.target.value || 0)] || firstOption;
+      const price = qs('[data-product-search-price]', content);
+      if (price) price.textContent = formatMoney(selected.price || activeSearchProduct.price);
+    });
   }
 
   function activateCatalogFilter(filter = 'all') {
@@ -931,13 +1192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const term = input?.value.trim() || '';
         hideSearchSuggestions(suggestions);
-
-        if (currentPage() !== 'produtos.html') {
-          window.location.href = productHref(term);
-          return;
-        }
-
-        runCatalogSearch(term);
+        openSearchProductFromQuery(term);
       });
     });
 
@@ -1009,12 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = qs('[data-site-search-input]', form);
         if (input) input.value = product.name;
         hideSearchSuggestions(suggestions);
-
-        if (currentPage() === 'produtos.html') {
-          runCatalogSearch(product.name);
-        } else {
-          window.location.href = productHref(product.name);
-        }
+        openProductSearchModal(product, matches, product.name);
       });
       suggestions.appendChild(item);
     });
@@ -1135,14 +1385,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function navigateSmartSearch(query) {
     const term = query.trim();
-
-    if (currentPage() === 'produtos.html') {
-      closeSmartSearch();
-      runCatalogSearch(term);
-      return;
-    }
-
-    window.location.href = productHref(term);
+    closeSmartSearch();
+    openSearchProductFromQuery(term);
   }
 
   function renderSmartSearchResults(query = '') {
@@ -1187,7 +1431,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function smartSearchMatches(query) {
-    return String(query ?? '').trim() ? catalogSearchProducts(query, 5) : featuredSearchProducts(6);
+    return searchSuggestionProducts(query, String(query ?? '').trim() ? 5 : 6);
   }
 
   function smartProductIcon(product) {
@@ -1462,6 +1706,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class="fa-solid fa-lock"></i>
               Finalizar pedido
             </a>
+            <button class="btn btn-secondary btn-full cart-clear-button hidden" type="button" data-clear-cart>
+              <i class="fa-solid fa-trash-can"></i>
+              Limpar carrinho
+            </button>
             <a class="btn btn-secondary btn-full" href="${productHref()}">
               <i class="fa-solid fa-store"></i>
               Continuar comprando
@@ -1479,6 +1727,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const close = event.target.closest('[data-close-cart]');
       const action = event.target.closest('[data-cart-action]');
       const pageCheckout = event.target.closest('[data-page-checkout]');
+      const clearCart = event.target.closest('[data-clear-cart]');
 
       if (open) {
         openCartModal();
@@ -1499,6 +1748,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (clearCart) {
+        clearCartItems();
+        return;
+      }
+
       if (!action) return;
 
       const id = action.dataset.cartId;
@@ -1515,8 +1769,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closeCartModal();
+      if (event.key === 'Escape') {
+        closeCartModal();
+        closeProductSearchModal();
+      }
     });
+  }
+
+  function bindDataCleanupActions() {
+    document.body.addEventListener('click', event => {
+      const clearCache = event.target.closest('[data-clear-cache]');
+      const clearOrders = event.target.closest('[data-clear-order-history]');
+      const clearAll = event.target.closest('[data-clear-cache-orders]');
+
+      if (clearCache) {
+        clearLocalCache();
+        return;
+      }
+
+      if (clearOrders) {
+        clearOrderHistory();
+        return;
+      }
+
+      if (clearAll) {
+        if (!confirm('Deseja limpar cache local, carrinho e histórico de pedidos deste navegador?')) return;
+        clearLocalCache(false);
+        clearOrderHistory(false);
+        showToast('Cache e histórico de pedidos limpos.');
+      }
+    });
+  }
+
+  function clearCartItems(showMessage = true) {
+    if (!cart.length) {
+      if (showMessage) showToast('O carrinho já está vazio.');
+      return;
+    }
+
+    if (showMessage && !confirm('Deseja remover todos os produtos do carrinho?')) return;
+    cart = [];
+    saveCart();
+    renderCart();
+    renderPaymentSummary();
+    if (showMessage) showToast('Carrinho limpo.');
+  }
+
+  function clearOrderHistory(showMessage = true) {
+    if (showMessage && !confirm('Deseja limpar o histórico de pedidos deste navegador?')) return;
+    saveJSON(STORAGE.orders, []);
+    renderOrdersEverywhere();
+    if (showMessage) showToast('Histórico de pedidos limpo.');
+  }
+
+  function clearLocalCache(showMessage = true) {
+    if (showMessage && !confirm('Deseja limpar o cache local do site neste navegador?')) return;
+
+    localStorage.removeItem(STORAGE.cart);
+    localStorage.removeItem(STORAGE.legacyCart);
+    localStorage.removeItem(STORAGE.legacyTheme);
+    Object.keys(localStorage)
+      .filter(key => key.startsWith('ms_setting_'))
+      .forEach(key => localStorage.removeItem(key));
+
+    if ('caches' in window) {
+      caches.keys()
+        .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+        .catch(() => {});
+    }
+
+    cart = [];
+    renderCart();
+    renderPaymentSummary();
+    updateThemeControls();
+    if (showMessage) showToast('Cache local limpo.');
   }
 
   function openCartModal() {
@@ -1560,6 +1886,10 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-page-checkout], [data-modal-checkout]').forEach(button => {
       button.classList.toggle('hidden', cart.length === 0);
       if (button instanceof HTMLAnchorElement) button.href = checkoutHref();
+    });
+
+    qsa('[data-clear-cart]').forEach(button => {
+      button.classList.toggle('hidden', cart.length === 0);
     });
   }
 
@@ -1806,6 +2136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <span>Total</span>
         <strong>${formatMoney(orderTotal())}</strong>
       </div>
+      <button class="btn btn-secondary btn-full cart-clear-button" type="button" data-clear-cart>
+        <i class="fa-solid fa-trash-can"></i>
+        Limpar carrinho
+      </button>
     `);
   }
 
@@ -1813,19 +2147,45 @@ document.addEventListener('DOMContentLoaded', () => {
     currentUser = loadJSON(STORAGE.user, null);
     const form = qs('#payment-form');
     const profileBox = qs('#checkout-profile-box');
+    const accountCard = qs('#checkout-account-card');
     const accountText = qs('#checkout-account-text');
     const loginLink = qs('[data-account-login]');
+    const signed = Boolean(currentUser?.email);
+    const complete = profileComplete();
 
-    if (profileComplete()) {
-      qs('#payment-name').value = currentUser.name || '';
-      qs('#payment-phone').value = currentUser.phone || '';
-      qs('#payment-address').value = currentUser.address || '';
-      form?.classList.add('profile-ready');
+    accountCard?.classList.toggle('is-signed', signed);
+    accountCard?.classList.toggle('needs-profile-data', signed && !complete);
+    accountCard?.classList.toggle('profile-complete', complete);
+
+    if (signed) {
+      const nameInput = qs('#payment-name');
+      const phoneInput = qs('#payment-phone');
+      const addressInput = qs('#payment-address');
+
+      if (nameInput && currentUser.name) nameInput.value = currentUser.name;
+      if (phoneInput && currentUser.phone) phoneInput.value = currentUser.phone;
+      if (addressInput && currentUser.address) addressInput.value = currentUser.address;
+
+      form?.classList.toggle('profile-ready', complete);
       profileBox?.classList.remove('hidden');
-      if (accountText) accountText.textContent = `Usando os dados salvos de ${firstName()}.`;
+      if (profileBox) {
+        const boxText = qs('p', profileBox);
+        if (boxText) {
+          boxText.textContent = complete
+            ? `Usando os dados salvos de ${firstName()} para este pedido.`
+            : 'Conta conectada. Complete os dados que faltam para finalizar o pedido.';
+        }
+      }
+      if (accountText) {
+        accountText.textContent = complete
+          ? `Conta conectada como ${firstName()}. Seus dados serao usados na entrega.`
+          : `Conta conectada como ${firstName()}. Complete telefone e endereco para finalizar.`;
+      }
       if (loginLink) {
         loginLink.href = profileHref();
-        loginLink.innerHTML = '<i class="fa-solid fa-user-gear"></i> Minha conta';
+        loginLink.innerHTML = complete
+          ? '<i class="fa-solid fa-user-check"></i> Minha conta'
+          : '<i class="fa-solid fa-user-pen"></i> Completar dados';
       }
     } else {
       form?.classList.remove('profile-ready');
@@ -1997,6 +2357,16 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('.profile-details .section-head p', signed
       ? 'Todos os dados são usados apenas para simplificar o pedido e a entrega.'
       : 'Você pode ajustar as configurações do site agora. Para editar perfil e salvar dados, entre ou cadastre-se.');
+
+    qsa('[data-profile-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.profileTab || 'details';
+        qsa('[data-profile-tab]').forEach(item => item.classList.toggle('active', item === tab));
+        qsa('[data-profile-panel]').forEach(panel => {
+          panel.classList.toggle('hidden', panel.dataset.profilePanel !== target);
+        });
+      });
+    });
 
     qs('[data-switch-account]')?.addEventListener('click', () => {
       window.location.href = loginHref({ redirect: 'perfil.html' });
@@ -2247,10 +2617,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderOrders(container, orders) {
     if (!container) return;
+    const isProfileHistory = container.id === 'profile-orders';
     container.innerHTML = '';
 
+    if (isProfileHistory) {
+      container.insertAdjacentHTML('beforeend', `
+        <div class="section-head">
+          <span class="eyebrow">Historico de pedidos</span>
+          <h3>Pedidos salvos neste navegador</h3>
+          <p>Acompanhe os pedidos ja enviados e limpe o historico quando quiser.</p>
+        </div>
+        <div class="settings-actions profile-history-actions">
+          <button class="btn btn-secondary" type="button" data-clear-order-history>
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            Limpar historico
+          </button>
+          <button class="btn btn-secondary" type="button" data-clear-cache-orders>
+            <i class="fa-solid fa-broom"></i>
+            Limpar cache e historico
+          </button>
+        </div>
+      `);
+    }
+
     let visibleOrders = orders;
-    if (container.id === 'profile-orders') {
+    if (isProfileHistory) {
       if (!currentUser?.email) {
         container.insertAdjacentHTML('beforeend', `
           <div class="profile-guest-note">
