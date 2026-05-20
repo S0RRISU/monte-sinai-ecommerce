@@ -561,26 +561,26 @@ document.addEventListener('DOMContentLoaded', () => {
       dock.className = 'mobile-quick-dock';
       dock.setAttribute('aria-label', 'Atalhos para celular');
       dock.innerHTML = `
+        <a href="${homeHref()}" data-dock-section="home">
+          <i class="fa-solid fa-house"></i>
+          <span>Início</span>
+        </a>
         <a href="${productHref()}" data-dock-section="store">
           <i class="fa-solid fa-store"></i>
           <span>Loja</span>
         </a>
-        <button type="button" data-open-search data-dock-section="search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <span>Buscar</span>
-        </button>
         <button class="dock-cart" type="button" data-open-cart data-dock-section="cart">
           <i class="fa-solid fa-bag-shopping"></i>
           <span>Carrinho</span>
           <strong data-cart-count>0</strong>
         </button>
-        <a class="mobile-settings-link" href="${pageHref('configuracoes.html')}" data-dock-section="settings">
-          <i class="fa-solid fa-gear"></i>
-          <span>Ajustes</span>
-        </a>
-        <a class="nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-dock-section="account">
+        <button type="button" data-open-search data-dock-section="search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <span>Pesquisa</span>
+        </button>
+        <a class="nav-account-link dock-profile-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-dock-section="account">
           <span class="dock-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
-          <span data-account-label>Conta</span>
+          <span class="dock-profile-label" data-account-label>Perfil</span>
         </a>
       `;
       document.body.appendChild(dock);
@@ -602,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasPhoto = signed && Boolean(currentUser?.photo);
     qsa('[data-account-label]').forEach(label => {
       label.textContent = label.closest('.mobile-quick-dock')
-        ? 'Conta'
+        ? 'Perfil'
         : (signed ? firstName() : 'Entrar ou cadastrar');
     });
 
@@ -678,9 +678,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateDockActive() {
     const page = currentPage();
     const activeSection = (() => {
-      if (['index.html', 'produtos.html'].includes(page)) return 'store';
-      if (page === 'configuracoes.html') return 'settings';
-      if (['login.html', 'perfil.html', 'editar-perfil.html', 'criar.html'].includes(page)) return 'account';
+      if (page === 'index.html') return 'home';
+      if (page === 'produtos.html') return 'store';
+      if (['login.html', 'perfil.html', 'editar-perfil.html', 'configuracoes.html', 'criar.html'].includes(page)) return 'account';
       return '';
     })();
 
@@ -866,12 +866,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="submit">Buscar</button>
         </form>
 
-        <div class="smart-search-chips" aria-label="Buscas rapidas">
-          ${SMART_SEARCH_CHIPS.map(chip => `
-            <button type="button" data-smart-chip="${escapeHTML(chip.query)}">${escapeHTML(chip.label)}</button>
-          `).join('')}
-        </div>
-
         <div class="smart-search-results" data-smart-search-results></div>
       </div>
     `;
@@ -906,15 +900,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const closeButton = event.target.closest('[data-close-search]');
       if (closeButton) {
         closeSmartSearch();
-        return;
-      }
-
-      const chip = event.target.closest('[data-smart-chip]');
-      if (chip) {
-        const query = chip.dataset.smartChip || '';
-        if (input) input.value = query;
-        renderSmartSearchResults(query);
-        input?.focus();
         return;
       }
 
@@ -981,7 +966,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <strong>${heading}</strong>
           <span>${subtitle}</span>
         </div>
-        <button type="button" data-smart-chip="limpeza">Ver limpeza</button>
       </div>
       ${matches.length ? `
         <div class="smart-search-result-grid">
