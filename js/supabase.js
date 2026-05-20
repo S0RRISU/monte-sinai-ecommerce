@@ -2,7 +2,7 @@
   'use strict';
 
   const SUPABASE_URL = 'https://nnglqufeyergsgzafdek.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_xxxxxxxxxxxxxxxxx';
+  const SUPABASE_KEY = 'sb_publishable_1WBJx-thg65xL4N7uEMuvg_mJHb-Oo9';
 
   if (!window.supabase) {
     console.warn('[Supabase] Biblioteca do Supabase não carregou.');

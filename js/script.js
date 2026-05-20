@@ -288,9 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      console.log('[Supabase] Buscando produtos na tabela "produtos"...');
+      console.log('[Supabase] Buscando produtos na tabela "produto"...');
       const { data, error } = await client
-        .from('produtos')
+        .from('produto')
         .select('nome, preco, imagem, categoria, descricao')
         .order('nome', { ascending: true });
 
