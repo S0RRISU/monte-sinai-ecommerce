@@ -117,6 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePayment = 'delivery';
   let activeSearchProduct = null;
   let productSearchResults = [];
+  let activeSearchSuggestionContext = null;
+  let searchSuggestionFrame = 0;
 
   applySavedTheme();
   upgradeProductImages();
@@ -1487,6 +1489,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function bindSiteSearch() {
+    bindSearchSuggestionViewportTracking();
+
     qsa('[data-site-search-form]').forEach(form => {
       const input = qs('[data-site-search-input]', form);
       const suggestions = ensureSearchSuggestions(form);
@@ -1500,10 +1504,12 @@ document.addEventListener('DOMContentLoaded', () => {
       input?.addEventListener('input', () => {
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
+        scheduleSearchSuggestionsPosition(form, suggestions);
       });
       input?.addEventListener('focus', () => {
         closeOtherSearchSuggestions(suggestions);
         renderSearchSuggestions(form, suggestions, input.value);
+        scheduleSearchSuggestionsPosition(form, suggestions);
       });
 
       form.addEventListener('submit', event => {
@@ -1538,6 +1544,8 @@ document.addEventListener('DOMContentLoaded', () => {
     suggestions.className = 'search-suggestions';
     suggestions.setAttribute('role', 'listbox');
     suggestions.setAttribute('aria-label', 'Sugestões de produtos');
+    suggestions.addEventListener('touchmove', event => event.stopPropagation(), { passive: true });
+    suggestions.addEventListener('wheel', event => event.stopPropagation(), { passive: true });
     form.appendChild(suggestions);
     return suggestions;
   }
@@ -1563,6 +1571,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       suggestions.classList.add('show');
+      scheduleSearchSuggestionsPosition(form, suggestions);
       return;
     }
 
@@ -1588,16 +1597,81 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     suggestions.classList.add('show');
+    scheduleSearchSuggestionsPosition(form, suggestions);
   }
 
   function hideSearchSuggestions(suggestions) {
     suggestions?.classList.remove('show');
+    clearSearchSuggestionsPosition(suggestions);
   }
 
   function closeOtherSearchSuggestions(activeSuggestions) {
     qsa('.search-suggestions').forEach(suggestions => {
       if (suggestions !== activeSuggestions) hideSearchSuggestions(suggestions);
     });
+  }
+
+  function isMobileSearchViewport() {
+    return window.matchMedia('(max-width: 760px)').matches;
+  }
+
+  function clearSearchSuggestionsPosition(suggestions) {
+    if (!suggestions) return;
+    suggestions.classList.remove('is-mobile-fixed');
+    ['--suggestions-top', '--suggestions-left', '--suggestions-width', '--suggestions-max-height'].forEach(prop => {
+      suggestions.style.removeProperty(prop);
+    });
+    if (activeSearchSuggestionContext?.suggestions === suggestions) activeSearchSuggestionContext = null;
+  }
+
+  function scheduleSearchSuggestionsPosition(form, suggestions) {
+    activeSearchSuggestionContext = { form, suggestions };
+    window.cancelAnimationFrame(searchSuggestionFrame);
+    searchSuggestionFrame = window.requestAnimationFrame(() => positionSearchSuggestions(form, suggestions));
+  }
+
+  function positionSearchSuggestions(form, suggestions) {
+    if (!suggestions?.classList.contains('show')) {
+      clearSearchSuggestionsPosition(suggestions);
+      return;
+    }
+
+    if (!isMobileSearchViewport()) {
+      clearSearchSuggestionsPosition(suggestions);
+      return;
+    }
+
+    const rect = form.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const viewportHeight = viewport?.height || window.innerHeight;
+    const safeGap = 12;
+    const dock = qs('.mobile-quick-dock');
+    const dockReserve = dock ? 104 : 18;
+    const left = Math.max(safeGap, Math.min(rect.left, window.innerWidth - 180));
+    const width = Math.max(220, Math.min(rect.width, window.innerWidth - left - safeGap));
+    const top = Math.max(safeGap, Math.min(rect.bottom + 8, viewportHeight - 156));
+    const maxHeight = Math.max(140, viewportHeight - top - dockReserve);
+
+    suggestions.style.setProperty('--suggestions-top', `${Math.round(top)}px`);
+    suggestions.style.setProperty('--suggestions-left', `${Math.round(left)}px`);
+    suggestions.style.setProperty('--suggestions-width', `${Math.round(width)}px`);
+    suggestions.style.setProperty('--suggestions-max-height', `${Math.round(maxHeight)}px`);
+    suggestions.classList.add('is-mobile-fixed');
+  }
+
+  function bindSearchSuggestionViewportTracking() {
+    if (document.body.dataset.searchSuggestionTracking === 'true') return;
+    document.body.dataset.searchSuggestionTracking = 'true';
+
+    const refresh = () => {
+      const context = activeSearchSuggestionContext;
+      if (context?.form && context?.suggestions) scheduleSearchSuggestionsPosition(context.form, context.suggestions);
+    };
+
+    window.addEventListener('resize', refresh, { passive: true });
+    window.addEventListener('scroll', refresh, { passive: true });
+    window.visualViewport?.addEventListener('resize', refresh, { passive: true });
+    window.visualViewport?.addEventListener('scroll', refresh, { passive: true });
   }
 
   function ensureSmartSearchShell() {
@@ -2752,6 +2826,107 @@ document.addEventListener('DOMContentLoaded', () => {
     window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}`, '_blank');
   }
 
+  function profileActionText(signed, action) {
+    if (!signed) {
+      return {
+        personal: 'Entre ou cadastre-se para salvar nome, WhatsApp, endereço e foto.',
+        orders: 'Abra o catálogo, escolha os produtos e finalize quando estiver pronto.',
+        privacy: 'Ajuste tema, notificações, cache, carrinho e histórico local.',
+        support: 'Fale conosco pelo WhatsApp para dúvidas, pedidos e ajuda no cadastro.'
+      }[action] || '';
+    }
+
+    const missing = [
+      !currentUser.name ? 'nome' : '',
+      !currentUser.phone ? 'WhatsApp' : '',
+      !currentUser.address ? 'endereço' : ''
+    ].filter(Boolean);
+
+    if (action === 'personal') {
+      return missing.length
+        ? `Conta conectada. Falta completar: ${missing.join(', ')}.`
+        : `${firstName()}, seus dados estão prontos para pedidos rápidos.`;
+    }
+
+    if (action === 'orders') {
+      const count = cartCount();
+      return count
+        ? `Você tem ${count} item${count === 1 ? '' : 's'} no carrinho para finalizar.`
+        : 'Use seus dados salvos para comprar sem repetir informações.';
+    }
+
+    if (action === 'privacy') {
+      return 'Seus dados ficam neste navegador. Você pode limpar cache, carrinho e histórico quando quiser.';
+    }
+
+    if (action === 'support') {
+      return `Chame a Monte Sinai pelo WhatsApp${currentUser.name ? ` como ${firstName()}` : ''}.`;
+    }
+
+    return '';
+  }
+
+  function setProfileActionCard(action, config) {
+    const card = qs(`[data-profile-action-card="${action}"]`);
+    if (!card) return;
+
+    const text = qs('[data-profile-action-text]', card);
+    const cta = qs('.profile-action-card-cta', card);
+    if (text) text.textContent = config.text || '';
+    if (cta) {
+      cta.innerHTML = `${escapeHTML(config.cta || 'Abrir')} <i class="fa-solid fa-arrow-right"></i>`;
+    }
+
+    if (card instanceof HTMLAnchorElement) {
+      card.href = config.href;
+      if (config.external) {
+        card.target = '_blank';
+        card.rel = 'noreferrer';
+      } else {
+        card.removeAttribute('target');
+        card.removeAttribute('rel');
+      }
+    }
+
+    card.setAttribute('aria-label', config.label || config.cta || 'Abrir ação do perfil');
+  }
+
+  function updateProfileActionCards(signed) {
+    const cartHasItems = cartCount() > 0;
+    const supportText = signed
+      ? `Olá, sou ${currentUser.name || currentUser.email}. Preciso de ajuda no site Monte Sinai.`
+      : 'Olá, preciso de ajuda no site Monte Sinai.';
+
+    setProfileActionCard('personal', {
+      href: signed ? 'editar-perfil.html' : loginHref({ mode: 'register', redirect: 'perfil.html' }),
+      text: profileActionText(signed, 'personal'),
+      cta: signed ? (profileComplete() ? 'Atualizar dados' : 'Completar perfil') : 'Entrar ou cadastrar',
+      label: signed ? 'Editar dados pessoais' : 'Entrar ou cadastrar para salvar dados'
+    });
+
+    setProfileActionCard('orders', {
+      href: cartHasItems ? checkoutHref() : productHref(),
+      text: profileActionText(signed, 'orders'),
+      cta: cartHasItems ? 'Finalizar carrinho' : 'Abrir catálogo',
+      label: cartHasItems ? 'Finalizar pedido no carrinho' : 'Abrir catálogo de produtos'
+    });
+
+    setProfileActionCard('privacy', {
+      href: 'configuracoes.html#controle-dados',
+      text: profileActionText(signed, 'privacy'),
+      cta: 'Abrir privacidade',
+      label: 'Abrir configurações de privacidade e dados'
+    });
+
+    setProfileActionCard('support', {
+      href: `https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(supportText)}`,
+      text: profileActionText(signed, 'support'),
+      cta: 'Chamar no WhatsApp',
+      label: 'Abrir suporte direto no WhatsApp',
+      external: true
+    });
+  }
+
   function initProfilePage() {
     if (!qs('#profile-page') || currentPage() !== 'perfil.html') return;
     const summary = qs('.profile-summary');
@@ -2801,6 +2976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('.profile-details .section-head p', signed
       ? 'Todos os dados são usados apenas para simplificar o pedido e a entrega.'
       : 'Você pode ajustar as configurações do site agora. Para editar perfil e salvar dados, entre ou cadastre-se.');
+    updateProfileActionCards(signed);
 
     qsa('[data-profile-tab]').forEach(tab => {
       tab.addEventListener('click', () => {

@@ -11312,6 +11312,151 @@ textarea {
   }
 }
 
+/* Profile action cards and mobile search stability. */
+.profile-action-card {
+  position: relative;
+  color: var(--text) !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.profile-action-card::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  pointer-events: none;
+}
+
+.profile-action-card:hover,
+.profile-action-card:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line)) !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, transparent), transparent 58%),
+    color-mix(in srgb, var(--surface-soft) 86%, var(--surface)) !important;
+  box-shadow: 0 18px 34px rgba(0, 15, 55, 0.22) !important;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.profile-action-card:focus-visible::after {
+  border-color: var(--accent);
+}
+
+.profile-action-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profile-action-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 2px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.profile-action-card-cta i {
+  display: inline-grid !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: currentColor !important;
+  font-size: 0.78rem;
+}
+
+.search-suggestions,
+.smart-search-panel,
+.smart-search-results {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-search,
+.hero-search,
+.catalog-search-form,
+.search-field {
+  position: relative !important;
+}
+
+.search-suggestions {
+  touch-action: pan-y;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 760px) {
+  .nav-search .search-suggestions.is-mobile-fixed,
+  .hero-search .search-suggestions.is-mobile-fixed,
+  .catalog-search-form .search-suggestions.is-mobile-fixed,
+  .search-field .search-suggestions.is-mobile-fixed {
+    position: fixed !important;
+    top: var(--suggestions-top) !important;
+    left: var(--suggestions-left) !important;
+    right: auto !important;
+    width: var(--suggestions-width) !important;
+    min-width: var(--suggestions-width) !important;
+    max-width: var(--suggestions-width) !important;
+    max-height: var(--suggestions-max-height) !important;
+    z-index: 1250 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    transform: translateZ(0) !important;
+  }
+
+  .nav-search .search-suggestions.show,
+  .hero-search .search-suggestions.show,
+  .catalog-search-form .search-suggestions.show,
+  .search-field .search-suggestions.show {
+    align-content: start !important;
+    max-height: min(320px, 42dvh) !important;
+  }
+
+  .smart-search.open {
+    align-items: stretch !important;
+  }
+
+  .smart-search-panel {
+    display: flex !important;
+    min-height: 0 !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .smart-search-results {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding-bottom: 12px !important;
+    touch-action: pan-y !important;
+  }
+
+  .smart-search-result-grid {
+    padding-bottom: 12px !important;
+  }
+
+  .profile-action-card {
+    min-height: 150px;
+  }
+
+  .profile-action-card:hover,
+  .profile-action-card:focus-visible {
+    transform: none;
+  }
+}
+
 @media (max-width: 1020px) {
   .mobile-quick-dock a.active:not(.dock-profile-link) > i,
   .mobile-quick-dock button.active:not(.dock-cart) > i {

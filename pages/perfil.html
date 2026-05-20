@@ -15,11 +15,11 @@
   <link rel="manifest" href="../site.webmanifest">
   <link rel="icon" type="image/png" href="../assets/brand/monte-sinai-logo-3d.png">
   <link rel="apple-touch-icon" href="../assets/brand/monte-sinai-logo-3d.png">
-  <link rel="stylesheet" href="../css/style.css?v=20260520-29">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-30">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-2"></script>
-  <script defer src="../js/script.js?v=20260520-22"></script>
+  <script defer src="../js/script.js?v=20260520-23"></script>
 </head>
 <body>
   <header class="navbar">
@@ -133,34 +133,38 @@
           <p>Todos os dados são usados apenas para simplificar o pedido e a entrega.</p>
         </div>
         <div class="profile-feature-grid">
-          <div class="feature-item">
+          <a class="feature-item profile-action-card" href="editar-perfil.html" data-profile-action-card="personal">
             <i class="fa-solid fa-user"></i>
-            <div>
+            <div class="profile-action-copy">
               <h3>Dados pessoais</h3>
-              <p>Nome, email, telefone e endereço estão salvos aqui.</p>
+              <p data-profile-action-text>Nome, email, telefone e endereço estão salvos aqui.</p>
+              <span class="profile-action-card-cta">Editar dados <i class="fa-solid fa-arrow-right"></i></span>
             </div>
-          </div>
-          <div class="feature-item">
+          </a>
+          <a class="feature-item profile-action-card" href="produtos.html#todos-produtos" data-profile-action-card="orders">
             <i class="fa-solid fa-basket-shopping"></i>
-            <div>
+            <div class="profile-action-copy">
               <h3>Pedidos futuros</h3>
-              <p>Use seu perfil para continuar comprando sem repetir informações.</p>
+              <p data-profile-action-text>Use seu perfil para continuar comprando sem repetir informações.</p>
+              <span class="profile-action-card-cta">Comprar agora <i class="fa-solid fa-arrow-right"></i></span>
             </div>
-          </div>
-          <div class="feature-item">
+          </a>
+          <a class="feature-item profile-action-card" href="configuracoes.html" data-profile-action-card="privacy">
             <i class="fa-solid fa-shield-halved"></i>
-            <div>
+            <div class="profile-action-copy">
               <h3>Privacidade</h3>
-              <p>Seus dados ficam no seu navegador e não são usados fora do pedido.</p>
+              <p data-profile-action-text>Seus dados ficam no seu navegador e não são usados fora do pedido.</p>
+              <span class="profile-action-card-cta">Abrir configurações <i class="fa-solid fa-arrow-right"></i></span>
             </div>
-          </div>
-          <div class="feature-item">
+          </a>
+          <a class="feature-item profile-action-card" href="https://wa.me/5511960928234" target="_blank" rel="noreferrer" data-profile-action-card="support">
             <i class="fa-solid fa-comment-dots"></i>
-            <div>
+            <div class="profile-action-copy">
               <h3>Suporte direto</h3>
-              <p>Fale conosco a qualquer momento via WhatsApp.</p>
+              <p data-profile-action-text>Fale conosco a qualquer momento via WhatsApp.</p>
+              <span class="profile-action-card-cta">Chamar no WhatsApp <i class="fa-solid fa-arrow-right"></i></span>
             </div>
-          </div>
+          </a>
         </div>
         </div>
         <div class="profile-orders profile-tab-panel hidden" id="profile-orders" data-orders-container data-profile-panel="history">
