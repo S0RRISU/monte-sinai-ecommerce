@@ -11175,6 +11175,143 @@ textarea {
   }
 }
 
+/* Fixed mobile top bar: keep logo and menu reachable while scrolling. */
+@media (max-width: 760px) {
+  body:has(.navbar) {
+    padding-top: calc(var(--nav-height) + env(safe-area-inset-top)) !important;
+  }
+
+  .navbar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 320 !important;
+    width: 100% !important;
+    min-height: calc(var(--nav-height) + env(safe-area-inset-top)) !important;
+    height: calc(var(--nav-height) + env(safe-area-inset-top)) !important;
+    padding-top: env(safe-area-inset-top) !important;
+    background: rgba(3, 16, 48, 0.98) !important;
+    border-bottom: 1px solid rgba(57, 139, 255, 0.26) !important;
+    box-shadow: 0 12px 28px rgba(0, 10, 38, 0.22) !important;
+    backdrop-filter: blur(14px) saturate(130%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+  }
+
+  body.light-mode .navbar {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-bottom-color: rgba(0, 91, 219, 0.16) !important;
+    box-shadow: 0 12px 28px rgba(0, 58, 140, 0.10) !important;
+  }
+
+  .navbar .nav-inner {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: min(100% - 24px, 1180px) !important;
+    min-height: var(--nav-height) !important;
+    height: var(--nav-height) !important;
+    gap: 12px !important;
+  }
+
+  .navbar .brand {
+    position: relative !important;
+    z-index: 321 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    flex: 1 1 auto !important;
+    width: min(190px, calc(100vw - 92px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 92px) !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    overflow: visible !important;
+  }
+
+  .navbar .brand-logo {
+    display: block !important;
+    width: 100% !important;
+    height: 54px !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+    filter: drop-shadow(0 8px 18px rgba(0, 91, 219, 0.16)) !important;
+  }
+
+  .navbar .brand-text {
+    display: none !important;
+  }
+
+  .navbar .nav-menu,
+  .navbar .nav-search,
+  .navbar .nav-actions {
+    display: none !important;
+  }
+
+  .navbar .mobile-menu-toggle {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 321 !important;
+    display: inline-grid !important;
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    place-items: center !important;
+    border: 1px solid rgba(57, 139, 255, 0.36) !important;
+    border-radius: 10px !important;
+    background: #075fc7 !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 22px rgba(0, 91, 219, 0.22) !important;
+  }
+
+  .navbar .mobile-menu-toggle i {
+    display: none !important;
+  }
+
+  .navbar .mobile-menu-toggle::before {
+    content: "" !important;
+    width: 20px !important;
+    height: 2px !important;
+    border-radius: 999px !important;
+    background: currentColor !important;
+    box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor !important;
+  }
+
+  .navbar .mobile-menu-toggle.open::before {
+    content: "x" !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 1.25rem !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+  }
+
+  .mobile-menu {
+    position: fixed !important;
+    top: calc(var(--nav-height) + env(safe-area-inset-top) + 8px) !important;
+    z-index: 310 !important;
+  }
+
+  @supports not selector(body:has(.navbar)) {
+    .navbar ~ main {
+      padding-top: calc(var(--nav-height) + env(safe-area-inset-top)) !important;
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .navbar .brand {
+    width: min(166px, calc(100vw - 86px)) !important;
+    max-width: calc(100vw - 86px) !important;
+  }
+
+  .navbar .brand-logo {
+    height: 50px !important;
+  }
+}
+
 @media (max-width: 1020px) {
   .mobile-quick-dock a.active:not(.dock-profile-link) > i,
   .mobile-quick-dock button.active:not(.dock-cart) > i {
