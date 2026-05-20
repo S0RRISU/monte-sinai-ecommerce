@@ -385,10 +385,114 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(query ?? '').trim() ? featuredSearchProducts(Math.min(limit, 4)) : featuredSearchProducts(limit);
   }
 
+  function catalogSearchProducts(query, limit = Infinity) {
+    const term = String(query ?? '').trim();
+    if (!term) return [];
+
+    const normalizedTerm = normalizeText(term);
+    const queryTokens = splitSearchTokens(term);
+    const exact = PRODUCT_INDEX.filter(product => normalizeText(product.name) === normalizedTerm);
+    if (exact.length) return exact.slice(0, limit);
+
+    const phraseMatches = PRODUCT_INDEX
+      .filter(product => {
+        const productName = normalizeText(product.name);
+        return productName.includes(normalizedTerm) || normalizedTerm.includes(productName);
+      })
+      .sort((a, b) => normalizeText(a.name).length - normalizeText(b.name).length || a.name.localeCompare(b.name, 'pt-BR'));
+
+    if (phraseMatches.length) return phraseMatches.slice(0, limit);
+
+    const scored = PRODUCT_INDEX
+      .map(product => {
+        const data = productSearchData(product);
+        const nameTokens = splitSearchTokens(product.name);
+        const contextTokens = splitSearchTokens(`${product.category || ''} ${product.terms || ''}`);
+        let nameScore = 0;
+        let totalScore = 0;
+        let matchedTokens = 0;
+
+        queryTokens.forEach(token => {
+          const directNameHit = data.normalizedName.includes(token);
+          const bestNameScore = nameTokens.reduce((best, candidate) => Math.max(best, fuzzyTokenScore(token, candidate)), 0);
+
+          if (directNameHit || bestNameScore >= 5) {
+            const score = Math.max(bestNameScore, directNameHit ? 8 : 0);
+            nameScore += score;
+            totalScore += score + 4;
+            matchedTokens += 1;
+            return;
+          }
+
+          const directContextHit = data.blob.includes(token);
+          const bestContextScore = contextTokens.reduce((best, candidate) => Math.max(best, fuzzyTokenScore(token, candidate)), 0);
+          if (directContextHit || bestContextScore >= 6) {
+            totalScore += Math.max(bestContextScore, directContextHit ? 4 : 0);
+            matchedTokens += 1;
+          }
+        });
+
+        return {
+          ...product,
+          nameScore,
+          totalScore,
+          matchedTokens
+        };
+      })
+      .filter(product => {
+        if (!queryTokens.length || product.matchedTokens < queryTokens.length) return false;
+        if (product.nameScore > 0) return true;
+        return product.totalScore >= (queryTokens.length > 1 ? 10 : 8);
+      })
+      .sort((a, b) => {
+        if (b.nameScore !== a.nameScore) return b.nameScore - a.nameScore;
+        if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+        return a.name.localeCompare(b.name, 'pt-BR');
+      });
+
+    const nameMatches = scored.filter(product => product.nameScore > 0);
+    const finalMatches = nameMatches.length ? nameMatches : scored;
+    return finalMatches.slice(0, limit).map(({ nameScore: _nameScore, totalScore: _totalScore, matchedTokens: _matchedTokens, ...product }) => product);
+  }
+
   function cardMatchesCatalogProduct(card, product) {
     const cardName = normalizeText(card.dataset.name || card.querySelector('h3')?.textContent || '');
     const productName = normalizeText(product.name);
     return cardName === productName || cardName.includes(productName) || productName.includes(cardName);
+  }
+
+  function cardMatchesCatalogQuery(card, query, allowContext = false) {
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return true;
+
+    const data = cardSearchData(card);
+    const normalizedName = normalizeText(data.name);
+    const tokens = splitSearchTokens(query);
+    if (!tokens.length) return false;
+    if (normalizedName === normalizedQuery || normalizedName.includes(normalizedQuery) || normalizedQuery.includes(normalizedName)) return true;
+
+    const nameTokens = splitSearchTokens(data.name);
+    const contextBlob = normalizeText(`${data.category || ''} ${data.terms || ''}`);
+    const contextTokens = splitSearchTokens(`${data.category || ''} ${data.terms || ''}`);
+    let nameMatches = 0;
+    let contextMatches = 0;
+
+    tokens.forEach(token => {
+      const directNameHit = normalizedName.includes(token);
+      const bestNameScore = nameTokens.reduce((best, candidate) => Math.max(best, fuzzyTokenScore(token, candidate)), 0);
+      if (directNameHit || bestNameScore >= 5) {
+        nameMatches += 1;
+        return;
+      }
+
+      if (!allowContext) return;
+
+      const directContextHit = contextBlob.includes(token);
+      const bestContextScore = contextTokens.reduce((best, candidate) => Math.max(best, fuzzyTokenScore(token, candidate)), 0);
+      if (directContextHit || bestContextScore >= 6) contextMatches += 1;
+    });
+
+    return nameMatches + contextMatches >= tokens.length && (nameMatches > 0 || allowContext);
   }
 
   function activateCatalogFilter(filter = 'all') {
@@ -1083,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function smartSearchMatches(query) {
-    return searchSuggestionProducts(query, String(query ?? '').trim() ? 5 : 6);
+    return String(query ?? '').trim() ? catalogSearchProducts(query, 5) : featuredSearchProducts(6);
   }
 
   function smartProductIcon(product) {
@@ -1131,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
-    const searchProducts = term ? searchSuggestionProducts(rawTerm, 5) : [];
+    const searchProducts = term ? catalogSearchProducts(rawTerm, 8) : [];
     const activeChip = qs('[data-filter].active');
     const filter = activeChip?.dataset.filter || 'all';
     let visible = 0;
@@ -1139,7 +1243,9 @@ document.addEventListener('DOMContentLoaded', () => {
     products.forEach(card => {
       const category = card.dataset.category || '';
       const recommended = card.dataset.recommended === 'true' || card.classList.contains('is-recommended');
-      const matchesTerm = !term || searchProducts.some(product => cardMatchesCatalogProduct(card, product));
+      const matchesProduct = searchProducts.some(product => cardMatchesCatalogProduct(card, product));
+      const matchesCardText = !searchProducts.length && cardMatchesCatalogQuery(card, rawTerm, true);
+      const matchesTerm = !term || matchesProduct || matchesCardText;
       const matchesFilter = filter === 'all' || category === filter || (filter === 'recommended' && recommended);
       const show = matchesTerm && matchesFilter;
       card.classList.toggle('hidden', !show);
