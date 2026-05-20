@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ORDER_STATUS_OPTIONS = ['Pedido enviado', 'Em preparo', 'Saiu para entrega', 'Entregue', 'Cancelado'];
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
+  const ADMIN_PANEL_HREF = '/pages/painel.html';
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -211,7 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
     currentUser = user;
     let saved = true;
     if (user) saved = saveJSON(STORAGE.user, user);
-    else localStorage.removeItem(STORAGE.user);
+    else {
+      localStorage.removeItem(STORAGE.user);
+      adminProfileCache = null;
+      setAdminPanelLinksVisible(false);
+    }
     updateAccountUI();
     return saved;
   }
@@ -241,9 +246,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyAuthSession(session) {
+    adminProfileCache = null;
     saveUser(session?.user ? userFromAuthUser(session.user) : null);
     applyCheckoutProfile();
     if (currentPage() === 'perfil.html') initProfilePage();
+    updateAdminPanelLinks({ force: true });
   }
 
   async function initSupabaseAuth() {
@@ -646,8 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return adminProfileCache;
   }
 
-  async function isCurrentUserAdmin() {
-    const profile = await currentAdminProfile({ force: true });
+  async function isCurrentUserAdmin({ force = true } = {}) {
+    const profile = await currentAdminProfile({ force });
     return Boolean(profile?.is_admin);
   }
 
@@ -1313,6 +1320,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return pageHref('perfil.html');
   }
 
+  function adminPanelHref() {
+    return ADMIN_PANEL_HREF;
+  }
+
   function checkoutHref() {
     return pageHref('pagamento.html');
   }
@@ -1478,6 +1489,12 @@ document.addEventListener('DOMContentLoaded', () => {
       brand.insertAdjacentHTML('beforeend', '<span class="brand-text">Monte Sinai</span>');
     }
 
+    if (navMenu && !qs('[data-admin-panel-link="nav"]', navMenu)) {
+      navMenu.insertAdjacentHTML('beforeend', `
+        <a class="hidden" href="${adminPanelHref()}" data-admin-panel-link="nav">Painel Admin</a>
+      `);
+    }
+
     if (!qs('.nav-search', navInner)) {
       const search = document.createElement('form');
       search.className = 'nav-search';
@@ -1517,6 +1534,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="mobile-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span data-account-label>Entrar ou cadastrar</span>
         </a>
+        <a class="mobile-only-link hidden" href="${adminPanelHref()}" data-admin-panel-link="mobile" data-mobile-extra>
+          <i class="fa-solid fa-gauge-high"></i>
+          Painel Admin
+        </a>
         <button class="mobile-only-link mobile-menu-button" type="button" data-open-cart data-mobile-extra>
           <i class="fa-solid fa-bag-shopping"></i>
           Carrinho
@@ -1524,6 +1545,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       `);
     }
+
+    updateAdminPanelLinks();
 
     if (!document.body.classList.contains('auth-body') && !qs('.mobile-quick-dock')) {
       const dock = document.createElement('nav');
@@ -1607,6 +1630,32 @@ document.addEventListener('DOMContentLoaded', () => {
       link.href = signed ? profileHref() : loginHref({ redirect: currentLocationForRedirect() });
       link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Entrar ou cadastrar');
     });
+  }
+
+  function setAdminPanelLinksVisible(visible) {
+    qsa('[data-admin-panel-link]').forEach(link => {
+      link.classList.toggle('hidden', !visible);
+      link.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      if (!visible) link.setAttribute('tabindex', '-1');
+      else link.removeAttribute('tabindex');
+      if (link instanceof HTMLAnchorElement) link.href = adminPanelHref();
+    });
+  }
+
+  async function updateAdminPanelLinks({ force = false } = {}) {
+    setAdminPanelLinksVisible(false);
+    if (!currentUser?.email) return false;
+
+    try {
+      await authReady.catch(() => null);
+      const admin = await isCurrentUserAdmin({ force });
+      setAdminPanelLinksVisible(admin);
+      return admin;
+    } catch (error) {
+      console.warn('[Admin] Nao foi possivel validar o link do painel.', error);
+      setAdminPanelLinksVisible(false);
+      return false;
+    }
   }
 
   function bindMobileMenu() {
