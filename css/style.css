@@ -11161,6 +11161,122 @@ textarea {
   }
 }
 
+@media (max-width: 1020px) {
+  .mobile-quick-dock a.active:not(.dock-profile-link) > i,
+  .mobile-quick-dock button.active:not(.dock-cart) > i {
+    color: var(--accent) !important;
+    transform: scale(1.08) translateZ(0) !important;
+  }
+
+  body:not(.cart-has-items) .mobile-quick-dock .dock-cart.active > i,
+  .mobile-quick-dock .dock-cart.active.is-empty > i {
+    color: var(--accent) !important;
+    transform: scale(1.08) translateZ(0) !important;
+  }
+
+  body.cart-has-items .mobile-quick-dock .dock-cart.active > i,
+  .mobile-quick-dock .dock-cart.has-items.active > i {
+    color: #061b45 !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link,
+  .mobile-quick-dock .dock-profile-link.active {
+    grid-template-rows: 1fr !important;
+    align-content: center !important;
+    justify-items: center !important;
+    overflow: visible !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: inherit !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link .dock-profile-label {
+    display: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    flex-basis: 36px !important;
+    border: 2px solid rgba(54, 166, 255, 0.74) !important;
+    border-radius: 50% !important;
+    background: rgba(0, 140, 255, 0.14) !important;
+    box-shadow: none !important;
+    color: #29aaff !important;
+    transition:
+      width 0.18s ease,
+      height 0.18s ease,
+      min-width 0.18s ease,
+      min-height 0.18s ease,
+      transform 0.18s ease !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    flex-basis: 48px !important;
+    border-color: rgba(54, 166, 255, 0.74) !important;
+    background: rgba(0, 140, 255, 0.14) !important;
+    transform: translateZ(0) !important;
+  }
+
+  .mobile-quick-dock .dock-account-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: inherit !important;
+    object-fit: cover !important;
+  }
+
+  .mobile-quick-dock .dock-account-avatar > span {
+    display: grid !important;
+    width: 100% !important;
+    height: 100% !important;
+    place-items: center !important;
+    color: inherit !important;
+    font-size: 0.95rem !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active .dock-account-avatar > span {
+    font-size: 1.12rem !important;
+  }
+
+  body.light-mode .mobile-quick-dock .dock-profile-link .dock-account-avatar,
+  body.light-mode .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar {
+    border-color: rgba(0, 91, 219, 0.46) !important;
+    background: rgba(0, 140, 255, 0.10) !important;
+    color: #075fd0 !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-quick-dock .dock-profile-link .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    flex-basis: 34px !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    flex-basis: 44px !important;
+  }
+}
+
 @media (min-width: 761px) {
   .cart-float {
     display: none !important;

@@ -1160,6 +1160,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return '';
     })();
 
+    setDockSectionActive(activeSection);
+  }
+
+  function setDockSectionActive(activeSection) {
     qsa('.mobile-quick-dock a, .mobile-quick-dock button').forEach(item => {
       const isActive = item.dataset.dockSection === activeSection;
       item.classList.toggle('active', isActive);
@@ -1368,12 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSmartSearchResults(seed);
     shell.classList.add('open');
     document.body.classList.add('smart-search-open');
-    qsa('.mobile-quick-dock a, .mobile-quick-dock button').forEach(item => {
-      item.classList.toggle('active', item.dataset.dockSection === 'search');
-      if (item.dataset.dockSection === 'search') item.setAttribute('aria-current', 'page');
-      else item.removeAttribute('aria-current');
-    });
-    qsa('.mobile-quick-dock [data-dock-section="search"]').forEach(button => button.classList.add('active'));
+    setDockSectionActive('search');
     setTimeout(() => input?.focus(), 80);
   }
 
@@ -1849,7 +1848,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCart();
     qs('.cart-modal')?.classList.add('open');
     document.body.classList.add('cart-open');
-    qsa('.mobile-quick-dock .dock-cart').forEach(button => button.classList.add('active'));
+    setDockSectionActive('cart');
   }
 
   function closeCartModal() {
