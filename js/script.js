@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
       actions.className = 'nav-actions';
       actions.innerHTML = `
         <a class="nav-pill nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" aria-label="Entrar ou cadastrar">
-          <span class="nav-account-avatar"><i class="fa-solid fa-user"></i></span>
+          <span class="nav-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span class="nav-account-label" data-account-label>Entrar ou cadastrar</span>
         </a>
         <button class="nav-icon nav-cart-link" type="button" data-open-cart aria-label="Abrir carrinho">
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
       mobileMenu.insertAdjacentHTML('beforeend', `
         <div class="mobile-menu-divider" data-mobile-extra></div>
         <a class="mobile-only-link nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-mobile-extra>
-          <i class="fa-solid fa-user"></i>
+          <span class="mobile-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span data-account-label>Entrar ou cadastrar</span>
         </a>
         <button class="mobile-only-link mobile-menu-button" type="button" data-open-cart data-mobile-extra>
@@ -483,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>Ajustes</span>
         </a>
         <a class="nav-account-link" href="${loginHref({ redirect: currentLocationForRedirect() })}" data-dock-section="account">
-          <i class="fa-solid fa-user"></i>
+          <span class="dock-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span data-account-label>Conta</span>
         </a>
       `;
@@ -494,12 +494,29 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDockActive();
   }
 
+  function accountAvatarHTML(signed) {
+    if (!signed) return '<i class="fa-solid fa-user" aria-hidden="true"></i>';
+    if (currentUser?.photo) return `<img src="${escapeHTML(currentUser.photo)}" alt="">`;
+    const initial = (currentUser?.name || currentUser?.email || 'U').trim().charAt(0).toUpperCase() || 'U';
+    return `<span>${escapeHTML(initial)}</span>`;
+  }
+
   function updateAccountUI() {
     const signed = Boolean(currentUser?.email);
     qsa('[data-account-label]').forEach(label => {
       label.textContent = label.closest('.mobile-quick-dock')
         ? 'Conta'
         : (signed ? firstName() : 'Entrar ou cadastrar');
+    });
+
+    qsa('[data-account-avatar]').forEach(avatar => {
+      avatar.classList.toggle('signed-in', signed);
+      avatar.classList.toggle('has-photo', signed && Boolean(currentUser?.photo));
+      avatar.innerHTML = accountAvatarHTML(signed);
+    });
+
+    qsa('[data-dock-section="account"]').forEach(link => {
+      link.classList.toggle('has-photo', signed && Boolean(currentUser?.photo));
     });
 
     qsa('.nav-account-link, [data-account-cta], [data-account-login]').forEach(link => {
@@ -1664,7 +1681,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (avatar) {
       avatar.textContent = (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase();
       if (currentUser.photo) {
-        avatar.innerHTML = `<img src="${currentUser.photo}" alt="">`;
+        avatar.innerHTML = `<img src="${escapeHTML(currentUser.photo)}" alt="">`;
       }
     }
 

@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Perfil | Monte Sinai</title>
-  <link rel="stylesheet" href="../css/style.css?v=20260519">
+  <link rel="stylesheet" href="../css/style.css?v=20260520-3">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script defer src="../js/script.js?v=20260519"></script>
+  <script defer src="../js/script.js?v=20260520-3"></script>
 </head>
 <body>
   <header class="navbar">
@@ -44,7 +44,28 @@
 
     <section class="section profile-grid">
       <article class="profile-card profile-summary">
-        <div class="profile-avatar-circle" id="profile-avatar">U</div>
+        <div class="profile-card-header">
+          <div class="profile-avatar-stack">
+            <div class="profile-avatar-circle" id="profile-avatar">U</div>
+            <a class="profile-mini-action profile-edit-action" href="editar-perfil.html">
+              <i class="fa-solid fa-pen"></i>
+              <span>Editar perfil</span>
+            </a>
+          </div>
+          <div class="profile-side-actions" id="profile-actions">
+            <button class="profile-mini-action" type="button" data-switch-account>
+              <i class="fa-solid fa-repeat"></i>
+              <span>Trocar conta</span>
+            </button>
+            <button class="profile-mini-action profile-logout-action" type="button" data-logout-account>
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span>Sair</span>
+            </button>
+          </div>
+          <a class="profile-settings-icon" href="configuracoes.html" id="profile-settings-link" aria-label="Configuracoes do site">
+            <i class="fa-solid fa-gear"></i>
+          </a>
+        </div>
         <div class="profile-headline">
           <span class="eyebrow">Bem-vindo de volta</span>
           <h2 id="profile-name">Usuário</h2>
@@ -74,24 +95,6 @@
             <span>Endereço</span>
             <strong id="profile-address">Rua, número, bairro e cidade</strong>
           </div>
-        </div>
-        <div class="profile-actions" id="profile-actions">
-          <a class="btn btn-secondary" href="editar-perfil.html">
-            <i class="fa-solid fa-pen"></i>
-            Editar perfil
-          </a>
-          <a class="btn btn-secondary" href="configuracoes.html" id="profile-settings-link">
-            <i class="fa-solid fa-gear"></i>
-            Configurações do site
-          </a>
-          <button class="btn btn-primary" type="button" data-switch-account>
-            <i class="fa-solid fa-repeat"></i>
-            Trocar conta
-          </button>
-          <button class="btn btn-secondary" type="button" data-logout-account>
-            <i class="fa-solid fa-right-from-bracket"></i>
-            Sair
-          </button>
         </div>
       </article>
 
