@@ -2769,9 +2769,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('.nav-account-link, [data-account-cta]').forEach(link => {
       if (!(link instanceof HTMLAnchorElement)) return;
-      link.href = profileHref();
+      link.href = signed ? profileHref() : loginHref({ redirect: currentLocationForRedirect() });
       link.classList.toggle('active', ['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(currentPage()));
-      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Abrir perfil do cliente');
+      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Entrar ou cadastrar');
 
       if (link.hasAttribute('data-account-cta')) {
         link.innerHTML = signed
