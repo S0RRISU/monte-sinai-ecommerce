@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     site: 'ms_site_config_v1',
     theme: 'ms_theme_v2',
     legacyTheme: 'ms_theme_v1',
-    installPromptDismissed: 'ms_install_prompt_dismissed_v1'
+    installPromptDismissed: 'ms_install_prompt_dismissed_v1',
+    appInstalled: 'ms_app_installed_v1'
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -106,7 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
   const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at';
-  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, estoque, estoque_minimo`;
+  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, estoque, estoque_minimo, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const ADMIN_ORDER_POLL_MS = 25000;
+  const ORDER_NOTIFICATION_SELECT = 'id, pedido_id, user_id, cliente_email, cliente_telefone, titulo, mensagem, tipo, lida, created_at';
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -170,6 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let searchSuggestionFrame = 0;
   let deferredInstallPrompt = null;
   let installPromptVisible = false;
+  let adminOrderPollTimer = null;
+  let adminRealtimeChannel = null;
+  let adminOrderAlertsStarted = false;
+  let orderNotificationsCache = [];
+  let orderNotificationsReady = true;
 
   applySavedTheme();
   applySiteConfig();
@@ -203,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadProductsFromSupabase();
   optimizeImageLoading();
   initInstallPrompt();
+  initAdminOrderAlerts();
   registerServiceWorker();
 
   function qs(selector, scope = document) {
@@ -781,7 +790,12 @@ document.addEventListener('DOMContentLoaded', () => {
       || text.includes('estoque')
       || text.includes('estoque_minimo')
       || text.includes('destaque')
-      || text.includes('tipo');
+      || text.includes('tipo')
+      || text.includes('catalogo_visivel')
+      || text.includes('loja_visivel')
+      || text.includes('catalogo_ordem')
+      || text.includes('descricao_detalhada')
+      || text.includes('catalogo_destaque');
   }
 
   function isMissingOrderExtensionError(error) {
@@ -798,6 +812,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function isMissingProfileRoleError(error) {
     const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
     return text.includes('admin_role') || text.includes('could not find') || text.includes('pgrst204');
+  }
+
+  function isMissingNotificationTableError(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return text.includes('pedido_notificacoes') || text.includes('could not find') || text.includes('pgrst205') || text.includes('pgrst204');
   }
 
   function escapeHTML(value) {
@@ -870,6 +889,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function storeProducts() {
+    return productIndex.filter(product => normalizeProduct(product).storeVisible);
+  }
+
+  function catalogProducts() {
+    return productIndex.filter(product => normalizeProduct(product).catalogVisible);
+  }
+
+  function compareCatalogProducts(a, b) {
+    const productA = normalizeProduct(a);
+    const productB = normalizeProduct(b);
+    const orderA = productA.catalogOrder;
+    const orderB = productB.catalogOrder;
+    if (orderA !== null || orderB !== null) return (orderA ?? 99999) - (orderB ?? 99999);
+
+    const stockA = productA.stockState === 'out' ? 1 : 0;
+    const stockB = productB.stockState === 'out' ? 1 : 0;
+    if (stockA !== stockB) return stockA - stockB;
+
+    const featuredA = productA.offerActive || productA.catalogHighlight || productA.highlight ? 0 : 1;
+    const featuredB = productB.offerActive || productB.catalogHighlight || productB.highlight ? 0 : 1;
+    if (featuredA !== featuredB) return featuredA - featuredB;
+
+    return String(productA.name || '').localeCompare(String(productB.name || ''), 'pt-BR');
+  }
+
   function catalogSectionMeta(slug, label) {
     return CATALOG_SECTION_META[slug] || {
       eyebrow: label || 'Produtos',
@@ -902,6 +947,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
     const stock = productStockLevel(raw);
     const lowStockLimit = productLowStockLimit(raw);
+    const catalogVisible = raw.catalogo_visivel ?? raw.catalogVisible ?? true;
+    const storeVisible = raw.loja_visivel ?? raw.storeVisible ?? true;
+    const catalogOrder = raw.catalogo_ordem ?? raw.catalogOrder ?? null;
+    const detailedDescription = String(raw.descricao_detalhada ?? raw.detailedDescription ?? '').trim();
+    const catalogHighlight = Boolean(raw.catalogo_destaque ?? raw.catalogHighlight ?? false);
 
     return {
       id: raw.id ?? raw.productId ?? '',
@@ -909,13 +959,15 @@ document.addEventListener('DOMContentLoaded', () => {
       category,
       categorySlug: categorySlug(category),
       description,
+      detailedDescription,
       price,
       originalPrice,
       promotionalPrice,
       image,
       type,
       isKit: type === 'kit',
-      highlight,
+      highlight: highlight || catalogHighlight,
+      catalogHighlight,
       offerActive,
       offerStartsAt: raw.oferta_inicio ?? raw.offerStartsAt ?? '',
       offerEndsAt: raw.oferta_fim ?? raw.offerEndsAt ?? '',
@@ -923,9 +975,12 @@ document.addEventListener('DOMContentLoaded', () => {
       stock,
       lowStockLimit,
       stockState: productStockState({ estoque: stock, estoque_minimo: lowStockLimit }),
+      catalogVisible: catalogVisible !== false,
+      storeVisible: storeVisible !== false,
+      catalogOrder: Number.isFinite(Number(catalogOrder)) ? Number(catalogOrder) : null,
       options: Array.isArray(raw.options) ? raw.options : [],
-      recommended: highlight,
-      terms: `${name} ${category} ${description}`
+      recommended: highlight || catalogHighlight,
+      terms: `${name} ${category} ${description} ${detailedDescription}`
     };
   }
 
@@ -2056,18 +2111,59 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${insidePages() ? '../' : ''}${clean}`;
   }
 
-  function showToast(message) {
-    let toast = qs('.toast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.className = 'toast';
-      document.body.appendChild(toast);
-    }
+  function toastIcon(type = 'info') {
+    return {
+      success: 'fa-circle-check',
+      error: 'fa-circle-exclamation',
+      warning: 'fa-triangle-exclamation',
+      order: 'fa-clipboard-list',
+      install: 'fa-mobile-screen-button',
+      info: 'fa-circle-info'
+    }[type] || 'fa-circle-info';
+  }
 
-    toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.remove('show'), 2200);
+  function ensureToastStack() {
+    let stack = qs('.toast-stack');
+    if (stack) return stack;
+    stack = document.createElement('div');
+    stack.className = 'toast-stack';
+    stack.setAttribute('aria-live', 'polite');
+    stack.setAttribute('aria-atomic', 'false');
+    document.body.appendChild(stack);
+    return stack;
+  }
+
+  function showToast(message, options = {}) {
+    const config = typeof options === 'string' ? { type: options } : (options || {});
+    const type = config.type || 'info';
+    const stack = ensureToastStack();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-modern toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.innerHTML = `
+      <span class="toast-icon"><i class="fa-solid ${toastIcon(type)}"></i></span>
+      <span class="toast-copy">
+        ${config.title ? `<strong>${escapeHTML(config.title)}</strong>` : ''}
+        <span>${escapeHTML(message)}</span>
+      </span>
+      ${config.actionLabel ? `<button class="toast-action" type="button">${escapeHTML(config.actionLabel)}</button>` : ''}
+      <button class="toast-close" type="button" aria-label="Fechar aviso"><i class="fa-solid fa-xmark"></i></button>
+    `;
+    stack.appendChild(toast);
+
+    const close = () => {
+      toast.classList.remove('show');
+      window.setTimeout(() => toast.remove(), 220);
+    };
+
+    qs('.toast-close', toast)?.addEventListener('click', close);
+    qs('.toast-action', toast)?.addEventListener('click', () => {
+      if (typeof config.onAction === 'function') config.onAction();
+      close();
+    });
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+    window.setTimeout(close, Number(config.duration || 3600));
   }
 
   function applySavedTheme() {
@@ -2179,6 +2275,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (navMenu && !qs('[data-admin-panel-link="nav"]', navMenu)) {
       navMenu.insertAdjacentHTML('beforeend', `
+        <a class="hidden nav-orders-link" href="${adminPanelHref()}#orders" data-admin-orders-link="nav" aria-label="Abrir pedidos pendentes">
+          Pedidos
+          <span class="admin-order-badge" data-admin-order-count>0</span>
+        </a>
         <a class="hidden" href="${adminPanelHref()}" data-admin-panel-link="nav">Painel Admin</a>
       `);
     }
@@ -2243,6 +2343,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <a class="mobile-only-link hidden" href="${adminPanelHref()}" data-admin-panel-link="mobile" data-mobile-extra>
           <i class="fa-solid fa-gauge-high"></i>
           Painel Admin
+        </a>
+        <a class="mobile-only-link hidden mobile-admin-orders-link" href="${adminPanelHref()}#orders" data-admin-orders-link="mobile" data-mobile-extra>
+          <i class="fa-solid fa-clipboard-list"></i>
+          Pedidos
+          <strong class="admin-order-badge" data-admin-order-count>0</strong>
         </a>
         <button class="mobile-only-link mobile-menu-button" type="button" data-open-cart data-mobile-extra>
           <i class="fa-solid fa-bag-shopping"></i>
@@ -2412,20 +2517,128 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function setAdminOrderLinksVisible(visible) {
+    qsa('[data-admin-orders-link]').forEach(link => {
+      link.classList.toggle('hidden', !visible);
+      link.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      if (!visible) link.setAttribute('tabindex', '-1');
+      else link.removeAttribute('tabindex');
+      if (link instanceof HTMLAnchorElement) link.href = `${adminPanelHref()}#orders`;
+    });
+    qs('.mobile-menu-toggle')?.classList.toggle('has-admin-order-alert', false);
+  }
+
+  function adminPendingOrders(orders = remoteOrdersCache) {
+    return (orders || []).filter(order => {
+      const payment = normalizePaymentStatus(order.paymentStatus);
+      if (payment === 'Cancelado') return false;
+      return !order.confirmed
+        || normalizeOrderStatus(order.status) !== 'Entregue'
+        || payment === 'Pendente';
+    });
+  }
+
+  function updateAdminOrderAlertUI(orders = remoteOrdersCache, visible = null) {
+    const pending = adminPendingOrders(orders);
+    const count = pending.length;
+    const anyVisible = qsa('[data-admin-orders-link]').some(link => !link.classList.contains('hidden'));
+    const shouldShow = visible ?? anyVisible;
+    setAdminOrderLinksVisible(Boolean(shouldShow));
+    qsa('[data-admin-order-count]').forEach(badge => {
+      badge.textContent = String(count);
+      badge.classList.toggle('is-empty', count === 0);
+      badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} pendente${count === 1 ? '' : 's'}`);
+    });
+    qsa('[data-admin-orders-link]').forEach(link => {
+      link.classList.toggle('has-pending-orders', count > 0);
+    });
+    const toggle = qs('.mobile-menu-toggle');
+    if (toggle) {
+      toggle.classList.toggle('has-admin-order-alert', count > 0 && Boolean(shouldShow));
+      toggle.setAttribute('data-admin-pending-orders', String(count));
+    }
+  }
+
   async function updateAdminPanelLinks({ force = false } = {}) {
     setAdminPanelLinksVisible(false);
+    setAdminOrderLinksVisible(false);
     if (!currentUser?.email) return false;
 
     try {
       await authReady.catch(() => null);
       const admin = await isCurrentUserAdmin({ force });
       setAdminPanelLinksVisible(admin);
+      setAdminOrderLinksVisible(admin);
+      if (admin) refreshAdminOrderAlerts({ force: true });
       return admin;
     } catch (error) {
       console.warn('[Admin] Nao foi possivel validar o link do painel.', error);
       setAdminPanelLinksVisible(false);
+      setAdminOrderLinksVisible(false);
       return false;
     }
+  }
+
+  async function refreshAdminOrderAlerts({ force = false } = {}) {
+    if (!currentUser?.email) {
+      updateAdminOrderAlertUI([], false);
+      return [];
+    }
+
+    let admin = false;
+    try {
+      admin = await isCurrentUserAdmin({ force: false });
+    } catch (_error) {
+      admin = false;
+    }
+    if (!admin) {
+      updateAdminOrderAlertUI([], false);
+      return [];
+    }
+
+    const orders = await loadOrdersFromSupabase({ force });
+    updateAdminOrderAlertUI(orders, true);
+    return orders;
+  }
+
+  function startAdminOrderPolling() {
+    if (adminOrderPollTimer) window.clearInterval(adminOrderPollTimer);
+    adminOrderPollTimer = window.setInterval(() => {
+      refreshAdminOrderAlerts({ force: true }).catch(error => {
+        console.warn('[Admin] Nao foi possivel atualizar contador de pedidos.', error);
+      });
+    }, ADMIN_ORDER_POLL_MS);
+  }
+
+  function startAdminOrdersRealtime() {
+    const client = ordersClient();
+    if (!client?.channel || adminRealtimeChannel) return;
+    try {
+      adminRealtimeChannel = client
+        .channel('monte-sinai-admin-pedidos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+          remoteOrdersLoaded = false;
+          refreshAdminOrderAlerts({ force: true }).catch(error => {
+            console.warn('[Admin] Realtime de pedidos falhou.', error);
+          });
+        })
+        .subscribe();
+    } catch (error) {
+      console.warn('[Admin] Realtime de pedidos indisponivel, usando polling.', error);
+      adminRealtimeChannel = null;
+    }
+  }
+
+  async function initAdminOrderAlerts() {
+    if (adminOrderAlertsStarted) return;
+    adminOrderAlertsStarted = true;
+    await authReady.catch(() => null);
+    await updateAdminPanelLinks({ force: true });
+    const admin = await isCurrentUserAdmin({ force: false }).catch(() => false);
+    if (!admin) return;
+    startAdminOrdersRealtime();
+    startAdminOrderPolling();
+    refreshAdminOrderAlerts({ force: true }).catch(() => {});
   }
 
   function bindMobileMenu() {
@@ -2899,7 +3112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterBar = qs('.filter-chips');
     if (!filterBar || !productIndex.length) return;
 
-    const categories = orderedCategoryEntries();
+    const categories = orderedCategoryEntries(storeProducts());
 
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
@@ -2911,9 +3124,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function catalogProductGroups() {
-    const recommended = productIndex.filter(product => isRecommendedProduct(product));
+    const products = storeProducts();
+    const recommended = products.filter(product => isRecommendedProduct(product));
     const recommendedNames = new Set(recommended.map(product => normalizeText(product.name)));
-    const remaining = productIndex.filter(product => !recommendedNames.has(normalizeText(product.name)));
+    const remaining = products.filter(product => !recommendedNames.has(normalizeText(product.name)));
     const groups = [];
 
     if (recommended.length) {
@@ -2925,12 +3139,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     orderedCategoryEntries(remaining).forEach(([slug, label]) => {
-      const products = remaining.filter(product => (product.categorySlug || categorySlug(product.category)) === slug);
-      if (!products.length) return;
+      const groupProducts = remaining.filter(product => (product.categorySlug || categorySlug(product.category)) === slug);
+      if (!groupProducts.length) return;
 
       groups.push({
         slug,
-        products,
+        products: groupProducts,
         ...catalogSectionMeta(slug, label)
       });
     });
@@ -2981,9 +3195,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const rail = qs('[data-product-rail]');
     if (!rail || !productIndex.length) return;
 
-    const recommended = productIndex.filter(product => isRecommendedProduct(product));
+    const products = storeProducts();
+    const recommended = products.filter(product => isRecommendedProduct(product));
     const recommendedNames = new Set(recommended.map(product => normalizeText(product.name)));
-    const featured = [...recommended, ...productIndex.filter(product => !recommendedNames.has(normalizeText(product.name)))].slice(0, 6);
+    const featured = [...recommended, ...products.filter(product => !recommendedNames.has(normalizeText(product.name)))].slice(0, 6);
     rail.innerHTML = `
       ${featured.map(product => productCardHTML(product, 'rail')).join('')}
       <a class="more-card rail-product more-card-3d tilt-3d" href="${catalogHref()}" aria-label="Ver catalogo completo">
@@ -3000,7 +3215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = qs('[data-promotions-grid]');
     if (!grid) return;
 
-    const offers = productIndex.filter(product => normalizeProduct(product).offerActive);
+    const offers = storeProducts().filter(product => normalizeProduct(product).offerActive);
     grid.innerHTML = offers.map(product => productCardHTML(product, 'catalog')).join('');
     qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
     qsa('[data-promotions-count]').forEach(el => { el.textContent = String(offers.length); });
@@ -3039,9 +3254,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const lowStock = normalized.stockState === 'low';
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
+    const key = normalized.id || normalized.name;
 
     return `
-      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
+      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
         <div class="full-catalog-media">
           ${image
             ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
@@ -3063,8 +3279,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="full-catalog-action">
           <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(normalized.price)}</strong>
-          <button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>
-            ${outOfStock ? 'Indisponivel' : 'Adicionar'}
+          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
+            <i class="fa-solid fa-circle-info"></i>
+            Ver detalhes
           </button>
         </div>
       </article>
@@ -3078,12 +3295,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = qs('[data-full-catalog-search]');
     const term = normalizeText(input?.value || '');
     const activeFilter = qs('[data-full-catalog-filter].active')?.dataset.fullCatalogFilter || 'all';
-    const products = [...productIndex].sort((a, b) => {
-      const stockA = normalizeProduct(a).stockState === 'out' ? 1 : 0;
-      const stockB = normalizeProduct(b).stockState === 'out' ? 1 : 0;
-      if (stockA !== stockB) return stockA - stockB;
-      return String(a.category || '').localeCompare(String(b.category || ''), 'pt-BR')
-        || String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    const products = catalogProducts().sort((a, b) => {
+      const productA = normalizeProduct(a);
+      const productB = normalizeProduct(b);
+      const categoryCompare = categoryOrderIndex(productA.categorySlug) - categoryOrderIndex(productB.categorySlug);
+      if (categoryCompare !== 0) return categoryCompare;
+      return compareCatalogProducts(a, b);
     });
 
     const visible = products.filter(product => {
@@ -3098,7 +3315,26 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('[data-full-catalog-available]', String(availableCount));
     setText('[data-full-catalog-out]', String(outCount));
 
-    list.innerHTML = visible.map(fullCatalogCardHTML).join('');
+    const grouped = orderedCategoryEntries(visible).map(([slug, label]) => {
+      const meta = catalogSectionMeta(slug, label);
+      const categoryProducts = visible
+        .filter(product => normalizeProduct(product).categorySlug === slug)
+        .sort(compareCatalogProducts);
+      return `
+        <section class="full-catalog-category" data-full-catalog-category="${escapeHTML(slug)}">
+          <div class="full-catalog-category-head">
+            <span class="eyebrow">${escapeHTML(meta.eyebrow)}</span>
+            <h2>${escapeHTML(label)}</h2>
+            <small>${categoryProducts.length} item${categoryProducts.length === 1 ? '' : 's'}</small>
+          </div>
+          <div class="full-catalog-category-grid">
+            ${categoryProducts.map(fullCatalogCardHTML).join('')}
+          </div>
+        </section>
+      `;
+    }).join('');
+
+    list.innerHTML = grouped;
     qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
@@ -3107,6 +3343,109 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `${visible.length} de ${products.length} produto${products.length === 1 ? '' : 's'} no catalogo`
         : 'Carregando catalogo...';
     }
+  }
+
+  function ensureCatalogDetailModal() {
+    let modal = qs('#catalog-detail-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'catalog-detail-modal';
+    modal.className = 'catalog-detail-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'catalog-detail-title');
+    modal.innerHTML = `
+      <button class="catalog-detail-backdrop" type="button" data-catalog-detail-close aria-label="Fechar detalhes"></button>
+      <article class="catalog-detail-panel">
+        <button class="catalog-detail-close" type="button" data-catalog-detail-close aria-label="Fechar detalhes">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div data-catalog-detail-body></div>
+      </article>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-catalog-detail-close]')) closeCatalogDetailModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeCatalogDetailModal();
+    });
+    return modal;
+  }
+
+  function catalogProductByKey(key = '') {
+    const target = String(key || '');
+    return catalogProducts().find(product => {
+      const normalized = normalizeProduct(product);
+      return String(normalized.id || normalized.name) === target;
+    });
+  }
+
+  function openCatalogDetailModal(key = '') {
+    const product = catalogProductByKey(key);
+    if (!product) {
+      showToast('Produto nao encontrado no catalogo.', { type: 'warning' });
+      return;
+    }
+
+    const normalized = normalizeProduct(product);
+    const modal = ensureCatalogDetailModal();
+    const body = qs('[data-catalog-detail-body]', modal);
+    const image = productAssetPath(normalized);
+    const outOfStock = normalized.stockState === 'out';
+    const lowStock = normalized.stockState === 'low';
+    const statusText = fullCatalogStatusText(normalized);
+    const stockText = fullCatalogStockText(normalized);
+    const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
+
+    if (body) {
+      body.innerHTML = `
+        <div class="catalog-detail-media">
+          ${image
+            ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
+            : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`}
+        </div>
+        <div class="catalog-detail-copy">
+          <div class="full-catalog-badges">
+            <span class="catalog-status-badge ${outOfStock ? 'is-out' : (lowStock ? 'is-low' : 'is-ok')}">${escapeHTML(statusText)}</span>
+            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+          </div>
+          <span class="eyebrow">${escapeHTML(normalized.category)}</span>
+          <h2 id="catalog-detail-title">${escapeHTML(normalized.name)}</h2>
+          <p>${escapeHTML(detailText)}</p>
+          ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
+          <div class="catalog-detail-facts">
+            <div><span>Preco</span><strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(normalized.price)}</strong></div>
+            <div><span>Estoque</span><strong>${escapeHTML(stockText)}</strong></div>
+            <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
+          </div>
+          <div class="catalog-detail-actions">
+            <a class="btn btn-primary" href="${productHref(normalized.name)}">
+              <i class="fa-solid fa-store"></i>
+              Comprar este produto
+            </a>
+            <button class="btn btn-secondary" type="button" data-catalog-detail-close>
+              <i class="fa-solid fa-arrow-left"></i>
+              Voltar ao catalogo
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('catalog-detail-open');
+    requestAnimationFrame(() => modal.classList.add('show'));
+  }
+
+  function closeCatalogDetailModal() {
+    const modal = qs('#catalog-detail-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.remove('show');
+    document.body.classList.remove('catalog-detail-open');
+    window.setTimeout(() => modal.classList.add('hidden'), 180);
   }
 
   function bindFullCatalogPage() {
@@ -3119,6 +3458,13 @@ document.addEventListener('DOMContentLoaded', () => {
         qsa('[data-full-catalog-filter]').forEach(item => item.classList.toggle('active', item === button));
         renderFullCatalogPage();
       });
+    });
+    list.addEventListener('click', event => {
+      const trigger = event.target.closest('[data-catalog-detail], [data-full-catalog-product]');
+      if (!trigger) return;
+      event.preventDefault();
+      const key = trigger.dataset.catalogDetail || trigger.dataset.catalogProductKey;
+      openCatalogDetailModal(key);
     });
 
     renderFullCatalogPage();
@@ -4328,21 +4674,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function initInstallPrompt() {
+    syncInstallVisibility();
     bindInstallButtons();
 
     window.addEventListener('beforeinstallprompt', event => {
       event.preventDefault();
+      syncInstallVisibility();
+      if (isAppInstalled()) return;
       deferredInstallPrompt = event;
       if (!installPromptBlocked()) scheduleInstallPrompt(false);
     });
 
     window.addEventListener('appinstalled', () => {
       deferredInstallPrompt = null;
+      markAppInstalled();
       hideInstallPrompt();
-      try {
-        localStorage.setItem(STORAGE.installPromptDismissed, String(Date.now() + 365 * 24 * 60 * 60 * 1000));
-      } catch (_error) {}
-      showToast('Aplicativo Monte Sinai instalado.');
+      showToast('Aplicativo Monte Sinai instalado.', { type: 'install' });
     });
 
     if (!installPromptBlocked() && isIOSInstallCandidate()) scheduleInstallPrompt(true);
@@ -4352,13 +4699,19 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-install-app]').forEach(button => {
       if (button.dataset.installBound === 'true') return;
       button.dataset.installBound = 'true';
+      if (isAppInstalled()) {
+        button.classList.add('hidden');
+        button.hidden = true;
+        return;
+      }
       button.addEventListener('click', () => handleManualInstallRequest());
     });
   }
 
   async function handleManualInstallRequest() {
-    if (isStandaloneApp()) {
-      showToast('O app Monte Sinai ja esta instalado neste aparelho.');
+    if (isAppInstalled()) {
+      syncInstallVisibility();
+      showToast('O app Monte Sinai ja esta instalado neste aparelho.', { type: 'install' });
       return;
     }
 
@@ -4368,9 +4721,10 @@ document.addEventListener('DOMContentLoaded', () => {
       deferredInstallPrompt = null;
       if (choice?.outcome === 'accepted') {
         hideInstallPrompt();
-        showToast('Instalacao iniciada.');
+        markAppInstalled();
+        showToast('Instalacao iniciada.', { type: 'install' });
       } else {
-        showToast('Instalacao cancelada. Voce pode tentar novamente depois.');
+        showToast('Instalacao cancelada. Voce pode tentar novamente depois.', { type: 'warning' });
       }
       return;
     }
@@ -4378,20 +4732,45 @@ document.addEventListener('DOMContentLoaded', () => {
     renderInstallPrompt(isIOSInstallCandidate(), { manual: true });
     showToast(isIOSInstallCandidate()
       ? 'No iPhone, toque em compartilhar e depois em Adicionar a Tela de Inicio.'
-      : 'No Chrome ou Edge, use o menu do navegador e escolha Instalar app.');
+      : 'No Chrome ou Edge, use o menu do navegador e escolha Instalar app.', { type: 'install' });
   }
 
   function installPromptBlocked(options = {}) {
     const manual = options.manual === true;
     if (!manual && document.body.classList.contains('auth-body')) return true;
     if (!manual && ['painel.html', 'login.html', 'pagamento.html'].includes(currentPage())) return true;
-    if (isStandaloneApp()) return true;
+    if (isAppInstalled()) return true;
     const dismissedUntil = Number(localStorage.getItem(STORAGE.installPromptDismissed) || 0);
     return !manual && Number.isFinite(dismissedUntil) && dismissedUntil > Date.now();
   }
 
+  function isAppInstalled() {
+    return isStandaloneApp() || localStorage.getItem(STORAGE.appInstalled) === 'true';
+  }
+
   function isStandaloneApp() {
     return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function markAppInstalled() {
+    try {
+      localStorage.setItem(STORAGE.appInstalled, 'true');
+      localStorage.setItem(STORAGE.installPromptDismissed, String(Date.now() + 365 * 24 * 60 * 60 * 1000));
+    } catch (_error) {}
+    syncInstallVisibility();
+  }
+
+  function syncInstallVisibility() {
+    const installed = isAppInstalled();
+    document.body.classList.toggle('app-is-installed', installed);
+    if (installed) hideInstallPrompt();
+    qsa('[data-install-app], .auth-install-button').forEach(element => {
+      element.classList.toggle('hidden', installed);
+      element.hidden = installed;
+      element.setAttribute('aria-hidden', String(installed));
+      if (installed) element.setAttribute('tabindex', '-1');
+      else element.removeAttribute('tabindex');
+    });
   }
 
   function isIOSInstallCandidate() {
@@ -4452,7 +4831,10 @@ document.addEventListener('DOMContentLoaded', () => {
       deferredInstallPrompt.prompt();
       const choice = await deferredInstallPrompt.userChoice.catch(() => null);
       deferredInstallPrompt = null;
-      if (choice?.outcome === 'accepted') hideInstallPrompt();
+      if (choice?.outcome === 'accepted') {
+        markAppInstalled();
+        hideInstallPrompt();
+      }
       else dismissInstallPrompt(7);
     });
   }
@@ -4501,6 +4883,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openWhatsAppOrder(order) {
     window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}`, '_blank');
+  }
+
+  function buildOrderUpdateMessage(order) {
+    const status = normalizeOrderStatus(order.status);
+    const payment = normalizePaymentStatus(order.paymentStatus);
+    const lines = [
+      `Ola, ${order.customer?.name || 'cliente'}! Aqui e a Monte Sinai.`,
+      `Seu pedido ${order.id} foi atualizado.`,
+      `Entrega: ${status}.`,
+      `Pagamento: ${payment}.`
+    ];
+    if (status === 'Saiu para entrega') lines.push('Seu pedido saiu para entrega e esta a caminho.');
+    if (status === 'Entregue') lines.push('Obrigado pela preferencia. A Monte Sinai cuida de voce e da sua casa.');
+    if (payment === 'Pendente') lines.push('Se precisar combinar o pagamento, responda esta mensagem.');
+    return lines.join('\n');
+  }
+
+  function openCustomerStatusWhatsApp(order) {
+    const phone = onlyDigits(order.customer?.phone || '');
+    const target = phone.length >= 10 ? phone : ownerWhatsApp();
+    window.open(`https://wa.me/${target}?text=${encodeURIComponent(buildOrderUpdateMessage(order))}`, '_blank');
   }
 
   function profileActionText(signed, action) {
@@ -5404,6 +5807,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const customerWhatsapp = event.target.closest('[data-order-customer-whatsapp]');
+    if (customerWhatsapp) {
+      const orders = await loadOrdersFromSupabase();
+      const order = orders.find(item => item.uuid === customerWhatsapp.dataset.orderCustomerWhatsapp || item.id === customerWhatsapp.dataset.orderCustomerWhatsapp);
+      if (order) openCustomerStatusWhatsApp(order);
+      return;
+    }
+
     const confirmOrder = event.target.closest('[data-order-confirm]');
     if (confirmOrder) {
       await confirmAdminOrder(confirmOrder.dataset.orderConfirm);
@@ -5505,7 +5916,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     remoteOrdersLoaded = false;
     await renderOrdersEverywhere({ force: true });
-    showToast('Status do pedido atualizado.');
+    showToast('Status do pedido atualizado e aviso interno criado.', { type: 'order' });
   }
 
   async function updateOrderPaymentStatus(orderId, status) {
@@ -5532,7 +5943,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     remoteOrdersLoaded = false;
     await renderOrdersEverywhere({ force: true });
-    showToast('Pagamento atualizado.');
+    showToast('Pagamento atualizado e aviso interno criado.', { type: 'order' });
   }
 
   async function confirmAdminOrder(orderId) {
@@ -5553,7 +5964,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     remoteOrdersLoaded = false;
     await renderOrdersEverywhere({ force: true });
-    showToast('Pedido confirmado.');
+    showToast('Pedido confirmado e cliente avisado no perfil.', { type: 'order' });
   }
 
   function localCategoryLabel(value = '') {
@@ -5701,14 +6112,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function supabaseProductRows(products = []) {
-    return products.map(product => ({
+    return products.map(product => {
+      const row = {
       nome: product.nome || '',
       preco: parsePrice(product.preco),
       imagem: canonicalAssetPath(product.imagem || ''),
       categoria: product.categoria || 'Produtos',
       descricao: product.descricao || '',
       ativo: product.ativo !== false
-    })).filter(product => product.nome);
+      };
+      if (productExtendedColumnsReady) {
+        row.catalogo_visivel = product.catalogo_visivel ?? true;
+        row.loja_visivel = product.loja_visivel ?? true;
+        row.catalogo_destaque = product.catalogo_destaque ?? false;
+        row.descricao_detalhada = product.descricao_detalhada || '';
+      }
+      return row;
+    }).filter(product => product.nome);
   }
 
   async function importLocalCatalogProducts() {
@@ -5953,6 +6373,13 @@ document.addEventListener('DOMContentLoaded', () => {
       payload.kit_itens = qs('#admin-product-kit-items')?.value.trim() || '';
       payload.estoque = qs('#admin-product-stock')?.value === '' ? null : Math.max(0, Math.round(parsePrice(qs('#admin-product-stock')?.value || 0)));
       payload.estoque_minimo = Math.max(0, Math.round(parsePrice(qs('#admin-product-stock-min')?.value || siteConfig.stockAlertThreshold || 0)));
+      payload.catalogo_visivel = qs('#admin-product-catalog-visible')?.value !== 'false';
+      payload.loja_visivel = qs('#admin-product-store-visible')?.value !== 'false';
+      payload.catalogo_destaque = qs('#admin-product-catalog-highlight')?.value === 'true';
+      payload.catalogo_ordem = qs('#admin-product-catalog-order')?.value === ''
+        ? null
+        : Math.max(0, Math.round(parsePrice(qs('#admin-product-catalog-order')?.value || 0)));
+      payload.descricao_detalhada = qs('#admin-product-detail-description')?.value.trim() || '';
     }
 
     return payload;
@@ -6148,6 +6575,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const offerEnd = qs('#admin-product-offer-end');
     const stock = qs('#admin-product-stock');
     const stockMin = qs('#admin-product-stock-min');
+    const catalogVisible = qs('#admin-product-catalog-visible');
+    const storeVisible = qs('#admin-product-store-visible');
+    const catalogHighlight = qs('#admin-product-catalog-highlight');
+    const catalogOrder = qs('#admin-product-catalog-order');
+    const detailDescription = qs('#admin-product-detail-description');
 
     if (id) id.value = product.id || '';
     if (name) name.value = product.nome || '';
@@ -6168,6 +6600,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (offerEnd) offerEnd.value = formatDateTimeLocalInput(product.oferta_fim);
     if (stock) stock.value = product.estoque ?? '';
     if (stockMin) stockMin.value = product.estoque_minimo ?? siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold;
+    if (catalogVisible) catalogVisible.value = product.catalogo_visivel === false ? 'false' : 'true';
+    if (storeVisible) storeVisible.value = product.loja_visivel === false ? 'false' : 'true';
+    if (catalogHighlight) catalogHighlight.value = product.catalogo_destaque ? 'true' : 'false';
+    if (catalogOrder) catalogOrder.value = product.catalogo_ordem ?? '';
+    if (detailDescription) detailDescription.value = product.descricao_detalhada || '';
     setText('#admin-product-form-title', productType(product) === 'kit' ? 'Editar kit' : 'Editar produto');
     setAdminTab('products');
     openAdminModal('product');
@@ -6181,11 +6618,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const type = qs('#admin-product-type');
     const highlight = qs('#admin-product-highlight');
     const stockMin = qs('#admin-product-stock-min');
+    const catalogVisible = qs('#admin-product-catalog-visible');
+    const storeVisible = qs('#admin-product-store-visible');
+    const catalogHighlight = qs('#admin-product-catalog-highlight');
     if (id) id.value = '';
     if (active) active.value = 'true';
     if (file) file.value = '';
     if (type) type.value = 'produto';
     if (highlight) highlight.value = 'false';
+    if (catalogVisible) catalogVisible.value = 'true';
+    if (storeVisible) storeVisible.value = 'true';
+    if (catalogHighlight) catalogHighlight.value = 'false';
     if (stockMin) stockMin.value = siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold;
     setText('#admin-product-form-title', 'Criar produto');
     updateAdminProductPreview('');
@@ -6582,6 +7025,93 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function loadCustomerOrderNotifications({ force = false } = {}) {
+    if (!force && orderNotificationsCache.length) return orderNotificationsCache;
+    if (!orderNotificationsReady) return [];
+    const client = ordersClient();
+    if (!client || !currentUser?.email) return [];
+
+    try {
+      await authReady.catch(() => null);
+      const authUser = await currentAuthUser().catch(() => null);
+      let rows = [];
+      if (authUser?.id) {
+        const byUser = await client
+          .from('pedido_notificacoes')
+          .select(ORDER_NOTIFICATION_SELECT)
+          .eq('user_id', authUser.id)
+          .order('created_at', { ascending: false })
+          .limit(12);
+        if (byUser.error) throw byUser.error;
+        rows = byUser.data || [];
+      }
+
+      if (!rows.length && currentUser.email) {
+        const byEmail = await client
+          .from('pedido_notificacoes')
+          .select(ORDER_NOTIFICATION_SELECT)
+          .eq('cliente_email', currentUser.email)
+          .order('created_at', { ascending: false })
+          .limit(12);
+        if (byEmail.error) throw byEmail.error;
+        rows = byEmail.data || [];
+      }
+
+      orderNotificationsCache = rows;
+      return rows;
+    } catch (error) {
+      if (isMissingNotificationTableError(error)) {
+        orderNotificationsReady = false;
+        return [];
+      }
+      console.warn('[Pedidos] Nao foi possivel carregar avisos do cliente.', error);
+      return [];
+    }
+  }
+
+  function ensureProfileNotificationsPanel() {
+    const detailsPanel = qs('[data-profile-panel="details"]');
+    if (!detailsPanel) return null;
+    let panel = qs('#profile-order-notifications', detailsPanel);
+    if (panel) return panel;
+
+    panel = document.createElement('section');
+    panel.id = 'profile-order-notifications';
+    panel.className = 'profile-order-notifications';
+    panel.innerHTML = `
+      <div class="section-head">
+        <span class="eyebrow">Avisos dos pedidos</span>
+        <h3>Atualizacoes da Monte Sinai</h3>
+        <p>Quando um pedido mudar de status, o aviso aparece aqui.</p>
+      </div>
+      <div class="profile-notification-list" data-profile-notification-list></div>
+    `;
+    detailsPanel.insertBefore(panel, qs('.profile-feature-grid', detailsPanel));
+    return panel;
+  }
+
+  async function renderCustomerOrderNotifications({ force = false } = {}) {
+    if (currentPage() !== 'perfil.html') return;
+    const panel = ensureProfileNotificationsPanel();
+    const list = qs('[data-profile-notification-list]', panel || document);
+    if (!panel || !list) return;
+
+    const notifications = await loadCustomerOrderNotifications({ force });
+    panel.classList.toggle('hidden', !currentUser?.email && !notifications.length);
+    list.innerHTML = notifications.length
+      ? notifications.map(item => `
+        <article class="profile-notification-item ${item.lida ? 'is-read' : ''}">
+          <i class="fa-solid ${toastIcon(item.tipo === 'pagamento' ? 'warning' : 'order')}"></i>
+          <span>
+            <strong>${escapeHTML(item.titulo || 'Atualizacao do pedido')}</strong>
+            <small>${escapeHTML(item.mensagem || '')}</small>
+            <em>${escapeHTML(formatDateTime(item.created_at))}</em>
+          </span>
+        </article>
+      `).join('')
+      : '<p class="empty-cart">Nenhum aviso de pedido ainda.</p>';
+  }
+
   async function renderOrdersEverywhere(options = {}) {
     const orders = await loadOrdersFromSupabase(options);
     const customerOrders = currentUser?.email
@@ -6593,6 +7123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('#dash-last-order', orders[0]?.id || 'Nenhum');
     renderSalesReports(orders);
     renderDeveloperDiagnostics();
+    updateAdminOrderAlertUI(orders);
     qsa('[data-profile-order-count]').forEach(el => {
       el.textContent = String(customerOrders.length);
     });
@@ -6600,6 +7131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-orders-container], #orders-list').forEach(container => {
       renderOrders(container, orders);
     });
+    renderCustomerOrderNotifications({ force: options.force === true });
   }
 
   function sameLocalDate(value, date = new Date()) {
@@ -6756,6 +7288,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn btn-secondary ${order.confirmed ? 'is-confirmed' : ''}" type="button" data-order-confirm="${escapeHTML(order.uuid)}" ${order.confirmed ? 'disabled' : ''}>
               <i class="fa-solid ${order.confirmed ? 'fa-circle-check' : 'fa-check-double'}"></i>
               ${order.confirmed ? 'Confirmado' : 'Confirmar pedido'}
+            </button>
+            <button class="btn btn-secondary" type="button" data-order-customer-whatsapp="${escapeHTML(order.uuid)}">
+              <i class="fa-brands fa-whatsapp"></i>
+              Avisar cliente
             </button>
           </div>
         `

@@ -545,6 +545,48 @@
                 <label for="admin-product-description">Descricao</label>
                 <textarea id="admin-product-description" rows="3" placeholder="Descricao curta exibida no catalogo"></textarea>
               </div>
+              <div class="admin-offer-panel admin-catalog-panel">
+                <div class="admin-offer-head">
+                  <div>
+                    <span class="eyebrow">Catalogo de consulta</span>
+                    <h3>Como este produto aparece no catalogo</h3>
+                    <p>Controle a vitrine de consulta sem obrigar o cliente a adicionar no carrinho.</p>
+                  </div>
+                </div>
+                <div class="form-grid-3">
+                  <div class="form-group">
+                    <label for="admin-product-catalog-visible">Aparece no catalogo</label>
+                    <select id="admin-product-catalog-visible">
+                      <option value="true">Mostrar no catalogo</option>
+                      <option value="false">Esconder do catalogo</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-product-store-visible">Aparece na loja</label>
+                    <select id="admin-product-store-visible">
+                      <option value="true">Pode vender na loja</option>
+                      <option value="false">Somente consulta</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-product-catalog-highlight">Destaque no catalogo</label>
+                    <select id="admin-product-catalog-highlight">
+                      <option value="false">Normal</option>
+                      <option value="true">Destacar no catalogo</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="admin-product-catalog-order">Ordem no catalogo</label>
+                    <input id="admin-product-catalog-order" type="number" min="0" step="1" placeholder="Opcional">
+                  </div>
+                  <div class="form-group">
+                    <label for="admin-product-detail-description">Detalhes completos</label>
+                    <textarea id="admin-product-detail-description" rows="3" placeholder="Texto maior exibido no modal de detalhes"></textarea>
+                  </div>
+                </div>
+              </div>
               <div class="form-group">
                 <label for="admin-product-kit-items">Itens do kit</label>
                 <textarea id="admin-product-kit-items" rows="3" placeholder="Ex: 1 Agua 20L + 1 Detergente 2L + 1 Esponja"></textarea>
