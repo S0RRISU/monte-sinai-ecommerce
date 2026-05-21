@@ -183,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setActiveNavigation();
   bindSiteSearch();
   bindCatalog();
+  bindFullCatalogPage();
   bindProductCards();
   bindProductRail();
   ensureCartShell();
@@ -1192,6 +1193,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const client = supabaseProductClient();
     if (!client) {
       console.warn('[Supabase] Cliente não encontrado. Usando produtos locais como fallback.');
+      const localProducts = await loadLocalCatalogProducts().catch(() => []);
+      if (localProducts.length) {
+        setProductIndex(localProducts);
+        renderSupabaseProducts();
+      }
       return;
     }
 
@@ -1233,6 +1239,11 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
+      const localProducts = await loadLocalCatalogProducts().catch(() => []);
+      if (localProducts.length) {
+        setProductIndex(localProducts);
+        renderSupabaseProducts();
+      }
       if (currentPage() === 'produtos.html') {
         showToast('Não foi possível carregar os produtos do Supabase. Mantive o catálogo local.');
       }
@@ -1241,6 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSupabaseProducts() {
     renderDynamicCatalog();
+    renderFullCatalogPage();
     renderPromotionsPage();
     renderDynamicProductRail();
     optimizeImageLoading();
@@ -1386,6 +1398,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function productHref(query = '') {
     const search = query ? `?q=${encodeURIComponent(query)}` : '';
     return `${pageHref('produtos.html')}${search}#todos-produtos`;
+  }
+
+  function catalogHref() {
+    return pageHref('catalogo.html');
   }
 
   function promotionsHref() {
@@ -1862,6 +1878,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const allowedPages = new Set([
         'index.html',
         'produtos.html',
+        'catalogo.html',
         'promocoes.html',
         'pagamento.html',
         'perfil.html',
@@ -2456,7 +2473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const page = currentPage();
     const activeSection = (() => {
       if (page === 'index.html') return 'home';
-      if (page === 'produtos.html') return 'store';
+      if (page === 'produtos.html' || page === 'catalogo.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
       if (['login.html', 'perfil.html', 'editar-perfil.html', 'configuracoes.html', 'criar.html'].includes(page)) return 'account';
       return '';
@@ -2969,7 +2986,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const featured = [...recommended, ...productIndex.filter(product => !recommendedNames.has(normalizeText(product.name)))].slice(0, 6);
     rail.innerHTML = `
       ${featured.map(product => productCardHTML(product, 'rail')).join('')}
-      <a class="more-card rail-product more-card-3d tilt-3d" href="${productHref()}" aria-label="Ver mais produtos">
+      <a class="more-card rail-product more-card-3d tilt-3d" href="${catalogHref()}" aria-label="Ver catalogo completo">
         <div class="product-icon"><i class="fa-solid fa-arrow-right"></i></div>
         <h3>Ver mais produtos</h3>
         <p>Abra o catálogo completo com todos os produtos cadastrados.</p>
@@ -2987,6 +3004,124 @@ document.addEventListener('DOMContentLoaded', () => {
     grid.innerHTML = offers.map(product => productCardHTML(product, 'catalog')).join('');
     qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
     qsa('[data-promotions-count]').forEach(el => { el.textContent = String(offers.length); });
+  }
+
+  function fullCatalogStockText(product) {
+    const normalized = normalizeProduct(product);
+    if (normalized.stockState === 'out') return 'Indisponivel';
+    if (normalized.stockState === 'low') return `${normalized.stock} na loja`;
+    if (normalized.stock === null) return 'Quantidade livre';
+    return `${normalized.stock} na loja`;
+  }
+
+  function fullCatalogStatusText(product) {
+    const normalized = normalizeProduct(product);
+    if (normalized.stockState === 'out') return 'Fora da loja agora';
+    if (normalized.stockState === 'low') return 'Estoque baixo';
+    if (normalized.stock === null) return 'Disponivel';
+    return 'Disponivel';
+  }
+
+  function fullCatalogMatchesFilter(product, filter) {
+    const normalized = normalizeProduct(product);
+    if (filter === 'available') return normalized.stockState !== 'out';
+    if (filter === 'out') return normalized.stockState === 'out';
+    if (filter === 'low') return normalized.stockState === 'low';
+    if (filter === 'offers') return normalized.offerActive;
+    if (filter === 'kits') return normalized.isKit;
+    return true;
+  }
+
+  function fullCatalogCardHTML(product) {
+    const normalized = normalizeProduct(product);
+    const image = productAssetPath(normalized);
+    const outOfStock = normalized.stockState === 'out';
+    const lowStock = normalized.stockState === 'low';
+    const statusText = fullCatalogStatusText(normalized);
+    const stockText = fullCatalogStockText(normalized);
+
+    return `
+      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
+        <div class="full-catalog-media">
+          ${image
+            ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
+            : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`}
+        </div>
+        <div class="full-catalog-copy">
+          <div class="full-catalog-badges">
+            <span class="catalog-status-badge ${outOfStock ? 'is-out' : (lowStock ? 'is-low' : 'is-ok')}">${escapeHTML(statusText)}</span>
+            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+          </div>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
+          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
+        </div>
+        <div class="full-catalog-stock">
+          <strong>${escapeHTML(stockText)}</strong>
+          <span>${escapeHTML(normalized.category)}</span>
+        </div>
+        <div class="full-catalog-action">
+          <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(normalized.price)}</strong>
+          <button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>
+            ${outOfStock ? 'Indisponivel' : 'Adicionar'}
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderFullCatalogPage() {
+    const list = qs('[data-full-catalog-list]');
+    if (!list) return;
+
+    const input = qs('[data-full-catalog-search]');
+    const term = normalizeText(input?.value || '');
+    const activeFilter = qs('[data-full-catalog-filter].active')?.dataset.fullCatalogFilter || 'all';
+    const products = [...productIndex].sort((a, b) => {
+      const stockA = normalizeProduct(a).stockState === 'out' ? 1 : 0;
+      const stockB = normalizeProduct(b).stockState === 'out' ? 1 : 0;
+      if (stockA !== stockB) return stockA - stockB;
+      return String(a.category || '').localeCompare(String(b.category || ''), 'pt-BR')
+        || String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    });
+
+    const visible = products.filter(product => {
+      const normalized = normalizeProduct(product);
+      const blob = normalizeText(`${normalized.name} ${normalized.category} ${normalized.description} ${normalized.kitItems}`);
+      return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
+    });
+
+    const availableCount = products.filter(product => normalizeProduct(product).stockState !== 'out').length;
+    const outCount = products.filter(product => normalizeProduct(product).stockState === 'out').length;
+    setText('[data-full-catalog-total]', String(products.length));
+    setText('[data-full-catalog-available]', String(availableCount));
+    setText('[data-full-catalog-out]', String(outCount));
+
+    list.innerHTML = visible.map(fullCatalogCardHTML).join('');
+    qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+
+    const result = qs('[data-full-catalog-results]');
+    if (result) {
+      result.textContent = products.length
+        ? `${visible.length} de ${products.length} produto${products.length === 1 ? '' : 's'} no catalogo`
+        : 'Carregando catalogo...';
+    }
+  }
+
+  function bindFullCatalogPage() {
+    const list = qs('[data-full-catalog-list]');
+    if (!list) return;
+
+    qs('[data-full-catalog-search]')?.addEventListener('input', renderFullCatalogPage);
+    qsa('[data-full-catalog-filter]').forEach(button => {
+      button.addEventListener('click', () => {
+        qsa('[data-full-catalog-filter]').forEach(item => item.classList.toggle('active', item === button));
+        renderFullCatalogPage();
+      });
+    });
+
+    renderFullCatalogPage();
   }
 
   function bindCatalog() {
@@ -5330,6 +5465,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const stock = event.target.closest('[data-admin-product-stock-save]');
     if (stock) {
       await saveAdminProductStock(stock.dataset.adminProductStockSave);
+      return;
+    }
+
+    const stockSet = event.target.closest('[data-admin-product-stock-set]');
+    if (stockSet) {
+      await setAdminProductStock(stockSet.dataset.adminProductStockSet, stockSet.dataset.stockValue);
     }
   }
 
@@ -5754,12 +5895,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const active = product.ativo !== false;
       const type = productType(product);
       const offer = productOfferActive(product);
+      const stockState = productStockState(product);
 
       const matchesFilter = filter === 'all'
         || (filter === 'active' && active)
         || (filter === 'inactive' && !active)
         || (filter === 'offer' && offer)
-        || (filter === 'kit' && type === 'kit');
+        || (filter === 'kit' && type === 'kit')
+        || (filter === 'low' && stockState === 'low')
+        || (filter === 'out' && stockState === 'out');
 
       return matchesSearch && matchesFilter;
     });
@@ -6190,6 +6334,26 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Estoque atualizado.');
   }
 
+  async function setAdminProductStock(id, value) {
+    const estoque = Math.max(0, Math.round(parsePrice(value || 0)));
+    const client = ordersClient();
+    if (!client || !id) return;
+    if (!productExtendedColumnsReady) {
+      showToast('Execute o SQL de estoque para controlar quantidades.');
+      return;
+    }
+
+    const { error } = await client.from('produtos').update({ estoque }).eq('id', id);
+    if (error) {
+      showToast('Nao consegui atualizar o estoque.');
+      console.warn('[Supabase] Erro ao definir estoque.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast(estoque === 0 ? 'Produto marcado como esgotado.' : 'Produto reposto no estoque.');
+  }
+
   async function deleteAdminProduct(id) {
     if (!id || !confirm('Deseja excluir este produto do Supabase?')) return;
     const client = ordersClient();
@@ -6301,6 +6465,16 @@ document.addEventListener('DOMContentLoaded', () => {
               Salvar estoque
             </button>
           </div>
+          ${local ? '' : `<div class="admin-stock-quick-actions">
+            <button class="btn btn-secondary" type="button" data-admin-product-stock-set="${escapeHTML(product.id)}" data-stock-value="0" ${!productExtendedColumnsReady ? 'disabled' : ''}>
+              <i class="fa-solid fa-ban"></i>
+              Esgotar
+            </button>
+            <button class="btn btn-secondary" type="button" data-admin-product-stock-set="${escapeHTML(product.id)}" data-stock-value="${escapeHTML((stock ?? 0) + 1)}" ${!productExtendedColumnsReady ? 'disabled' : ''}>
+              <i class="fa-solid fa-plus"></i>
+              +1 unidade
+            </button>
+          </div>`}
         </div>
         <div class="admin-product-actions">
           <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">

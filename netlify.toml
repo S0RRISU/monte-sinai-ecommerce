@@ -12,6 +12,16 @@
   status = 200
 
 [[redirects]]
+  from = "/catalogo"
+  to = "/pages/catalogo.html"
+  status = 200
+
+[[redirects]]
+  from = "/catalogo.html"
+  to = "/pages/catalogo.html"
+  status = 200
+
+[[redirects]]
   from = "/promocoes"
   to = "/pages/promocoes.html"
   status = 200

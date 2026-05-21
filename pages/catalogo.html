@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Promocoes Monte Sinai com ofertas de agua, gas e produtos de limpeza por tempo limitado.">
+  <meta name="description" content="Catalogo completo Monte Sinai com produtos, quantidades em estoque e itens indisponiveis.">
   <meta name="theme-color" content="#00061f">
   <meta name="color-scheme" content="dark light">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <link rel="canonical" href="https://monte-sinai.netlify.app/promocoes">
-  <meta property="og:url" content="https://monte-sinai.netlify.app/promocoes">
+  <link rel="canonical" href="https://monte-sinai.netlify.app/catalogo">
+  <meta property="og:url" content="https://monte-sinai.netlify.app/catalogo">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Promocoes | Monte Sinai">
-  <meta property="og:description" content="Veja ofertas ativas da Monte Sinai e monte seu pedido pelo carrinho.">
+  <meta property="og:title" content="Catalogo | Monte Sinai">
+  <meta property="og:description" content="Veja todos os produtos da Monte Sinai, estoque atual e itens indisponiveis.">
   <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/hero-banner.png">
-  <title>Promocoes | Monte Sinai</title>
+  <title>Catalogo | Monte Sinai</title>
   <link rel="manifest" href="../site.webmanifest">
   <link rel="icon" type="image/png" href="../assets/brand/monte-sinai-logo-3d.png">
   <link rel="apple-touch-icon" href="../assets/brand/monte-sinai-logo-3d.png">
@@ -50,22 +50,22 @@
   <div class="mobile-menu">
     <a href="../index.html">Inicio</a>
     <a href="produtos.html">Produtos</a>
-        <a href="catalogo.html">Catalogo</a>
-        <a href="promocoes.html">Promocoes</a>
+    <a href="catalogo.html">Catalogo</a>
+    <a href="promocoes.html">Promocoes</a>
     <a href="sobre.html">Sobre</a>
     <a href="contato.html">Contato</a>
   </div>
 
-  <main class="container promotions-page">
-    <section class="hero hero-small">
+  <main class="container catalog-page">
+    <section class="hero hero-small catalog-hero">
       <div class="hero-copy">
-        <span class="eyebrow">Ofertas ativas</span>
-        <h1>Ofertas Monte Sinai</h1>
-        <p>Produtos com preco promocional aparecem aqui automaticamente quando a oferta estiver ativa no painel.</p>
+        <span class="eyebrow">Catalogo completo</span>
+        <h1>Todos os produtos da loja</h1>
+        <p>Veja a lista completa, a quantidade disponivel e os produtos que estao indisponiveis no momento.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="produtos.html#todos-produtos">
             <i class="fa-solid fa-basket-shopping"></i>
-            Ver catalogo completo
+            Comprar produtos
           </a>
           <button class="btn btn-secondary" type="button" data-open-cart>
             <i class="fa-solid fa-bag-shopping"></i>
@@ -75,14 +75,40 @@
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <span class="eyebrow"><span data-promotions-count>0</span> ofertas</span>
-        <h2>Produtos em oferta agora</h2>
-        <p>Adicione ao carrinho e finalize com sua conta para salvar o pedido no historico.</p>
+    <section class="catalog-dashboard" aria-label="Resumo do catalogo">
+      <article>
+        <span>Total no catalogo</span>
+        <strong data-full-catalog-total>0</strong>
+      </article>
+      <article>
+        <span>Disponiveis</span>
+        <strong data-full-catalog-available>0</strong>
+      </article>
+      <article>
+        <span>Indisponiveis</span>
+        <strong data-full-catalog-out>0</strong>
+      </article>
+    </section>
+
+    <section class="section full-catalog-section" aria-label="Lista completa de produtos">
+      <div class="full-catalog-toolbar">
+        <form class="full-catalog-search" role="search" data-full-catalog-form>
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" data-full-catalog-search placeholder="Buscar no catalogo" aria-label="Buscar no catalogo">
+        </form>
+        <div class="full-catalog-filters" role="group" aria-label="Filtros do catalogo">
+          <button class="active" type="button" data-full-catalog-filter="all">Todos</button>
+          <button type="button" data-full-catalog-filter="available">Disponiveis</button>
+          <button type="button" data-full-catalog-filter="out">Indisponiveis</button>
+          <button type="button" data-full-catalog-filter="low">Estoque baixo</button>
+          <button type="button" data-full-catalog-filter="offers">Ofertas</button>
+          <button type="button" data-full-catalog-filter="kits">Kits</button>
+        </div>
       </div>
-      <div class="grid-produtos promotions-grid" data-promotions-grid></div>
-      <p id="promotions-empty" class="empty-cart">Nenhuma promocao ativa agora. Volte em breve ou confira o catalogo completo.</p>
+
+      <p class="catalog-results" data-full-catalog-results>Carregando catalogo...</p>
+      <div class="full-catalog-list" data-full-catalog-list></div>
+      <p class="empty-cart hidden" data-full-catalog-empty>Nenhum produto encontrado neste filtro.</p>
     </section>
   </main>
 
