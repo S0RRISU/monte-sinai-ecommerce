@@ -22,5 +22,4 @@
     }
   });
   window.supabaseClient = window.monteSinaiSupabase;
-  console.log('[Supabase] Cliente conectado:', SUPABASE_URL);
 })();

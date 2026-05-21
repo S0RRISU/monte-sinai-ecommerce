@@ -9,7 +9,7 @@ values (
   'produtos',
   true,
   5242880,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+  array['image/jpeg', 'image/png', 'image/webp']
 )
 on conflict (id) do update set
   public = excluded.public,

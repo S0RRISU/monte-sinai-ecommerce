@@ -4,7 +4,8 @@
 begin;
 
 alter table public.profiles
-  add column if not exists is_admin boolean not null default false;
+  add column if not exists is_admin boolean not null default false,
+  add column if not exists admin_role text not null default 'customer';
 
 create or replace function public.is_admin()
 returns boolean
@@ -13,7 +14,11 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select p.is_admin from public.profiles p where p.id = auth.uid()),
+    (
+      select p.is_admin or p.admin_role in ('developer', 'owner', 'staff')
+      from public.profiles p
+      where p.id = auth.uid()
+    ),
     false
   );
 $$;
@@ -59,7 +64,7 @@ drop policy if exists "pedidos_select_own_or_admin" on public.pedidos;
 create policy "pedidos_select_own_or_admin"
 on public.pedidos for select
 to authenticated
-using (user_id = auth.uid() or public.is_admin());
+using ((user_id is not null and user_id = auth.uid()) or public.is_admin());
 
 drop policy if exists "pedido_itens_select_by_order_access" on public.pedido_itens;
 create policy "pedido_itens_select_by_order_access"
@@ -70,14 +75,21 @@ using (
     select 1
     from public.pedidos p
     where p.id = pedido_itens.pedido_id
-      and (p.user_id = auth.uid() or public.is_admin())
+      and ((p.user_id is not null and p.user_id = auth.uid()) or public.is_admin())
   )
 );
 
 -- Troque o email abaixo pelo email de login do lojista.
 -- Depois de executar, esse usuario passa a ver todos os pedidos e gerenciar produtos.
 update public.profiles
-set is_admin = true
-where email = 'email-do-lojista@exemplo.com';
+set is_admin = true,
+    admin_role = 'developer'
+where lower(email) = 'marcelol527319@gmail.com';
+
+-- Troque pelo email real da Patricia quando ela criar a conta.
+-- update public.profiles
+-- set is_admin = true,
+--     admin_role = 'owner'
+-- where lower(email) = 'email-da-patricia@exemplo.com';
 
 commit;

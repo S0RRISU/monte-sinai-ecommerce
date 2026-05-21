@@ -6,9 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     legacyCart: 'ms_cart_v1',
     user: 'ms_customer_v2',
     orders: 'ms_orders_v1',
+    coupon: 'ms_coupon_v1',
     owner: 'ms_owner_config_v1',
+    site: 'ms_site_config_v1',
     theme: 'ms_theme_v2',
-    legacyTheme: 'ms_theme_v1'
+    legacyTheme: 'ms_theme_v1',
+    installPromptDismissed: 'ms_install_prompt_dismissed_v1'
   };
 
   const DEFAULT_OWNER = {
@@ -16,11 +19,36 @@ document.addEventListener('DOMContentLoaded', () => {
     altWhatsapp: '5511982690871',
     merchantName: 'MONTE SINAI',
     merchantCity: 'SAO PAULO',
-    pixKey: ''
+    pixKey: '',
+    deliveryFee: 3,
+    freeShippingFrom: 50,
+    giftText: 'Compra de gás'
+  };
+
+  const DEFAULT_SITE_CONFIG = {
+    storeName: 'Monte Sinai',
+    footerDescription: 'Água, gás e produtos de limpeza para sua casa.',
+    logoUrl: 'assets/brand/monte-sinai-logo-3d.png',
+    accentColor: '#008cff',
+    heroEyebrow: 'Entrega rápida, segura e local',
+    heroTitle: 'Monte Sinai leva água, gás e produtos de limpeza até você.',
+    heroText: 'Escolha os produtos, monte o carrinho, entre com sua conta e finalize com pagamento na entrega ou atendimento pelo WhatsApp.',
+    heroButton: 'Comprar agora',
+    heroImage: 'assets/hero/hero-site-3d.png',
+    announcementActive: false,
+    announcement: 'Entrega rápida hoje para água, gás e limpeza.',
+    catalogTitle: 'Essenciais para abastecer e cuidar da casa',
+    showcaseTitle: 'Role pelas laterais e escolha seus produtos',
+    storefrontTitle: 'Atalhos para resolver a casa em poucos toques',
+    stockAlertThreshold: 3,
+    servedNeighborhoods: ['Centro', 'Jardim Monte Sinai', 'Vila Sao Jose'],
+    coupons: [],
+    copyright: '© 2026 Monte Sinai. Todos os direitos reservados.'
   };
 
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
+  const SITE_CONFIG_TABLE = 'site_configuracoes';
   let productIndex = [];
   const CATALOG_CATEGORY_ORDER = ['agua', 'gas', 'limpeza', 'lavanderia', 'higiene', 'banheiro', 'cozinha', 'utensilios', 'organizacao'];
   const CATALOG_SECTION_META = {
@@ -69,12 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
     'gas-de-cozinha-p13': ['Supergas', 'Ultragas'],
     'desinfetante-2l': ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive']
   };
-  const ORDER_STATUS_OPTIONS = ['Pedido enviado', 'Em preparo', 'Saiu para entrega', 'Entregue', 'Cancelado'];
+  const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue'];
+  const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
+  const DEVELOPER_EMAIL = 'marcelol527319@gmail.com';
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
   const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at';
-  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens`;
+  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, estoque, estoque_minimo`;
   const SEARCH_EXPANSIONS = {
     ada: 'agua mineral galao garrafao bebedouro',
     agau: 'agua mineral galao garrafao bebedouro',
@@ -117,25 +147,36 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   let cart = loadCart();
+  let appliedCoupon = loadJSON(STORAGE.coupon, null);
   let currentUser = loadJSON(STORAGE.user, null);
   if (currentUser?.provider !== 'Supabase Auth') currentUser = null;
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
+  let siteConfig = { ...DEFAULT_SITE_CONFIG, ...loadJSON(STORAGE.site, {}) };
   let remoteOrdersCache = [];
   let remoteOrdersLoaded = false;
   let adminProductsCache = [];
+  let adminProductsSource = 'supabase';
+  let localCatalogProductsCache = null;
   let adminProfileCache = null;
   let productExtendedColumnsReady = true;
+  let orderExtendedColumnsReady = true;
   let activePayment = 'delivery';
+  let lastLowStockSignature = '';
   let activeSearchProduct = null;
   let productSearchResults = [];
   let activeSearchSuggestionContext = null;
   let searchSuggestionFrame = 0;
+  let deferredInstallPrompt = null;
+  let installPromptVisible = false;
 
   applySavedTheme();
+  applySiteConfig();
   const authReady = initSupabaseAuth();
+  initSiteConfig();
   upgradeProductImages();
   syncProductsFromRenderedCards();
   enhanceNavigation();
+  applySiteConfig();
   bindMobileMenu();
   setActiveNavigation();
   bindSiteSearch();
@@ -158,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSubtleAnimations();
   loadProductsFromSupabase();
   optimizeImageLoading();
+  initInstallPrompt();
   registerServiceWorker();
 
   function qs(selector, scope = document) {
@@ -187,6 +229,287 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function cleanConfigText(value, fallback = '') {
+    const text = String(value ?? '').trim();
+    return text || fallback;
+  }
+
+  function cleanColor(value, fallback = DEFAULT_SITE_CONFIG.accentColor) {
+    const color = String(value ?? '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+  }
+
+  function uniqueCleanList(values = []) {
+    const source = Array.isArray(values)
+      ? values
+      : String(values ?? '').split(/\r?\n|,/);
+    const seen = new Set();
+    return source
+      .map(value => String(value ?? '').trim())
+      .filter(value => {
+        const key = normalizeText(value);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function normalizeNeighborhoods(value) {
+    const list = uniqueCleanList(value);
+    return list.length ? list : [...DEFAULT_SITE_CONFIG.servedNeighborhoods];
+  }
+
+  function normalizeCoupon(raw = {}) {
+    let source = raw;
+    if (typeof raw === 'string') {
+      const parts = raw.split(/[|;]/).map(part => part.trim());
+      const valueText = parts[1] || '';
+      source = {
+        code: parts[0],
+        value: parsePrice(valueText),
+        type: valueText.includes('%') ? 'percent' : 'fixed',
+        minSubtotal: parsePrice(parts[2] || 0),
+        label: parts[3] || ''
+      };
+    }
+
+    const code = normalizeText(source.code || '').replace(/[^a-z0-9]+/g, '').toUpperCase();
+    const type = source.type === 'fixed' ? 'fixed' : 'percent';
+    const value = parsePrice(source.value);
+    const minSubtotal = parsePrice(source.minSubtotal ?? source.min ?? 0);
+    if (!code || value <= 0) return null;
+
+    return {
+      code,
+      type,
+      value: type === 'percent' ? Math.min(100, value) : value,
+      minSubtotal,
+      label: cleanConfigText(source.label, type === 'percent' ? `${value}% de desconto` : `${formatMoney(value)} de desconto`),
+      active: source.active !== false
+    };
+  }
+
+  function normalizeCoupons(value) {
+    const source = Array.isArray(value)
+      ? value
+      : String(value ?? '').split(/\r?\n/).filter(Boolean);
+    const seen = new Set();
+    return source
+      .map(normalizeCoupon)
+      .filter(coupon => {
+        if (!coupon || seen.has(coupon.code)) return false;
+        seen.add(coupon.code);
+        return true;
+      });
+  }
+
+  function couponLinesFromCoupons(coupons = []) {
+    return coupons
+      .map(coupon => {
+        const value = coupon.type === 'percent' ? `${coupon.value}%` : String(coupon.value);
+        return [coupon.code, value, coupon.minSubtotal || 0, coupon.label || ''].join(' | ');
+      })
+      .join('\n');
+  }
+
+  function normalizedOwnerConfig(raw = {}) {
+    return {
+      ...DEFAULT_OWNER,
+      ...raw,
+      whatsapp: cleanConfigText(raw.whatsapp, DEFAULT_OWNER.whatsapp),
+      altWhatsapp: cleanConfigText(raw.altWhatsapp, DEFAULT_OWNER.altWhatsapp),
+      merchantName: cleanConfigText(raw.merchantName, DEFAULT_OWNER.merchantName).slice(0, 25),
+      merchantCity: cleanConfigText(raw.merchantCity, DEFAULT_OWNER.merchantCity).slice(0, 15),
+      pixKey: cleanConfigText(raw.pixKey, ''),
+      deliveryFee: parsePrice(raw.deliveryFee ?? DEFAULT_OWNER.deliveryFee),
+      freeShippingFrom: parsePrice(raw.freeShippingFrom ?? DEFAULT_OWNER.freeShippingFrom),
+      giftText: cleanConfigText(raw.giftText, DEFAULT_OWNER.giftText)
+    };
+  }
+
+  function normalizedSiteConfig(raw = {}) {
+    return {
+      ...DEFAULT_SITE_CONFIG,
+      ...raw,
+      storeName: cleanConfigText(raw.storeName, DEFAULT_SITE_CONFIG.storeName),
+      footerDescription: cleanConfigText(raw.footerDescription, DEFAULT_SITE_CONFIG.footerDescription),
+      logoUrl: cleanConfigText(raw.logoUrl, DEFAULT_SITE_CONFIG.logoUrl),
+      accentColor: cleanColor(raw.accentColor),
+      heroEyebrow: cleanConfigText(raw.heroEyebrow, DEFAULT_SITE_CONFIG.heroEyebrow),
+      heroTitle: cleanConfigText(raw.heroTitle, DEFAULT_SITE_CONFIG.heroTitle),
+      heroText: cleanConfigText(raw.heroText, DEFAULT_SITE_CONFIG.heroText),
+      heroButton: cleanConfigText(raw.heroButton, DEFAULT_SITE_CONFIG.heroButton),
+      heroImage: cleanConfigText(raw.heroImage, DEFAULT_SITE_CONFIG.heroImage),
+      announcementActive: raw.announcementActive === true || raw.announcementActive === 'true',
+      announcement: cleanConfigText(raw.announcement, DEFAULT_SITE_CONFIG.announcement),
+      catalogTitle: cleanConfigText(raw.catalogTitle, DEFAULT_SITE_CONFIG.catalogTitle),
+      showcaseTitle: cleanConfigText(raw.showcaseTitle, DEFAULT_SITE_CONFIG.showcaseTitle),
+      storefrontTitle: cleanConfigText(raw.storefrontTitle, DEFAULT_SITE_CONFIG.storefrontTitle),
+      stockAlertThreshold: Math.max(0, Math.round(parsePrice(raw.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold))),
+      servedNeighborhoods: normalizeNeighborhoods(raw.servedNeighborhoods ?? raw.neighborhoods),
+      coupons: normalizeCoupons(raw.coupons ?? raw.couponsText),
+      copyright: cleanConfigText(raw.copyright, DEFAULT_SITE_CONFIG.copyright)
+    };
+  }
+
+  function persistSiteSettings() {
+    ownerConfig = normalizedOwnerConfig(ownerConfig);
+    siteConfig = normalizedSiteConfig(siteConfig);
+    saveJSON(STORAGE.owner, ownerConfig);
+    saveJSON(STORAGE.site, siteConfig);
+  }
+
+  async function initSiteConfig() {
+    const remote = await loadRemoteSiteConfig();
+    if (!remote) return;
+    if (remote.owner) ownerConfig = normalizedOwnerConfig({ ...ownerConfig, ...remote.owner });
+    if (remote.site || !remote.owner) siteConfig = normalizedSiteConfig({ ...siteConfig, ...(remote.site || remote) });
+    persistSiteSettings();
+    applySiteConfig();
+    renderCart();
+  }
+
+  function missingSiteConfigTable(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return text.includes('site_configuracoes') || text.includes('pgrst205') || text.includes('could not find the table');
+  }
+
+  async function loadRemoteSiteConfig() {
+    const client = supabaseProductClient();
+    if (!client) return null;
+
+    try {
+      const { data, error } = await client
+        .from(SITE_CONFIG_TABLE)
+        .select('config')
+        .eq('id', 'site')
+        .maybeSingle();
+
+      if (error) throw error;
+      return data?.config || null;
+    } catch (error) {
+      if (!missingSiteConfigTable(error)) console.warn('[Supabase] Nao foi possivel carregar configuracoes do site.', error);
+      return null;
+    }
+  }
+
+  async function saveRemoteSiteConfig() {
+    const client = ordersClient();
+    if (!client) return { saved: false, reason: 'no-client' };
+
+    const config = {
+      owner: normalizedOwnerConfig(ownerConfig),
+      site: normalizedSiteConfig(siteConfig)
+    };
+
+    try {
+      const { error } = await client
+        .from(SITE_CONFIG_TABLE)
+        .upsert({
+          id: 'site',
+          config,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+
+      if (error) throw error;
+      return { saved: true };
+    } catch (error) {
+      if (!missingSiteConfigTable(error)) console.warn('[Supabase] Nao foi possivel salvar configuracoes do site.', error);
+      return { saved: false, error };
+    }
+  }
+
+  function setElementText(selector, value, scope = document) {
+    const el = qs(selector, scope);
+    if (el && value) el.textContent = value;
+  }
+
+  function heroBackgroundImage(value) {
+    const href = assetHref(value || DEFAULT_SITE_CONFIG.heroImage).replaceAll('"', '\\"');
+    return `linear-gradient(90deg, rgba(0, 6, 31, 0.98) 0%, rgba(0, 15, 62, 0.84) 44%, rgba(0, 16, 68, 0.16) 100%), url("${href}")`;
+  }
+
+  function syncSiteAnnouncement() {
+    let banner = qs('.site-announcement');
+    if (!siteConfig.announcementActive) {
+      banner?.remove();
+      return;
+    }
+
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'site-announcement';
+      const header = qs('.navbar');
+      header?.insertAdjacentElement('afterend', banner);
+    }
+
+    banner.innerHTML = `
+      <span><i class="fa-solid fa-bullhorn" aria-hidden="true"></i>${escapeHTML(siteConfig.announcement)}</span>
+      <a href="https://wa.me/${ownerWhatsApp()}" target="_blank" rel="noreferrer">WhatsApp</a>
+    `;
+  }
+
+  function renderServedNeighborhoods() {
+    const neighborhoods = normalizeNeighborhoods(siteConfig.servedNeighborhoods);
+    qsa('[data-served-neighborhoods]').forEach(container => {
+      container.innerHTML = neighborhoods
+        .map(name => `<span class="neighborhood-chip">${escapeHTML(name)}</span>`)
+        .join('');
+    });
+    qsa('[data-served-neighborhoods-count]').forEach(el => {
+      el.textContent = String(neighborhoods.length);
+    });
+  }
+
+  function applySiteConfig() {
+    siteConfig = normalizedSiteConfig(siteConfig);
+    ownerConfig = normalizedOwnerConfig(ownerConfig);
+
+    document.documentElement.style.setProperty('--primary', siteConfig.accentColor);
+    document.documentElement.style.setProperty('--primary-strong', siteConfig.accentColor);
+    document.documentElement.style.setProperty('--blue', siteConfig.accentColor);
+
+    qsa('.brand-logo').forEach(img => {
+      if (siteConfig.logoUrl) img.src = assetHref(siteConfig.logoUrl);
+      img.alt = siteConfig.storeName;
+    });
+    qsa('.brand-text').forEach(el => { el.textContent = siteConfig.storeName; });
+    qsa('.footer-inner > div:first-child h3').forEach(el => { el.textContent = siteConfig.storeName; });
+    qsa('.footer-inner > div:first-child p').forEach(el => { el.textContent = siteConfig.footerDescription; });
+    qsa('.footer-copy').forEach(el => { el.textContent = siteConfig.copyright; });
+    qsa('.footer-social a[href*="wa.me"]').forEach(link => {
+      link.href = `https://wa.me/${ownerWhatsApp()}`;
+    });
+
+    const hero = qs('.hero-home');
+    if (hero) {
+      hero.style.backgroundImage = heroBackgroundImage(siteConfig.heroImage);
+      setElementText('.hero-home .eyebrow', siteConfig.heroEyebrow);
+      setElementText('.hero-home h1', siteConfig.heroTitle);
+      setElementText('.hero-home-content > p', siteConfig.heroText);
+      setElementText('.hero-home .hero-actions .btn-primary', siteConfig.heroButton);
+    }
+
+    const homeSectionHeads = qsa('main > .section.container > .section-head');
+    if (homeSectionHeads[0]) setElementText('h2', siteConfig.catalogTitle, homeSectionHeads[0]);
+    setElementText('#mais-vendidos .section-head h2', siteConfig.showcaseTitle);
+    setElementText('.storefront-section .section-head h2', siteConfig.storefrontTitle);
+
+    const trust = qsa('.trust-strip .trust-item').at(-1)?.querySelector('span');
+    if (trust) trust.textContent = `Frete grátis acima de ${formatMoney(ownerFreeShippingFrom())}`;
+    qsa('.payment-note-box strong').forEach(el => {
+      el.textContent = ownerDeliveryFee()
+        ? `Taxa de entrega de ${formatMoney(ownerDeliveryFee())} adicionada ao valor final.`
+        : 'Entrega grátis para todos os pedidos.';
+    });
+    qsa('.payment-note-large p').forEach(el => {
+      el.textContent = `Entrega grátis em pedidos acima de ${formatMoney(ownerFreeShippingFrom())}. Na compra de um gás, você ganha: ${ownerGiftText()}.`;
+    });
+
+    syncSiteAnnouncement();
+    renderServedNeighborhoods();
+  }
+
   function loadCart() {
     const modern = loadJSON(STORAGE.cart, null);
     if (Array.isArray(modern)) return modern;
@@ -196,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const migrated = legacy.map(item => ({
       id: item.id || makeCartId(item.name, item.variant),
+      productId: item.productId || '',
       name: item.name,
       variant: item.variant || '',
       price: Number(item.price || 0),
@@ -284,17 +608,60 @@ document.addEventListener('DOMContentLoaded', () => {
   function authFriendlyError(error, fallback = 'Não foi possível concluir. Tente novamente.') {
     const message = normalizeText(error?.message || '');
     if (message.includes('invalid login') || message.includes('invalid credentials')) return 'Email ou senha incorretos.';
-    if (message.includes('email not confirmed')) return 'Confirme seu email antes de entrar.';
+    if (message.includes('email not confirmed')) return 'Seu cadastro foi criado, mas a confirmacao por email ainda esta ligada no Supabase.';
     if (message.includes('already registered') || message.includes('user already registered')) return 'Este email já está cadastrado. Tente entrar.';
     if (message.includes('password') && message.includes('six')) return 'Use uma senha com pelo menos 6 caracteres.';
     if (message.includes('rate limit')) return 'Muitas tentativas. Aguarde um pouco e tente novamente.';
     return fallback;
   }
 
+  function checkoutFriendlyError(error, fallback = 'Nao consegui salvar o pedido no Supabase. Tente novamente.') {
+    const message = normalizeText(`${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`);
+    if (message.includes('create_order') || message.includes('function') || message.includes('rpc')) {
+      return 'Finalize a atualizacao do SQL no Supabase antes de vender. O carrinho foi mantido.';
+    }
+    if (message.includes('estoque insuficiente') || message.includes('produto do pedido nao esta disponivel')) {
+      return 'Um produto ficou sem estoque ou indisponivel. Confira o carrinho e tente novamente.';
+    }
+    if (message.includes('telefone')) return 'Confira o WhatsApp informado antes de finalizar.';
+    return fallback;
+  }
+
   function authRedirectUrl(page = 'login.html', params = {}) {
-    const url = new URL(pageHref(page), window.location.href);
+    const allowedPages = new Set(['login.html', 'perfil.html']);
+    const safePage = allowedPages.has(page) ? page : 'login.html';
+    const url = new URL(pageHref(safePage), window.location.href);
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     return url.href;
+  }
+
+  async function sendWelcomeEmail(user = {}) {
+    const client = authClient();
+    const email = user.email || '';
+    if (!client?.functions || !email) return;
+
+    try {
+      const { data: sessionData } = await client.auth.getSession();
+      const session = sessionData?.session;
+      if (!session?.access_token) return;
+      if (normalizeText(session.user?.email || '') !== normalizeText(email)) return;
+
+      await client.functions.invoke('send-welcome-email', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          email,
+          name: user.name || email.split('@')[0],
+          storeName: siteConfig.storeName || DEFAULT_SITE_CONFIG.storeName,
+          logoUrl: new URL(assetHref(siteConfig.logoUrl || DEFAULT_SITE_CONFIG.logoUrl), window.location.href).href,
+          siteUrl: new URL(homeHref(), window.location.href).href,
+          installUrl: new URL(homeHref(), window.location.href).href
+        }
+      });
+    } catch (error) {
+      console.warn('[Supabase] Email de boas-vindas nao enviado.', error);
+    }
   }
 
   function formatMoney(value) {
@@ -315,6 +682,41 @@ document.addEventListener('DOMContentLoaded', () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  function normalizeOrderStatus(status = '') {
+    const text = normalizeText(status);
+    if (text.includes('prepar')) return 'Preparando';
+    if (text.includes('saiu') || text.includes('entrega')) return text.includes('entregue') ? 'Entregue' : 'Saiu para entrega';
+    if (text.includes('entregue')) return 'Entregue';
+    return 'Recebido';
+  }
+
+  function normalizePaymentStatus(status = '') {
+    const text = normalizeText(status);
+    if (text.includes('pago') || text.includes('paid')) return 'Pago';
+    if (text.includes('cancel')) return 'Cancelado';
+    return 'Pendente';
+  }
+
+  function adminRole(profile = adminProfileCache) {
+    const role = normalizeText(profile?.admin_role || profile?.role || '');
+    if (role) return role;
+    if (normalizeText(profile?.email) === normalizeText(DEVELOPER_EMAIL)) return 'developer';
+    return profile?.is_admin ? 'owner' : 'customer';
+  }
+
+  function isDeveloperProfile(profile = adminProfileCache) {
+    return adminRole(profile) === 'developer' || normalizeText(profile?.email) === normalizeText(DEVELOPER_EMAIL);
+  }
+
+  function roleLabel(role = adminRole()) {
+    return {
+      developer: 'Programador',
+      owner: 'Dona da loja',
+      staff: 'Equipe',
+      customer: 'Cliente'
+    }[role] || 'Administrador';
   }
 
   function formatDateTimeLocalInput(value) {
@@ -373,8 +775,26 @@ document.addEventListener('DOMContentLoaded', () => {
       || text.includes('oferta_inicio')
       || text.includes('oferta_fim')
       || text.includes('kit_itens')
+      || text.includes('estoque')
+      || text.includes('estoque_minimo')
       || text.includes('destaque')
       || text.includes('tipo');
+  }
+
+  function isMissingOrderExtensionError(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return text.includes('cupom_codigo')
+      || text.includes('desconto')
+      || text.includes('cliente_tipo')
+      || text.includes('confirmado')
+      || text.includes('pagamento_status')
+      || text.includes('could not find')
+      || text.includes('pgrst204');
+  }
+
+  function isMissingProfileRoleError(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return text.includes('admin_role') || text.includes('could not find') || text.includes('pgrst204');
   }
 
   function escapeHTML(value) {
@@ -389,6 +809,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function escapeSelectorValue(value) {
     if (window.CSS?.escape) return CSS.escape(String(value ?? ''));
     return String(value ?? '').replace(/["\\]/g, '\\$&');
+  }
+
+  function isUUID(value = '') {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
   }
 
   function normalizeText(value) {
@@ -473,8 +897,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const offerActive = productOfferActive(raw);
     const price = offerActive && promotionalPrice > 0 ? promotionalPrice : originalPrice;
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
+    const stock = productStockLevel(raw);
+    const lowStockLimit = productLowStockLimit(raw);
 
     return {
+      id: raw.id ?? raw.productId ?? '',
       name,
       category,
       categorySlug: categorySlug(category),
@@ -490,6 +917,9 @@ document.addEventListener('DOMContentLoaded', () => {
       offerStartsAt: raw.oferta_inicio ?? raw.offerStartsAt ?? '',
       offerEndsAt: raw.oferta_fim ?? raw.offerEndsAt ?? '',
       kitItems: raw.kit_itens ?? raw.kitItems ?? '',
+      stock,
+      lowStockLimit,
+      stockState: productStockState({ estoque: stock, estoque_minimo: lowStockLimit }),
       options: Array.isArray(raw.options) ? raw.options : [],
       recommended: highlight,
       terms: `${name} ${category} ${description}`
@@ -672,15 +1102,26 @@ document.addEventListener('DOMContentLoaded', () => {
       foto: source.photo || ''
     };
 
-    const columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
-    const { data: existing, error: lookupError } = await client
+    let columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin, admin_role';
+    let { data: existing, error: lookupError } = await client
       .from('profiles')
       .select(columns)
       .eq('id', authUser.id)
       .maybeSingle();
 
+    if (lookupError && isMissingProfileRoleError(lookupError)) {
+      columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
+      const fallback = await client
+        .from('profiles')
+        .select(columns)
+        .eq('id', authUser.id)
+        .maybeSingle();
+      existing = fallback.data;
+      lookupError = fallback.error;
+    }
+
     if (lookupError) throw lookupError;
-    if (existing?.is_admin) return existing;
+    if (existing?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(existing))) return existing;
 
     const query = existing
       ? client.from('profiles').update(profile).eq('id', authUser.id)
@@ -719,11 +1160,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id) return null;
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('profiles')
-      .select('id, email, nome, is_admin')
+      .select('id, email, nome, is_admin, admin_role')
       .eq('id', authUser.id)
       .maybeSingle();
+
+    if (error && isMissingProfileRoleError(error)) {
+      const fallback = await client
+        .from('profiles')
+        .select('id, email, nome, is_admin')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw error;
     adminProfileCache = data || await upsertProfileRecord(authUser, userFromAuthUser(authUser));
@@ -732,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function isCurrentUserAdmin({ force = true } = {}) {
     const profile = await currentAdminProfile({ force });
-    return Boolean(profile?.is_admin);
+    return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
   }
 
   async function loadProductsFromSupabase() {
@@ -749,7 +1200,6 @@ document.addEventListener('DOMContentLoaded', () => {
       let lastError = null;
 
       for (const tableName of tableNames) {
-        console.log(`[Supabase] Buscando produtos na tabela "${tableName}"...`);
         const selectColumns = tableName === 'produtos' && productExtendedColumnsReady
           ? PRODUCT_EXTENDED_SELECT
           : (tableName === 'produtos' ? PRODUCT_BASE_SELECT : 'nome, preco, imagem, categoria, descricao');
@@ -777,7 +1227,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
-      console.log(`[Supabase] ${products.length} produto(s) carregado(s) da tabela "${loadedTable}".`, products);
       setProductIndex(products);
       renderSupabaseProducts();
     } catch (error) {
@@ -790,6 +1239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSupabaseProducts() {
     renderDynamicCatalog();
+    renderPromotionsPage();
     renderDynamicProductRail();
     optimizeImageLoading();
     applyCatalogFilters();
@@ -934,6 +1384,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function productHref(query = '') {
     const search = query ? `?q=${encodeURIComponent(query)}` : '';
     return `${pageHref('produtos.html')}${search}#todos-produtos`;
+  }
+
+  function promotionsHref() {
+    return pageHref('promocoes.html');
   }
 
   function featuredSearchProducts(limit = 6) {
@@ -1394,8 +1848,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scroll) scrollCatalogToTop(behavior);
   }
 
+  function safeRedirectTarget(value, fallback = profileHref()) {
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    if (/^(?:https?:|\/\/|javascript:|data:)/i.test(raw)) return fallback;
+
+    try {
+      const url = new URL(raw, window.location.href);
+      if (url.origin !== window.location.origin) return fallback;
+      const page = url.pathname.split('/').pop() || 'index.html';
+      const allowedPages = new Set([
+        'index.html',
+        'produtos.html',
+        'promocoes.html',
+        'pagamento.html',
+        'perfil.html',
+        'editar-perfil.html',
+        'configuracoes.html',
+        'painel.html',
+        'sobre.html',
+        'contato.html'
+      ]);
+      if (!allowedPages.has(page)) return fallback;
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch (_error) {
+      return fallback;
+    }
+  }
+
   function loginHref(params = {}) {
-    const query = new URLSearchParams(params).toString();
+    const cleanParams = { ...params };
+    if (cleanParams.redirect) cleanParams.redirect = safeRedirectTarget(cleanParams.redirect, '');
+    if (!cleanParams.redirect) delete cleanParams.redirect;
+    const query = new URLSearchParams(cleanParams).toString();
     return `${pageHref('login.html')}${query ? `?${query}` : ''}`;
   }
 
@@ -1432,12 +1917,79 @@ document.addEventListener('DOMContentLoaded', () => {
     return cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
   }
 
+  function activeCoupons() {
+    return normalizeCoupons(siteConfig.coupons).filter(coupon => coupon.active);
+  }
+
+  function couponByCode(code = '') {
+    const normalized = normalizeText(code).replace(/[^a-z0-9]+/g, '').toUpperCase();
+    return activeCoupons().find(coupon => coupon.code === normalized) || null;
+  }
+
+  function couponDiscountAmount(coupon, subtotal = cartSubtotal()) {
+    if (!coupon || subtotal < Number(coupon.minSubtotal || 0)) return 0;
+    const discount = coupon.type === 'percent'
+      ? subtotal * (Number(coupon.value || 0) / 100)
+      : Number(coupon.value || 0);
+    return Math.min(subtotal, Math.max(0, Number(discount.toFixed(2))));
+  }
+
+  function currentCoupon() {
+    if (!appliedCoupon?.code) return null;
+    return couponByCode(appliedCoupon.code);
+  }
+
+  function couponDiscount() {
+    return couponDiscountAmount(currentCoupon());
+  }
+
+  function saveAppliedCoupon(coupon) {
+    appliedCoupon = coupon ? { code: coupon.code } : null;
+    if (appliedCoupon) saveJSON(STORAGE.coupon, appliedCoupon);
+    else localStorage.removeItem(STORAGE.coupon);
+  }
+
+  function productStockLevel(product = {}) {
+    const raw = product.estoque ?? product.stock;
+    if (raw === null || raw === undefined || raw === '') return null;
+    const value = Math.round(parsePrice(raw));
+    return Number.isFinite(value) ? Math.max(0, value) : null;
+  }
+
+  function productLowStockLimit(product = {}) {
+    const value = Math.round(parsePrice(product.estoque_minimo ?? product.lowStockLimit ?? siteConfig.stockAlertThreshold));
+    return Number.isFinite(value) && value >= 0 ? value : DEFAULT_SITE_CONFIG.stockAlertThreshold;
+  }
+
+  function productStockState(product = {}) {
+    const stock = productStockLevel(product);
+    const limit = productLowStockLimit(product);
+    if (stock === null) return 'untracked';
+    if (stock <= 0) return 'out';
+    if (stock <= limit) return 'low';
+    return 'ok';
+  }
+
+  function ownerDeliveryFee() {
+    const value = parsePrice(ownerConfig.deliveryFee ?? DELIVERY_FEE);
+    return Number.isFinite(value) && value >= 0 ? value : DELIVERY_FEE;
+  }
+
+  function ownerFreeShippingFrom() {
+    const value = parsePrice(ownerConfig.freeShippingFrom ?? FREE_SHIPPING_FROM);
+    return Number.isFinite(value) && value >= 0 ? value : FREE_SHIPPING_FROM;
+  }
+
+  function ownerGiftText() {
+    return cleanConfigText(ownerConfig.giftText, DEFAULT_OWNER.giftText);
+  }
+
   function deliveryFee() {
-    return cartSubtotal() >= FREE_SHIPPING_FROM || cartSubtotal() === 0 ? 0 : DELIVERY_FEE;
+    return cartSubtotal() >= ownerFreeShippingFrom() || cartSubtotal() === 0 ? 0 : ownerDeliveryFee();
   }
 
   function orderTotal() {
-    return cartSubtotal() + deliveryFee();
+    return Math.max(0, cartSubtotal() - couponDiscount()) + deliveryFee();
   }
 
   function cartCount() {
@@ -1577,7 +2129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <a class="hidden" href="${adminPanelHref()}" data-admin-panel-link="nav">Painel Admin</a>
       `);
     }
-
     if (!qs('.nav-search', navInner)) {
       const search = document.createElement('form');
       search.className = 'nav-search';
@@ -1591,6 +2142,22 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       `;
       navInner.insertBefore(search, navMenu?.nextSibling || mobileToggle || null);
+    }
+
+    if (mobileToggle && !qs('.nav-search-trigger', navInner)) {
+      const trigger = document.createElement('button');
+      trigger.className = 'nav-search-trigger';
+      trigger.type = 'button';
+      trigger.dataset.openSearch = '';
+      trigger.setAttribute('aria-label', 'Abrir pesquisa');
+      trigger.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+      navInner.insertBefore(trigger, mobileToggle);
+    }
+    syncTopNavControls();
+    if (document.body.dataset.topNavControlsBound !== 'true') {
+      window.addEventListener('resize', syncTopNavControls, { passive: true });
+      window.visualViewport?.addEventListener('resize', syncTopNavControls, { passive: true });
+      document.body.dataset.topNavControlsBound = 'true';
     }
 
     if (!qs('.nav-actions', navInner)) {
@@ -1607,6 +2174,26 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       `;
       navInner.insertBefore(actions, mobileToggle || null);
+    }
+
+    if (!qs('.mobile-top-actions')) {
+      const topActions = document.createElement('div');
+      topActions.className = 'mobile-top-actions';
+      topActions.setAttribute('aria-label', 'Acoes rapidas do topo');
+      topActions.innerHTML = `
+        <button class="mobile-top-action" type="button" data-open-search aria-label="Abrir busca">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+        <button class="mobile-top-action mobile-menu-proxy" type="button" data-mobile-menu-proxy aria-label="Abrir menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      `;
+      document.body.appendChild(topActions);
+      document.body.classList.add('has-mobile-top-actions');
+      qs('[data-mobile-menu-proxy]', topActions)?.addEventListener('click', event => {
+        event.preventDefault();
+        mobileToggle?.click();
+      });
     }
 
     const mobileMenu = qs('.mobile-menu');
@@ -1628,7 +2215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       `);
     }
-
     updateAdminPanelLinks();
 
     if (!document.body.classList.contains('auth-body') && !qs('.mobile-quick-dock')) {
@@ -1649,7 +2235,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>Carrinho</span>
           <strong data-cart-count>0</strong>
         </button>
-        <button type="button" data-open-search data-dock-section="search">
+        <button class="dock-search" type="button" data-open-search data-dock-section="search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Pesquisa</span>
         </button>
@@ -1659,10 +2245,74 @@ document.addEventListener('DOMContentLoaded', () => {
         </a>
       `;
       document.body.appendChild(dock);
+      syncTopNavControls();
     }
 
     updateAccountUI();
     updateDockActive();
+  }
+
+  function syncTopNavControls() {
+    const navInner = qs('.nav-inner');
+    const brand = qs('.brand', navInner || document);
+    const trigger = qs('.nav-search-trigger', navInner || document);
+    const mobileToggle = qs('.mobile-menu-toggle', navInner || document);
+    const dock = qs('.mobile-quick-dock');
+    if (!brand && !trigger && !mobileToggle && !dock) return;
+
+    const compact = window.matchMedia?.('(max-width: 760px)').matches;
+    const placeFixed = (element, styles = {}) => {
+      if (!element) return;
+      element.removeAttribute('style');
+      Object.entries(styles).forEach(([property, value]) => {
+        element.style.setProperty(property, value, 'important');
+      });
+    };
+
+    if (compact) {
+      placeFixed(brand, {
+        position: 'fixed',
+        left: '10px',
+        top: '38px',
+        width: 'min(156px, 48vw)',
+        'z-index': '760',
+        transform: 'translateY(-50%)'
+      });
+      placeFixed(trigger, {
+        position: 'fixed',
+        right: '72px',
+        top: '38px',
+        display: 'inline-grid',
+        visibility: 'visible',
+        opacity: '1',
+        width: '46px',
+        height: '46px',
+        'min-width': '46px',
+        'min-height': '46px',
+        'z-index': '761',
+        transform: 'translateY(-50%)'
+      });
+      placeFixed(mobileToggle, {
+        position: 'fixed',
+        right: '10px',
+        top: '38px',
+        display: 'inline-grid',
+        visibility: 'visible',
+        opacity: '1',
+        width: '54px',
+        height: '54px',
+        'min-width': '54px',
+        'min-height': '54px',
+        'z-index': '761',
+        transform: 'translateY(-50%)'
+      });
+    } else {
+      [brand, trigger, mobileToggle].filter(Boolean).forEach(control => {
+        control.removeAttribute('style');
+      });
+    }
+
+    if (dock) dock.removeAttribute('style');
   }
 
   function accountAvatarHTML(signed) {
@@ -1787,6 +2437,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeSection = (() => {
       if (page === 'index.html') return 'home';
       if (page === 'produtos.html') return 'store';
+      if (page === 'promocoes.html') return 'promos';
       if (['login.html', 'perfil.html', 'editar-perfil.html', 'configuracoes.html', 'criar.html'].includes(page)) return 'account';
       return '';
     })();
@@ -2166,19 +2817,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = productOptions(normalized);
     const hasOptions = options.length > 1;
     const firstOption = options[0] || { price: normalized.price };
+    const outOfStock = normalized.stockState === 'out';
+    const lowStock = normalized.stockState === 'low';
     const cardClass = [
       'product-card',
       mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
       recommended ? 'is-recommended' : '',
       normalized.offerActive ? 'is-offer-product' : '',
-      normalized.isKit ? 'is-kit-product' : ''
+      normalized.isKit ? 'is-kit-product' : '',
+      outOfStock ? 'is-out-of-stock' : '',
+      lowStock ? 'is-low-stock' : ''
     ].filter(Boolean).join(' ');
 
     return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}">
-        ${normalized.offerActive
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}">
+        ${outOfStock
+          ? '<span class="recommended-badge stock-badge">Esgotado</span>'
+          : (lowStock
+            ? `<span class="recommended-badge stock-badge">Ultimas ${escapeHTML(normalized.stock)} un.</span>`
+            : (normalized.offerActive
           ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
-          : (normalized.isKit ? '<span class="recommended-badge kit-badge">Kit especial</span>' : (recommended ? '<span class="recommended-badge">Recomendado</span>' : ''))}
+          : (normalized.isKit ? '<span class="recommended-badge kit-badge">Kit especial</span>' : (recommended ? '<span class="recommended-badge">Recomendado</span>' : ''))))}
         <div class="product-media">
           ${image
             ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
@@ -2194,7 +2853,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
         ` : ''}
         <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
-        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}">Adicionar</button>
+        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>${outOfStock ? 'Indisponivel' : 'Adicionar'}</button>
       </article>
     `;
   }
@@ -2300,6 +2959,16 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('.rail-product', rail).forEach((card, index) => card.classList.toggle('is-center', index === 0));
   }
 
+  function renderPromotionsPage() {
+    const grid = qs('[data-promotions-grid]');
+    if (!grid) return;
+
+    const offers = productIndex.filter(product => normalizeProduct(product).offerActive);
+    grid.innerHTML = offers.map(product => productCardHTML(product, 'catalog')).join('');
+    qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
+    qsa('[data-promotions-count]').forEach(el => { el.textContent = String(offers.length); });
+  }
+
   function bindCatalog() {
     const input = qs('[data-catalog-search]');
     const filterBar = qs('.filter-chips');
@@ -2400,10 +3069,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!baseName || Number.isNaN(price)) return;
 
       addToCart({
+        productId: button.dataset.productId || card?.dataset.productId || '',
         name: baseName,
         variant,
         price,
-        image
+        image,
+        stock: button.dataset.stock === '' ? null : Number(button.dataset.stock)
       });
 
       const original = button.dataset.originalText || button.textContent.trim();
@@ -2421,18 +3092,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayName = product.variant ? `${product.name} - ${product.variant}` : product.name;
     const id = makeCartId(product.name, product.variant);
     const existing = cart.find(item => item.id === id);
+    const stock = product.stock === null || product.stock === undefined || Number.isNaN(Number(product.stock))
+      ? null
+      : Number(product.stock);
+
+    if (stock !== null && stock <= 0) {
+      showToast(`${displayName} esta esgotado.`);
+      return;
+    }
+
+    if (stock !== null && existing && existing.quantity >= stock) {
+      showToast(`Estoque maximo de ${displayName} no carrinho.`);
+      return;
+    }
 
     if (existing) {
       existing.quantity += 1;
     } else {
       cart.push({
         id,
+        productId: product.productId || '',
         name: displayName,
         baseName: product.name,
         variant: product.variant || '',
         price: Number(product.price || 0),
         quantity: 1,
-        image: product.image || ''
+        image: product.image || '',
+        stock
       });
     }
 
@@ -2584,6 +3270,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const action = event.target.closest('[data-cart-action]');
       const pageCheckout = event.target.closest('[data-page-checkout]');
       const clearCart = event.target.closest('[data-clear-cart]');
+      const applyCoupon = event.target.closest('[data-apply-coupon]');
+      const clearCoupon = event.target.closest('[data-clear-coupon]');
+      const repeatOrderButton = event.target.closest('[data-repeat-order]');
 
       if (open) {
         openCartModal();
@@ -2609,13 +3298,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (applyCoupon) {
+        applyCouponFromInput();
+        return;
+      }
+
+      if (clearCoupon) {
+        saveAppliedCoupon(null);
+        renderPaymentSummary();
+        showToast('Cupom removido.');
+        return;
+      }
+
+      if (repeatOrderButton) {
+        repeatOrderById(repeatOrderButton.dataset.repeatOrder, repeatOrderButton.dataset.repeatCheckout === 'true');
+        return;
+      }
+
       if (!action) return;
 
       const id = action.dataset.cartId;
       const item = cart.find(entry => entry.id === id);
       if (!item) return;
 
-      if (action.dataset.cartAction === 'increase') item.quantity += 1;
+      if (action.dataset.cartAction === 'increase') {
+        if (item.stock !== null && item.stock !== undefined && item.quantity >= Number(item.stock)) {
+          showToast('Quantidade maxima em estoque no carrinho.');
+          return;
+        }
+        item.quantity += 1;
+      }
       if (action.dataset.cartAction === 'decrease') item.quantity = Math.max(1, item.quantity - 1);
       if (action.dataset.cartAction === 'remove') cart = cart.filter(entry => entry.id !== id);
 
@@ -2665,10 +3377,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (showMessage && !confirm('Deseja remover todos os produtos do carrinho?')) return;
     cart = [];
+    saveAppliedCoupon(null);
     saveCart();
     renderCart();
     renderPaymentSummary();
     if (showMessage) showToast('Carrinho limpo.');
+  }
+
+  function applyCouponFromInput() {
+    const input = qs('#payment-coupon');
+    const raw = input?.value.trim() || '';
+    if (!raw) {
+      showToast('Digite um cupom.');
+      return;
+    }
+
+    const coupon = couponByCode(raw);
+    if (!coupon) {
+      showToast('Cupom nao encontrado ou inativo.');
+      return;
+    }
+
+    if (cartSubtotal() < coupon.minSubtotal) {
+      showToast(`Este cupom vale acima de ${formatMoney(coupon.minSubtotal)}.`);
+      return;
+    }
+
+    saveAppliedCoupon(coupon);
+    renderPaymentSummary();
+    showToast(`Cupom ${coupon.code} aplicado.`);
+  }
+
+  async function repeatOrderById(orderId, goToCheckout = false) {
+    const orders = await loadOrdersFromSupabase();
+    const order = orders.find(item => item.id === orderId);
+    if (!order?.items?.length) {
+      showToast('Nao encontrei os itens deste pedido.');
+      return;
+    }
+
+    cart = order.items.map(item => {
+      const baseName = item.baseName || item.name;
+      return {
+        id: makeCartId(baseName, item.variant || ''),
+        productId: item.productId || '',
+        name: item.variant ? `${baseName} - ${item.variant}` : item.name,
+        baseName,
+        variant: item.variant || '',
+        price: Number(item.price || 0),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+        image: item.image || ''
+      };
+    });
+    saveAppliedCoupon(null);
+    saveCart();
+    renderCart();
+    renderPaymentSummary();
+    showToast('Pedido repetido no carrinho.');
+    window.location.href = goToCheckout ? checkoutHref() : productHref();
   }
 
   function clearOrderHistory(showMessage = true) {
@@ -2682,6 +3448,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (showMessage && !confirm('Deseja limpar o cache local do site neste navegador?')) return;
 
     localStorage.removeItem(STORAGE.cart);
+    localStorage.removeItem(STORAGE.coupon);
     localStorage.removeItem(STORAGE.legacyCart);
     localStorage.removeItem(STORAGE.legacyTheme);
     Object.keys(localStorage)
@@ -2695,6 +3462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     cart = [];
+    appliedCoupon = null;
     renderCart();
     renderPaymentSummary();
     updateThemeControls();
@@ -2847,6 +3615,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     tabs.forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.authMode || 'login')));
+    qsa('[data-toggle-password]', form).forEach(button => {
+      button.addEventListener('click', () => {
+        const input = qs(button.dataset.togglePassword);
+        if (!input) return;
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        button.setAttribute('aria-label', visible ? 'Mostrar senha' : 'Ocultar senha');
+        button.innerHTML = visible ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+      });
+    });
     window.addEventListener('monte-sinai-password-recovery', () => setMode('reset-password'));
 
     if (currentUser?.email) {
@@ -2961,9 +3739,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const user = userFromAuthUser(data.session.user);
             await upsertProfileRecord(data.session.user, user);
             saveUser(user);
+            sendWelcomeEmail(user);
             finishLogin(user, 'Conta criada com sucesso.');
           } else {
-            showToast('Conta criada. Confira seu email para confirmar o cadastro.');
+            showToast('Conta criada. Entre com email e senha para receber a boas-vindas e salvar seus dados.');
             setMode('login');
           }
           return;
@@ -2994,9 +3773,9 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(message);
 
     const params = new URLSearchParams(location.search);
-    const redirect = params.get('redirect');
+    const redirect = safeRedirectTarget(params.get('redirect'), profileHref());
     setTimeout(() => {
-      window.location.href = redirect || profileHref();
+      window.location.href = redirect;
     }, 500);
   }
 
@@ -3080,14 +3859,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const fee = deliveryFee();
+    const coupon = currentCoupon();
+    const discount = couponDiscount();
     const gift = hasGasGift();
     summary.appendChild(list);
     summary.insertAdjacentHTML('beforeend', `
+      <div class="coupon-box">
+        <label for="payment-coupon">Cupom de desconto</label>
+        <div class="coupon-entry">
+          <input id="payment-coupon" type="text" value="${escapeHTML(appliedCoupon?.code || '')}" placeholder="Digite seu cupom">
+          <button class="btn btn-secondary" type="button" data-apply-coupon>Aplicar</button>
+        </div>
+        ${coupon
+          ? `<p class="coupon-feedback">Cupom ${escapeHTML(coupon.code)} ativo: ${escapeHTML(coupon.label)} <button type="button" data-clear-coupon>remover</button></p>`
+          : '<p class="coupon-feedback">Use um cupom divulgado pela loja para ganhar desconto.</p>'}
+      </div>
+      <div class="payment-fee">
+        <span>Subtotal</span>
+        <strong>${formatMoney(cartSubtotal())}</strong>
+      </div>
+      ${discount ? `<div class="payment-fee payment-discount"><span>Desconto</span><strong>- ${formatMoney(discount)}</strong></div>` : ''}
       <div class="payment-fee">
         <span>Entrega</span>
         <strong>${fee ? formatMoney(fee) : 'Grátis'}</strong>
       </div>
-      ${gift ? '<div class="payment-gift"><span>Brinde</span><strong>Compra de gás</strong></div>' : ''}
+      ${gift ? `<div class="payment-gift"><span>Brinde</span><strong>${escapeHTML(ownerGiftText())}</strong></div>` : ''}
       <div class="payment-total">
         <span>Total</span>
         <strong>${formatMoney(orderTotal())}</strong>
@@ -3145,10 +3941,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       form?.classList.remove('profile-ready');
       profileBox?.classList.add('hidden');
-      if (accountText) accountText.textContent = 'Entre ou cadastre-se para salvar seus dados e pedir mais rápido.';
+      if (accountText) accountText.textContent = 'Login opcional: preencha os dados abaixo para finalizar como visitante.';
       if (loginLink) {
         loginLink.href = loginHref({ redirect: currentLocationForRedirect() });
-        loginLink.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Entrar';
+        loginLink.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Entrar para salvar dados';
       }
     }
   }
@@ -3185,30 +3981,34 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('[Supabase] Nao foi possivel conferir usuario autenticado.', error);
     }
 
-    if (!client || !authUser?.id) {
-      showToast('Entre ou cadastre-se para salvar o pedido com seguranca.');
-      setTimeout(() => {
-        window.location.href = loginHref({ redirect: 'pagamento.html' });
-      }, 600);
+    if (!client) {
+      showToast('Nao consegui conectar ao Supabase agora. Tente novamente em instantes.');
       return;
     }
 
     const customer = collectCheckoutCustomer();
     if (!customer) return;
 
+    const coupon = currentCoupon();
+    const discount = couponDiscount();
     const order = {
       id: createOrderId(),
       createdAt: new Date().toISOString(),
       customer,
       items: cart.map(item => ({ ...item })),
       subtotal: cartSubtotal(),
+      discount,
+      coupon: coupon ? { code: coupon.code, label: coupon.label, type: coupon.type, value: coupon.value } : null,
       delivery: deliveryFee(),
       total: orderTotal(),
       gift: hasGasGift(),
       payment: activePayment === 'whatsapp'
         ? 'Combinar pelo WhatsApp'
         : (qs('input[name="delivery-payment"]:checked')?.value || 'Pagar na entrega'),
-      status: 'Pedido enviado'
+      status: 'Recebido',
+      confirmed: false,
+      paymentStatus: 'Pendente',
+      customerType: authUser?.id ? 'cliente' : 'visitante'
     };
 
     const confirm = qs('#payment-confirm');
@@ -3221,7 +4021,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await saveOrder(order, authUser);
     } catch (error) {
       console.error('[Supabase] Erro ao salvar pedido:', error);
-      showToast('Nao consegui salvar o pedido no Supabase. Tente novamente.');
+      showToast(checkoutFriendlyError(error));
       if (confirm) {
         confirm.disabled = false;
         confirm.classList.remove('is-loading');
@@ -3242,7 +4042,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="checkout-success">
           <span class="eyebrow">Pedido enviado</span>
           <h3>${escapeHTML(order.id)}</h3>
-          <p>Seu pedido foi montado e enviado para atendimento no WhatsApp. Você também pode reenviar a mensagem se o navegador bloquear a abertura automática.</p>
+          <p>Seu pedido foi salvo e enviado para atendimento no WhatsApp. ${authUser?.id ? 'Ele tambem ficou vinculado ao seu perfil.' : 'Voce finalizou como visitante, sem precisar fazer login.'}</p>
           <a class="btn btn-primary" href="https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}" target="_blank" rel="noreferrer">
             <i class="fa-brands fa-whatsapp"></i>
             Reenviar WhatsApp
@@ -3266,38 +4066,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const client = ordersClient();
     if (!client) throw new Error('Cliente Supabase indisponivel.');
 
-    await upsertProfileRecord(authUser, {
-      ...currentUser,
-      name: order.customer.name,
-      phone: order.customer.phone,
-      address: order.customer.address
-    });
+    if (authUser?.id) {
+      order.customer.email = order.customer.email || authUser.email || '';
+      await upsertProfileRecord(authUser, {
+        ...currentUser,
+        name: order.customer.name,
+        phone: order.customer.phone,
+        address: order.customer.address
+      });
+    }
 
-    const { data: savedOrder, error: orderError } = await client
-      .from('pedidos')
-      .insert({
-        codigo: order.id,
-        user_id: authUser.id,
-        cliente_nome: order.customer.name,
-        cliente_email: order.customer.email || authUser.email || '',
-        cliente_telefone: order.customer.phone,
-        endereco_entrega: order.customer.address,
-        observacao: order.customer.note || '',
-        pagamento: order.payment,
-        status: order.status,
-        subtotal: order.subtotal,
-        entrega: order.delivery,
-        total: order.total,
-        brinde: order.gift,
-        whatsapp_enviado: true
-      })
-      .select('id')
-      .single();
+    const saved = await saveOrderThroughRpc(order);
+    if (saved?.codigo) order.id = saved.codigo;
+    if (Number.isFinite(Number(saved?.subtotal))) order.subtotal = Number(saved.subtotal);
+    if (Number.isFinite(Number(saved?.desconto))) order.discount = Number(saved.desconto);
+    if (Number.isFinite(Number(saved?.entrega))) order.delivery = Number(saved.entrega);
+    if (Number.isFinite(Number(saved?.total))) order.total = Number(saved.total);
+    if (saved?.cliente_tipo) order.customerType = saved.cliente_tipo;
 
-    if (orderError) throw orderError;
+    saveOrderLocally(order);
+  }
 
-    const rows = order.items.map(item => ({
-      pedido_id: savedOrder.id,
+  function orderPayload(order) {
+    return {
+      codigo: order.id,
+      cliente_tipo: order.customerType || 'visitante',
+      cliente_nome: order.customer.name,
+      cliente_email: order.customer.email || '',
+      cliente_telefone: order.customer.phone,
+      endereco_entrega: order.customer.address,
+      observacao: order.customer.note || '',
+      pagamento: order.payment,
+      status: order.status,
+      subtotal: order.subtotal,
+      desconto: order.discount || 0,
+      cupom_codigo: order.coupon?.code || '',
+      entrega: order.delivery,
+      total: order.total,
+      brinde: order.gift,
+      whatsapp_enviado: true,
+      confirmado: false,
+      pagamento_status: normalizePaymentStatus(order.paymentStatus)
+    };
+  }
+
+  function orderItemsPayload(order) {
+    return order.items.map(item => ({
+      produto_id: isUUID(item.productId) ? item.productId : null,
       nome: item.name,
       variacao: item.variant || '',
       quantidade: Number(item.quantity || 1),
@@ -3305,12 +4120,19 @@ document.addEventListener('DOMContentLoaded', () => {
       total: Number(item.price || 0) * Number(item.quantity || 1),
       imagem: item.image || ''
     }));
+  }
 
-    const { error: itemsError } = await client.from('pedido_itens').insert(rows);
-    if (itemsError) throw itemsError;
+  async function saveOrderThroughRpc(order) {
+    const client = ordersClient();
+    const { data, error } = await client.rpc('create_order', {
+      order_payload: orderPayload(order),
+      items_payload: orderItemsPayload(order)
+    });
+    if (error) throw error;
+    return data || {};
+  }
 
-    await upsertCheckoutAddress(authUser.id, order.customer);
-
+  function saveOrderLocally(order) {
     const orders = loadJSON(STORAGE.orders, []);
     orders.unshift(order);
     saveJSON(STORAGE.orders, orders.slice(0, 20));
@@ -3350,6 +4172,151 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function initInstallPrompt() {
+    bindInstallButtons();
+
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      if (!installPromptBlocked()) scheduleInstallPrompt(false);
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      hideInstallPrompt();
+      try {
+        localStorage.setItem(STORAGE.installPromptDismissed, String(Date.now() + 365 * 24 * 60 * 60 * 1000));
+      } catch (_error) {}
+      showToast('Aplicativo Monte Sinai instalado.');
+    });
+
+    if (!installPromptBlocked() && isIOSInstallCandidate()) scheduleInstallPrompt(true);
+  }
+
+  function bindInstallButtons() {
+    qsa('[data-install-app]').forEach(button => {
+      if (button.dataset.installBound === 'true') return;
+      button.dataset.installBound = 'true';
+      button.addEventListener('click', () => handleManualInstallRequest());
+    });
+  }
+
+  async function handleManualInstallRequest() {
+    if (isStandaloneApp()) {
+      showToast('O app Monte Sinai ja esta instalado neste aparelho.');
+      return;
+    }
+
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
+      deferredInstallPrompt = null;
+      if (choice?.outcome === 'accepted') {
+        hideInstallPrompt();
+        showToast('Instalacao iniciada.');
+      } else {
+        showToast('Instalacao cancelada. Voce pode tentar novamente depois.');
+      }
+      return;
+    }
+
+    renderInstallPrompt(isIOSInstallCandidate(), { manual: true });
+    showToast(isIOSInstallCandidate()
+      ? 'No iPhone, toque em compartilhar e depois em Adicionar a Tela de Inicio.'
+      : 'No Chrome ou Edge, use o menu do navegador e escolha Instalar app.');
+  }
+
+  function installPromptBlocked(options = {}) {
+    const manual = options.manual === true;
+    if (!manual && document.body.classList.contains('auth-body')) return true;
+    if (!manual && ['painel.html', 'login.html', 'pagamento.html'].includes(currentPage())) return true;
+    if (isStandaloneApp()) return true;
+    const dismissedUntil = Number(localStorage.getItem(STORAGE.installPromptDismissed) || 0);
+    return !manual && Number.isFinite(dismissedUntil) && dismissedUntil > Date.now();
+  }
+
+  function isStandaloneApp() {
+    return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function isIOSInstallCandidate() {
+    const agent = window.navigator.userAgent || '';
+    const isAppleMobile = /iphone|ipad|ipod/i.test(agent);
+    return isAppleMobile && !isStandaloneApp();
+  }
+
+  function scheduleInstallPrompt(iosHelp = false) {
+    if (installPromptBlocked()) return;
+    window.setTimeout(() => renderInstallPrompt(iosHelp), iosHelp ? 2600 : 1600);
+  }
+
+  function renderInstallPrompt(iosHelp = false, options = {}) {
+    const manual = options.manual === true;
+    if (installPromptBlocked({ manual }) || installPromptVisible || qs('[data-app-install-banner]')) return;
+    if (!iosHelp && !deferredInstallPrompt && !manual) return;
+
+    const banner = document.createElement('aside');
+    banner.className = 'app-install-banner';
+    banner.dataset.appInstallBanner = 'true';
+    banner.setAttribute('aria-label', 'Instalar aplicativo Monte Sinai');
+    banner.innerHTML = `
+      <div class="app-install-icon">
+        <img src="${escapeHTML(assetHref(siteConfig.logoUrl || DEFAULT_SITE_CONFIG.logoUrl))}" alt="" loading="eager" decoding="async">
+      </div>
+      <div class="app-install-copy">
+        <strong>Baixe o app Monte Sinai</strong>
+        <span>${iosHelp
+          ? 'No iPhone, toque em compartilhar e escolha "Adicionar a Tela de Inicio".'
+          : (deferredInstallPrompt ? 'Instale no celular para pedir agua, gas e limpeza mais rapido.' : 'Abra o menu do Chrome ou Edge e escolha Instalar app.')}</span>
+      </div>
+      <div class="app-install-actions">
+        <button class="btn btn-primary" type="button" data-app-install-action>
+          <i class="fa-solid fa-download"></i>
+          ${iosHelp || !deferredInstallPrompt ? 'Entendi' : 'Instalar'}
+        </button>
+        <button class="app-install-close" type="button" aria-label="Fechar sugestao de app" data-app-install-dismiss>
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(banner);
+    installPromptVisible = true;
+    requestAnimationFrame(() => banner.classList.add('show'));
+
+    qs('[data-app-install-dismiss]', banner)?.addEventListener('click', () => dismissInstallPrompt());
+    qs('[data-app-install-action]', banner)?.addEventListener('click', async () => {
+      if (iosHelp) {
+        dismissInstallPrompt(14);
+        return;
+      }
+      if (!deferredInstallPrompt) {
+        dismissInstallPrompt(manual ? 0 : 3);
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice.catch(() => null);
+      deferredInstallPrompt = null;
+      if (choice?.outcome === 'accepted') hideInstallPrompt();
+      else dismissInstallPrompt(7);
+    });
+  }
+
+  function dismissInstallPrompt(days = 7) {
+    try {
+      localStorage.setItem(STORAGE.installPromptDismissed, String(Date.now() + days * 24 * 60 * 60 * 1000));
+    } catch (_error) {}
+    hideInstallPrompt();
+  }
+
+  function hideInstallPrompt() {
+    const banner = qs('[data-app-install-banner]');
+    installPromptVisible = false;
+    if (!banner) return;
+    banner.classList.remove('show');
+    window.setTimeout(() => banner.remove(), 220);
+  }
+
   function buildOrderMessage(order) {
     const lines = [
       '*Novo pedido Monte Sinai*',
@@ -3368,8 +4335,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lines.push('');
     lines.push(`Subtotal: ${formatMoney(order.subtotal)}`);
+    if (order.coupon?.code) lines.push(`Cupom: ${order.coupon.code}`);
+    if (order.discount) lines.push(`Desconto: - ${formatMoney(order.discount)}`);
     lines.push(`Entrega: ${order.delivery ? formatMoney(order.delivery) : 'Grátis'}`);
-    if (order.gift) lines.push('Brinde: compra de gás');
+    if (order.gift) lines.push(`Brinde: ${ownerGiftText()}`);
     lines.push(`*Total: ${formatMoney(order.total)}*`);
     if (order.customer.note) lines.push(`Observações: ${order.customer.note}`);
     return lines.join('\n');
@@ -3661,7 +4630,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function resizeProfilePhoto(file) {
     return new Promise((resolve, reject) => {
-      if (!file.type?.startsWith('image/')) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         reject(new Error('Arquivo invalido'));
         return;
       }
@@ -3868,6 +4837,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       access?.classList.add('hidden');
       content?.classList.remove('hidden');
+      applyAdminRoleUI(await currentAdminProfile({ force: true }));
       return true;
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel validar admin.', error);
@@ -3878,33 +4848,174 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function populateOwnerConfigForm() {
     const fields = {
+      storeName: qs('#owner-store-name'),
+      footerDescription: qs('#owner-footer-description'),
+      logoUrl: qs('#owner-logo-url'),
+      accentColor: qs('#owner-accent-color'),
       whatsapp: qs('#owner-whatsapp'),
       pixKey: qs('#owner-pix-key'),
       merchantName: qs('#owner-merchant-name'),
-      merchantCity: qs('#owner-merchant-city')
+      merchantCity: qs('#owner-merchant-city'),
+      heroEyebrow: qs('#owner-hero-eyebrow'),
+      heroTitle: qs('#owner-hero-title'),
+      heroText: qs('#owner-hero-text'),
+      heroButton: qs('#owner-hero-button'),
+      heroImage: qs('#owner-hero-image'),
+      announcementActive: qs('#owner-announcement-active'),
+      announcement: qs('#owner-announcement'),
+      deliveryFee: qs('#owner-delivery-fee'),
+      freeShippingFrom: qs('#owner-free-shipping'),
+      giftText: qs('#owner-gift-text'),
+      catalogTitle: qs('#owner-catalog-title'),
+      showcaseTitle: qs('#owner-showcase-title'),
+      storefrontTitle: qs('#owner-storefront-title'),
+      coupons: qs('#owner-coupons'),
+      neighborhoods: qs('#owner-neighborhoods'),
+      stockAlertThreshold: qs('#owner-stock-threshold')
     };
 
+    if (fields.storeName) fields.storeName.value = siteConfig.storeName || DEFAULT_SITE_CONFIG.storeName;
+    if (fields.footerDescription) fields.footerDescription.value = siteConfig.footerDescription || DEFAULT_SITE_CONFIG.footerDescription;
+    if (fields.logoUrl) fields.logoUrl.value = siteConfig.logoUrl || DEFAULT_SITE_CONFIG.logoUrl;
+    if (fields.accentColor) fields.accentColor.value = siteConfig.accentColor || DEFAULT_SITE_CONFIG.accentColor;
     if (fields.whatsapp) fields.whatsapp.value = ownerConfig.whatsapp || '';
     if (fields.pixKey) fields.pixKey.value = ownerConfig.pixKey || '';
     if (fields.merchantName) fields.merchantName.value = ownerConfig.merchantName || DEFAULT_OWNER.merchantName;
     if (fields.merchantCity) fields.merchantCity.value = ownerConfig.merchantCity || DEFAULT_OWNER.merchantCity;
+    if (fields.heroEyebrow) fields.heroEyebrow.value = siteConfig.heroEyebrow || DEFAULT_SITE_CONFIG.heroEyebrow;
+    if (fields.heroTitle) fields.heroTitle.value = siteConfig.heroTitle || DEFAULT_SITE_CONFIG.heroTitle;
+    if (fields.heroText) fields.heroText.value = siteConfig.heroText || DEFAULT_SITE_CONFIG.heroText;
+    if (fields.heroButton) fields.heroButton.value = siteConfig.heroButton || DEFAULT_SITE_CONFIG.heroButton;
+    if (fields.heroImage) fields.heroImage.value = siteConfig.heroImage || DEFAULT_SITE_CONFIG.heroImage;
+    if (fields.announcementActive) fields.announcementActive.value = siteConfig.announcementActive ? 'true' : 'false';
+    if (fields.announcement) fields.announcement.value = siteConfig.announcement || DEFAULT_SITE_CONFIG.announcement;
+    if (fields.deliveryFee) fields.deliveryFee.value = String(ownerDeliveryFee());
+    if (fields.freeShippingFrom) fields.freeShippingFrom.value = String(ownerFreeShippingFrom());
+    if (fields.giftText) fields.giftText.value = ownerGiftText();
+    if (fields.catalogTitle) fields.catalogTitle.value = siteConfig.catalogTitle || DEFAULT_SITE_CONFIG.catalogTitle;
+    if (fields.showcaseTitle) fields.showcaseTitle.value = siteConfig.showcaseTitle || DEFAULT_SITE_CONFIG.showcaseTitle;
+    if (fields.storefrontTitle) fields.storefrontTitle.value = siteConfig.storefrontTitle || DEFAULT_SITE_CONFIG.storefrontTitle;
+    if (fields.coupons) fields.coupons.value = couponLinesFromCoupons(siteConfig.coupons);
+    if (fields.neighborhoods) fields.neighborhoods.value = normalizeNeighborhoods(siteConfig.servedNeighborhoods).join('\n');
+    if (fields.stockAlertThreshold) fields.stockAlertThreshold.value = String(siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold);
+  }
+
+  function applyAdminRoleUI(profile = adminProfileCache) {
+    const role = adminRole(profile);
+    const developer = isDeveloperProfile(profile);
+    document.body.dataset.adminRole = role;
+    document.body.classList.toggle('admin-developer', developer);
+    document.body.classList.toggle('admin-owner', role === 'owner' || role === 'staff');
+    qsa('[data-developer-only]').forEach(element => {
+      element.classList.toggle('hidden', !developer);
+      element.hidden = !developer;
+      element.setAttribute('aria-hidden', String(!developer));
+    });
+    setText('[data-admin-role-label]', roleLabel(role));
+    setText('[data-admin-name-label]', profile?.nome || profile?.email || 'Administrador');
+  }
+
+  function renderDeveloperDiagnostics() {
+    const container = qs('#developer-diagnostics');
+    if (!container) return;
+
+    const cssHref = qs('link[href*="style.css"]')?.getAttribute('href') || '';
+    const jsSrc = qs('script[src*="script.js"]')?.getAttribute('src') || '';
+    const cssVersion = new URL(cssHref, window.location.href).searchParams.get('v') || 'sem versao';
+    const jsVersion = new URL(jsSrc, window.location.href).searchParams.get('v') || 'sem versao';
+    const swState = 'serviceWorker' in navigator
+      ? (navigator.serviceWorker.controller ? 'Ativo nesta aba' : 'Registravel')
+      : 'Nao suportado';
+    const rows = [
+      { label: 'Perfil admin', value: `${roleLabel(adminRole())} (${adminProfileCache?.email || 'sem email'})` },
+      { label: 'Sessao local', value: currentUser?.email ? 'Cliente autenticado' : 'Sem sessao salva' },
+      { label: 'Supabase', value: ordersClient() ? 'Cliente carregado' : 'Indisponivel' },
+      { label: 'RPC pedidos', value: 'create_order obrigatorio' },
+      { label: 'Schema produtos', value: productExtendedColumnsReady ? 'Ofertas/estoque ativos' : 'Campos extras pendentes' },
+      { label: 'Schema pedidos', value: orderExtendedColumnsReady ? 'Pagamento/cupom ativos' : 'Campos extras pendentes' },
+      { label: 'Service worker', value: swState },
+      { label: 'CSS ativo', value: cssVersion },
+      { label: 'JS ativo', value: jsVersion },
+      { label: 'Pedidos em cache', value: String(remoteOrdersCache.length) },
+      { label: 'Produtos em cache', value: String(adminProductsCache.length) },
+      { label: 'Caches do navegador', value: 'Conferindo...', key: 'cache' }
+    ];
+
+    container.innerHTML = rows.map(row => `
+      <div class="developer-diagnostic-row" ${row.key ? `data-dev-diagnostic="${escapeHTML(row.key)}"` : ''}>
+        <span>${escapeHTML(row.label)}</span>
+        <strong>${escapeHTML(row.value)}</strong>
+      </div>
+    `).join('');
+
+    if ('caches' in window) {
+      caches.keys()
+        .then(keys => {
+          const row = qs('[data-dev-diagnostic="cache"] strong', container);
+          if (row) row.textContent = keys.filter(key => key.startsWith('monte-sinai-')).join(', ') || 'Nenhum cache Monte Sinai';
+        })
+        .catch(() => {
+          const row = qs('[data-dev-diagnostic="cache"] strong', container);
+          if (row) row.textContent = 'Sem acesso ao Cache API';
+        });
+    }
   }
 
   function bindAdminDashboardActions() {
     const dashboard = qs('#admin-dashboard');
     if (dashboard?.dataset.adminBound === 'true') return;
 
-    qs('#owner-config-form')?.addEventListener('submit', event => {
+    qs('#owner-config-form')?.addEventListener('submit', async event => {
       event.preventDefault();
-      ownerConfig = {
+      const submit = qs('#owner-config-form button[type="submit"]');
+      if (submit) {
+        submit.disabled = true;
+        submit.classList.add('is-loading');
+      }
+
+      ownerConfig = normalizedOwnerConfig({
         whatsapp: qs('#owner-whatsapp')?.value.trim() || DEFAULT_OWNER.whatsapp,
         pixKey: qs('#owner-pix-key')?.value.trim() || '',
         merchantName: qs('#owner-merchant-name')?.value.trim() || DEFAULT_OWNER.merchantName,
         merchantCity: qs('#owner-merchant-city')?.value.trim() || DEFAULT_OWNER.merchantCity,
+        deliveryFee: qs('#owner-delivery-fee')?.value || DEFAULT_OWNER.deliveryFee,
+        freeShippingFrom: qs('#owner-free-shipping')?.value || DEFAULT_OWNER.freeShippingFrom,
+        giftText: qs('#owner-gift-text')?.value.trim() || DEFAULT_OWNER.giftText,
         savedAt: new Date().toISOString()
-      };
-      saveJSON(STORAGE.owner, ownerConfig);
-      showToast('Configuracao salva.');
+      });
+      siteConfig = normalizedSiteConfig({
+        storeName: qs('#owner-store-name')?.value.trim() || DEFAULT_SITE_CONFIG.storeName,
+        footerDescription: qs('#owner-footer-description')?.value.trim() || DEFAULT_SITE_CONFIG.footerDescription,
+        logoUrl: qs('#owner-logo-url')?.value.trim() || DEFAULT_SITE_CONFIG.logoUrl,
+        accentColor: qs('#owner-accent-color')?.value || DEFAULT_SITE_CONFIG.accentColor,
+        heroEyebrow: qs('#owner-hero-eyebrow')?.value.trim() || DEFAULT_SITE_CONFIG.heroEyebrow,
+        heroTitle: qs('#owner-hero-title')?.value.trim() || DEFAULT_SITE_CONFIG.heroTitle,
+        heroText: qs('#owner-hero-text')?.value.trim() || DEFAULT_SITE_CONFIG.heroText,
+        heroButton: qs('#owner-hero-button')?.value.trim() || DEFAULT_SITE_CONFIG.heroButton,
+        heroImage: qs('#owner-hero-image')?.value.trim() || DEFAULT_SITE_CONFIG.heroImage,
+        announcementActive: qs('#owner-announcement-active')?.value === 'true',
+        announcement: qs('#owner-announcement')?.value.trim() || DEFAULT_SITE_CONFIG.announcement,
+        catalogTitle: qs('#owner-catalog-title')?.value.trim() || DEFAULT_SITE_CONFIG.catalogTitle,
+        showcaseTitle: qs('#owner-showcase-title')?.value.trim() || DEFAULT_SITE_CONFIG.showcaseTitle,
+        storefrontTitle: qs('#owner-storefront-title')?.value.trim() || DEFAULT_SITE_CONFIG.storefrontTitle,
+        couponsText: qs('#owner-coupons')?.value || '',
+        servedNeighborhoods: qs('#owner-neighborhoods')?.value || DEFAULT_SITE_CONFIG.servedNeighborhoods,
+        stockAlertThreshold: qs('#owner-stock-threshold')?.value || DEFAULT_SITE_CONFIG.stockAlertThreshold
+      });
+
+      persistSiteSettings();
+      applySiteConfig();
+      renderCart();
+      populateOwnerConfigForm();
+
+      const remote = await saveRemoteSiteConfig();
+      if (submit) {
+        submit.disabled = false;
+        submit.classList.remove('is-loading');
+      }
+      showToast(remote.saved
+        ? 'Configuracao salva e aplicada no site.'
+        : 'Configuracao aplicada neste navegador. Execute o SQL de configuracoes para salvar globalmente.');
     });
 
     qs('#request-notification')?.addEventListener('click', async () => {
@@ -3917,7 +5028,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     qs('#refresh-orders')?.addEventListener('click', () => renderOrdersEverywhere({ force: true }));
+    qsa('[data-admin-refresh-dashboard]').forEach(button => {
+      button.addEventListener('click', () => {
+        renderOrdersEverywhere({ force: true });
+        refreshAdminProducts({ force: true });
+        renderDeveloperDiagnostics();
+      });
+    });
     qs('#refresh-products')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
+    qs('#import-local-products')?.addEventListener('click', importLocalCatalogProducts);
     qsa('[data-admin-create-product]').forEach(button => {
       button.addEventListener('click', () => startAdminProductForm('produto'));
     });
@@ -3931,7 +5050,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.addEventListener('click', () => setAdminOfferDuration(Number(button.dataset.offerDuration || 24)));
     });
 
-    qs('#export-orders')?.addEventListener('click', async () => {
+    const exportOrders = async () => {
       const orders = await loadOrdersFromSupabase({ force: true });
       const blob = new Blob([JSON.stringify(orders, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -3940,6 +5059,10 @@ document.addEventListener('DOMContentLoaded', () => {
       link.download = `pedidos-monte-sinai-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
+    };
+    qs('#export-orders')?.addEventListener('click', exportOrders);
+    qsa('[data-admin-export-orders]').forEach(button => {
+      button.addEventListener('click', exportOrders);
     });
 
     qs('#admin-product-form')?.addEventListener('submit', saveAdminProduct);
@@ -3984,7 +5107,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    setAdminTab(adminTabFromHash(location.hash));
+    const defaultTab = !location.hash && !isDeveloperProfile() && window.matchMedia?.('(max-width: 760px)').matches
+      ? 'products'
+      : adminTabFromHash(location.hash);
+    setAdminTab(defaultTab);
     content.dataset.tabsBound = 'true';
   }
 
@@ -3993,19 +5119,60 @@ document.addEventListener('DOMContentLoaded', () => {
     if (target === 'admin-products' || target === 'products') return 'products';
     if (target === 'orders-list' || target === 'orders') return 'orders';
     if (target === 'owner-config-form' || target === 'store') return 'store';
+    if (target === 'developer' || target === 'programador') return 'developer';
     return 'overview';
   }
 
   function setAdminTab(tab = 'overview') {
-    const target = ['overview', 'products', 'orders', 'store'].includes(tab) ? tab : 'overview';
+    let target = ['overview', 'products', 'orders', 'store', 'developer'].includes(tab) ? tab : 'overview';
+    if (target === 'developer' && !isDeveloperProfile()) target = 'overview';
     qsa('[data-admin-tab]').forEach(button => {
       const active = button.dataset.adminTab === target;
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
     });
     qsa('[data-admin-tab-panel]').forEach(panel => {
-      panel.classList.toggle('active', panel.dataset.adminTabPanel === target);
+      const active = panel.dataset.adminTabPanel === target;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+      panel.setAttribute('aria-hidden', String(!active));
     });
+
+    const groupedTabsActive = ['orders', 'store'].includes(target);
+    const layout = qs('.dashboard-layout');
+    if (layout) {
+      layout.classList.toggle('is-active-tab-group', groupedTabsActive);
+      layout.hidden = !groupedTabsActive;
+      layout.setAttribute('aria-hidden', String(!groupedTabsActive));
+    }
+
+    if (target === 'products') {
+      ensureAdminProductsVisible();
+      if (!adminProductsCache.length || qs('#admin-products-list')?.childElementCount === 0) {
+        refreshAdminProducts({ force: !adminProductsCache.length });
+      }
+    }
+
+    if (target === 'developer') renderDeveloperDiagnostics();
+  }
+
+  function ensureAdminProductsVisible() {
+    const panel = qs('#admin-products');
+    const list = qs('#admin-products-list');
+    if (!panel) return;
+
+    panel.classList.add('active');
+    panel.hidden = false;
+    panel.removeAttribute('aria-hidden');
+
+    if (list) {
+      list.hidden = false;
+      list.classList.remove('hidden');
+      list.removeAttribute('aria-hidden');
+      list.style.removeProperty('display');
+      list.style.removeProperty('visibility');
+      list.style.removeProperty('opacity');
+    }
   }
 
   function adminModalElement(name = 'product') {
@@ -4066,10 +5233,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const confirmOrder = event.target.closest('[data-order-confirm]');
+    if (confirmOrder) {
+      await confirmAdminOrder(confirmOrder.dataset.orderConfirm);
+      return;
+    }
+
     const edit = event.target.closest('[data-admin-product-edit]');
     if (edit) {
       const product = adminProductsCache.find(item => item.id === edit.dataset.adminProductEdit);
-      if (product) fillAdminProductForm(product);
+      if (product) {
+        fillAdminProductForm(product.__local ? { ...product, id: '' } : product);
+        if (product.__local) showToast('Produto local aberto. Salve para criar no Supabase.');
+      }
       return;
     }
 
@@ -4112,13 +5288,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const price = event.target.closest('[data-admin-product-price-save]');
     if (price) {
       await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+      return;
+    }
+
+    const stock = event.target.closest('[data-admin-product-stock-save]');
+    if (stock) {
+      await saveAdminProductStock(stock.dataset.adminProductStockSave);
     }
   }
 
   async function handleAdminPanelChange(event) {
     const status = event.target.closest('[data-order-status]');
-    if (!status) return;
-    await updateOrderStatus(status.dataset.orderStatus, status.value);
+    if (status) {
+      await updateOrderStatus(status.dataset.orderStatus, status.value);
+      return;
+    }
+
+    const paymentStatus = event.target.closest('[data-order-payment-status]');
+    if (paymentStatus) {
+      await updateOrderPaymentStatus(paymentStatus.dataset.orderPaymentStatus, paymentStatus.value);
+    }
   }
 
   async function updateOrderStatus(orderId, status) {
@@ -4142,49 +5331,361 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Status do pedido atualizado.');
   }
 
-  async function loadAdminProducts({ force = false } = {}) {
+  async function updateOrderPaymentStatus(orderId, status) {
+    const normalized = normalizePaymentStatus(status);
+    if (!orderId || !PAYMENT_STATUS_OPTIONS.includes(normalized)) return;
     const client = ordersClient();
-    if (!client) return [];
-    if (adminProductsCache.length && !force) return adminProductsCache;
+    if (!client) return;
 
-    let { data, error } = await client
-      .from('produtos')
-      .select(productExtendedColumnsReady ? PRODUCT_EXTENDED_SELECT : PRODUCT_BASE_SELECT)
-      .order('nome', { ascending: true });
+    const payload = {
+      pagamento_status: normalized,
+      pagamento_confirmado_em: normalized === 'Pago' ? new Date().toISOString() : null
+    };
 
-    if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
-      productExtendedColumnsReady = false;
-      const fallback = await client
-        .from('produtos')
-        .select(PRODUCT_BASE_SELECT)
-        .order('nome', { ascending: true });
-      data = fallback.data;
-      error = fallback.error;
+    const { error } = await client
+      .from('pedidos')
+      .update(payload)
+      .eq('id', orderId);
+
+    if (error) {
+      showToast('Nao consegui atualizar o pagamento. Execute o SQL novo no Supabase.');
+      console.warn('[Supabase] Erro ao atualizar pagamento.', error);
+      return;
     }
 
-    if (error) throw error;
-    adminProductsCache = data || [];
+    remoteOrdersLoaded = false;
+    await renderOrdersEverywhere({ force: true });
+    showToast('Pagamento atualizado.');
+  }
+
+  async function confirmAdminOrder(orderId) {
+    if (!orderId) return;
+    const client = ordersClient();
+    if (!client) return;
+
+    const { error } = await client
+      .from('pedidos')
+      .update({ confirmado: true, confirmado_em: new Date().toISOString() })
+      .eq('id', orderId);
+
+    if (error) {
+      showToast('Nao consegui confirmar o pedido. Execute o SQL novo no Supabase.');
+      console.warn('[Supabase] Erro ao confirmar pedido.', error);
+      return;
+    }
+
+    remoteOrdersLoaded = false;
+    await renderOrdersEverywhere({ force: true });
+    showToast('Pedido confirmado.');
+  }
+
+  function localCategoryLabel(value = '') {
+    const slug = categorySlug(value || 'produtos');
+    return {
+      recommended: 'Recomendados',
+      agua: 'Agua',
+      gas: 'Gas',
+      limpeza: 'Limpeza',
+      lavanderia: 'Lavanderia',
+      higiene: 'Higiene',
+      banheiro: 'Banheiro',
+      cozinha: 'Cozinha',
+      utensilios: 'Utensilios',
+      organizacao: 'Organizacao'
+    }[slug] || cleanConfigText(value, 'Produtos');
+  }
+
+  function localProductFromCard(card, index = 0) {
+    const button = qs('.btn-add-cart', card);
+    const name = card.dataset.name || qs('h3', card)?.textContent?.trim() || button?.dataset.name || `Produto ${index + 1}`;
+    const price = parsePrice(button?.dataset.price || qs('strong', card)?.textContent || 0);
+    const image = canonicalAssetPath(qs('.product-image', card)?.getAttribute('src') || productAssetFallback(name));
+    const category = localCategoryLabel(card.dataset.category || qs('.eyebrow', card)?.textContent || 'Produtos');
+    return {
+      id: `local-${storageSafeFileName(name)}-${index}`,
+      nome: name,
+      preco: price,
+      imagem: image,
+      categoria: category,
+      descricao: qs('p', card)?.textContent?.trim() || `Produto do catalogo ${siteConfig.storeName}.`,
+      ativo: true,
+      tipo: normalizeText(category).includes('kit') ? 'kit' : 'produto',
+      destaque: card.classList.contains('is-recommended') || card.dataset.recommended === 'true',
+      __local: true
+    };
+  }
+
+  function staticLocalCatalogProducts() {
+    const items = [
+      ['Agua mineral 20L', 15, 'Agua'],
+      ['Gas de cozinha P13', 125, 'Gas'],
+      ['Alcool Perfumado 500ml', 5, 'Limpeza'],
+      ['Amaciante 2L', 10, 'Lavanderia'],
+      ['Candida 2L Tradicional', 5, 'Limpeza'],
+      ['Candida Colorida 2L', 12, 'Limpeza'],
+      ['Cloro 1L Tradicional', 7.5, 'Limpeza'],
+      ['Cloro 2L Tradicional', 12, 'Limpeza'],
+      ['Detergente 2L Neutro', 10, 'Cozinha'],
+      ['Desinfetante 2L', 5, 'Limpeza'],
+      ['Limpa Aluminio 500ml', 5, 'Cozinha'],
+      ['Limpa Pedra 2L Uso Pesado', 12, 'Limpeza'],
+      ['Limpa Pedra 500ml Uso Diario', 5, 'Limpeza'],
+      ['Sabao de Coco 2L', 12, 'Lavanderia'],
+      ['Sabao Omo 2L', 22, 'Lavanderia'],
+      ['Sabonete Liquido 500ml', 6, 'Higiene'],
+      ['Escova de Roupa', 5, 'Lavanderia'],
+      ['Escova de Vaso Sanitario com Pote', 8.5, 'Banheiro'],
+      ['Esponja de Aco', 4.9, 'Cozinha'],
+      ['Esponja de Louca', 2, 'Cozinha'],
+      ['Esponjao', 9.9, 'Utensilios'],
+      ['Bombril', 3, 'Cozinha'],
+      ['Pa', 7.5, 'Utensilios'],
+      ['Pasta de Brilho', 6, 'Cozinha'],
+      ['Pedra de Vaso', 2.5, 'Banheiro'],
+      ['Prendedor de Madeira', 3.2, 'Organizacao'],
+      ['Prendedor Plastico', 3.6, 'Organizacao'],
+      ['Rodo Grande', 9.9, 'Utensilios'],
+      ['Rodo Pequeno', 7.99, 'Utensilios'],
+      ['Rodinho de Pia', 5, 'Cozinha'],
+      ['Saco de Lixo', 6, 'Organizacao'],
+      ['Vassoura', 12, 'Utensilios']
+    ];
+
+    return items.map(([nome, preco, categoria], index) => ({
+      id: `local-${storageSafeFileName(nome)}-${index}`,
+      nome,
+      preco,
+      imagem: productAssetFallback(nome),
+      categoria,
+      descricao: `Produto de ${categoria.toLowerCase()} pronto para venda no catalogo.`,
+      ativo: true,
+      tipo: 'produto',
+      destaque: index < 2,
+      __local: true
+    }));
+  }
+
+  async function loadLocalCatalogProducts() {
+    if (localCatalogProductsCache) return localCatalogProductsCache;
+
+    if (productIndex.length) {
+      localCatalogProductsCache = productIndex.map((product, index) => ({
+        id: `local-${storageSafeFileName(product.name)}-${index}`,
+        nome: product.name,
+        preco: Number(product.price || 0),
+        imagem: productAssetPath(product),
+        categoria: product.category || 'Produtos',
+        descricao: product.description || productDescription(product),
+        ativo: true,
+        tipo: product.isKit ? 'kit' : 'produto',
+        destaque: Boolean(product.recommended || product.highlight),
+        __local: true
+      }));
+      return localCatalogProductsCache;
+    }
+
+    try {
+      const response = await fetch(pageHref('produtos.html'), { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const cards = [...doc.querySelectorAll('.catalog-product')];
+      localCatalogProductsCache = cards.map(localProductFromCard).filter(product => product.nome && product.preco >= 0);
+    } catch (error) {
+      console.warn('[Catalogo local] Nao foi possivel ler pages/produtos.html. Usando lista interna.', error);
+      localCatalogProductsCache = staticLocalCatalogProducts();
+    }
+
+    if (!localCatalogProductsCache.length) localCatalogProductsCache = staticLocalCatalogProducts();
+    return localCatalogProductsCache;
+  }
+
+  async function fallbackAdminProducts(source = 'local') {
+    adminProductsSource = source;
+    adminProductsCache = await loadLocalCatalogProducts();
     return adminProductsCache;
+  }
+
+  function withAdminTimeout(promise, ms = 4500, label = 'Supabase') {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error(`${label} demorou mais de ${ms}ms`)), ms);
+      })
+    ]);
+  }
+
+  function updateAdminProductMetrics(products = []) {
+    setText('#dash-products-count', String(products.filter(product => product.ativo !== false).length));
+    setText('#dash-offers-count', String(products.filter(product => productOfferActive(product)).length));
+    setText('#dash-kits-count', String(products.filter(product => productType(product) === 'kit').length));
+    renderStockAlerts(products);
+    setProductIndex(products.filter(product => product.ativo !== false));
+  }
+
+  function supabaseProductRows(products = []) {
+    return products.map(product => ({
+      nome: product.nome || '',
+      preco: parsePrice(product.preco),
+      imagem: canonicalAssetPath(product.imagem || ''),
+      categoria: product.categoria || 'Produtos',
+      descricao: product.descricao || '',
+      ativo: product.ativo !== false
+    })).filter(product => product.nome);
+  }
+
+  async function importLocalCatalogProducts() {
+    const client = ordersClient();
+    if (!client) {
+      showToast('Supabase indisponivel para importar o catalogo.');
+      return;
+    }
+
+    const button = qs('#import-local-products');
+    if (button) {
+      button.disabled = true;
+      button.classList.add('is-loading');
+    }
+
+    try {
+      const products = await loadLocalCatalogProducts();
+      const rows = supabaseProductRows(products);
+      const names = rows.map(product => product.nome);
+      if (!rows.length) {
+        showToast('Nenhum produto local para importar.');
+        return;
+      }
+
+      const { data: existing, error: lookupError } = await client
+        .from('produtos')
+        .select('nome')
+        .in('nome', names);
+      if (lookupError) throw lookupError;
+
+      const existingNames = new Set((existing || []).map(product => normalizeText(product.nome)));
+      const missing = rows.filter(product => !existingNames.has(normalizeText(product.nome)));
+      if (!missing.length) {
+        showToast('Catalogo ja esta importado no Supabase.');
+        await refreshAdminProducts({ force: true });
+        return;
+      }
+
+      const { error } = await client.from('produtos').insert(missing);
+      if (error) throw error;
+
+      await refreshAdminProducts({ force: true });
+      showToast(`${missing.length} produto${missing.length === 1 ? '' : 's'} importado${missing.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      console.warn('[Supabase] Nao foi possivel importar catalogo local.', error);
+      showToast('Nao consegui importar o catalogo. Confira as permissoes admin.');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.classList.remove('is-loading');
+      }
+    }
+  }
+
+  async function loadAdminProducts({ force = false } = {}) {
+    const client = ordersClient();
+    if (!client) return fallbackAdminProducts('local-no-client');
+    if (adminProductsCache.length && !force) return adminProductsCache;
+
+    let data = [];
+    let error = null;
+
+    try {
+      const response = await withAdminTimeout(
+        client
+          .from('produtos')
+          .select(productExtendedColumnsReady ? PRODUCT_EXTENDED_SELECT : PRODUCT_BASE_SELECT)
+          .order('nome', { ascending: true }),
+        4500,
+        'Produtos do Supabase'
+      );
+
+      data = response.data;
+      error = response.error;
+
+      if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+        productExtendedColumnsReady = false;
+        const fallback = await withAdminTimeout(
+          client
+            .from('produtos')
+            .select(PRODUCT_BASE_SELECT)
+            .order('nome', { ascending: true }),
+          4500,
+          'Produtos basicos do Supabase'
+        );
+        data = fallback.data;
+        error = fallback.error;
+      }
+
+      if (error) throw error;
+      if (!data?.length) return fallbackAdminProducts('local-empty-supabase');
+
+      adminProductsSource = 'supabase';
+      adminProductsCache = data || [];
+      return adminProductsCache;
+    } catch (loadError) {
+      console.warn('[Supabase] Produtos administrativos indisponiveis. Mostrando catalogo local.', loadError);
+      return fallbackAdminProducts('local-error');
+    }
   }
 
   async function refreshAdminProducts({ force = true } = {}) {
     try {
-      setAdminProductsStatus('Carregando produtos do Supabase...');
+      ensureAdminProductsVisible();
+      setAdminProductsStatus('Preparando produtos...');
+      const list = qs('#admin-products-list');
+      const previewProducts = adminProductsCache.length
+        ? adminProductsCache
+        : await loadLocalCatalogProducts().catch(() => []);
+
+      if (previewProducts.length) {
+        if (!adminProductsCache.length) {
+          adminProductsSource = 'local-preview';
+          adminProductsCache = previewProducts;
+        }
+        renderAdminProducts(previewProducts);
+        updateAdminProductMetrics(previewProducts);
+        setAdminProductsStatus('Catalogo local visivel. Sincronizando produtos do Supabase...');
+      } else if (list) {
+        list.innerHTML = `
+          <div class="admin-products-empty">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <strong>Carregando produtos...</strong>
+            <span>Buscando o catalogo na tabela public.produtos.</span>
+          </div>
+        `;
+      }
       const products = await loadAdminProducts({ force });
       renderAdminProducts(products);
-      setText('#dash-products-count', String(products.filter(product => product.ativo).length));
-      setText('#dash-offers-count', String(products.filter(product => productOfferActive(product)).length));
-      setText('#dash-kits-count', String(products.filter(product => productType(product) === 'kit').length));
-      setProductIndex(products.filter(product => product.ativo));
-      const extra = productExtendedColumnsReady
-        ? 'Kits, destaques e ofertas com temporizador estao ativos.'
-        : 'Execute supabase/ofertas-kits-produtos.sql para liberar kits e ofertas completas.';
-      setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} carregado${products.length === 1 ? '' : 's'} da tabela public.produtos. ${extra}`);
+      updateAdminProductMetrics(products);
+      if (adminProductsSource === 'supabase') {
+        const extra = productExtendedColumnsReady
+          ? 'Kits, destaques e ofertas com temporizador estao ativos.'
+          : 'Execute supabase/ofertas-kits-produtos.sql para liberar kits e ofertas completas.';
+        setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} carregado${products.length === 1 ? '' : 's'} da tabela public.produtos. ${extra}`);
+      } else {
+        setAdminProductsStatus(`${products.length} produto${products.length === 1 ? '' : 's'} do catalogo local visivel${products.length === 1 ? '' : 's'} com imagem. Use "Importar catalogo" para copiar para o Supabase e controlar tudo pelo painel.`);
+      }
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel carregar produtos administrativos.', error);
       setAdminProductsStatus('Nao foi possivel carregar os produtos do Supabase.');
       qs('#admin-products-list')?.replaceChildren();
-      qs('#admin-products-list')?.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nao foi possivel carregar os produtos.</p>');
+      qs('#admin-products-list')?.insertAdjacentHTML('beforeend', `
+        <div class="admin-products-empty">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <strong>Nao foi possivel carregar os produtos</strong>
+          <span>Confira o acesso admin, as policies do Supabase e a tabela public.produtos.</span>
+          <button class="btn btn-secondary" type="button" id="refresh-products-inline">
+            <i class="fa-solid fa-rotate"></i>
+            Tentar novamente
+          </button>
+        </div>
+      `);
+      qs('#refresh-products-inline')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
     }
   }
 
@@ -4270,6 +5771,8 @@ document.addEventListener('DOMContentLoaded', () => {
         : null;
       payload.oferta_fim = offerActive ? isoFromLocalInput(qs('#admin-product-offer-end')?.value || '') : null;
       payload.kit_itens = qs('#admin-product-kit-items')?.value.trim() || '';
+      payload.estoque = qs('#admin-product-stock')?.value === '' ? null : Math.max(0, Math.round(parsePrice(qs('#admin-product-stock')?.value || 0)));
+      payload.estoque_minimo = Math.max(0, Math.round(parsePrice(qs('#admin-product-stock-min')?.value || siteConfig.stockAlertThreshold || 0)));
     }
 
     return payload;
@@ -4303,17 +5806,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function imageFileExtension(file) {
     const fromName = String(file?.name || '').split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(fromName)) return fromName === 'jpeg' ? 'jpg' : fromName;
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(fromName)) return fromName === 'jpeg' ? 'jpg' : fromName;
     if (file?.type === 'image/jpeg') return 'jpg';
     if (file?.type === 'image/png') return 'png';
     if (file?.type === 'image/webp') return 'webp';
-    if (file?.type === 'image/svg+xml') return 'svg';
     return 'png';
   }
 
   function imageContentType(file, extension) {
     if (file?.type) return file.type;
-    if (extension === 'svg') return 'image/svg+xml';
     if (extension === 'jpg') return 'image/jpeg';
     return `image/${extension}`;
   }
@@ -4329,8 +5830,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return '';
     }
 
-    if (!file.type?.startsWith('image/')) {
-      showToast('Escolha um arquivo de imagem.');
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('Use imagem JPG, PNG ou WebP.');
       return '';
     }
 
@@ -4409,7 +5911,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const id = qs('#admin-product-id')?.value || '';
     const client = ordersClient();
-    if (!client) return;
+    if (!client) {
+      showToast('Supabase indisponivel para salvar o produto.');
+      return;
+    }
 
     const request = id
       ? client.from('produtos').update(payload).eq('id', id)
@@ -4461,6 +5966,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const promoPrice = qs('#admin-product-promo-price');
     const offerStart = qs('#admin-product-offer-start');
     const offerEnd = qs('#admin-product-offer-end');
+    const stock = qs('#admin-product-stock');
+    const stockMin = qs('#admin-product-stock-min');
 
     if (id) id.value = product.id || '';
     if (name) name.value = product.nome || '';
@@ -4479,6 +5986,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (promoPrice) promoPrice.value = product.preco_promocional ? Number(product.preco_promocional).toFixed(2) : '';
     if (offerStart) offerStart.value = formatDateTimeLocalInput(product.oferta_inicio);
     if (offerEnd) offerEnd.value = formatDateTimeLocalInput(product.oferta_fim);
+    if (stock) stock.value = product.estoque ?? '';
+    if (stockMin) stockMin.value = product.estoque_minimo ?? siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold;
     setText('#admin-product-form-title', productType(product) === 'kit' ? 'Editar kit' : 'Editar produto');
     setAdminTab('products');
     openAdminModal('product');
@@ -4491,11 +6000,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const file = qs('#admin-product-file');
     const type = qs('#admin-product-type');
     const highlight = qs('#admin-product-highlight');
+    const stockMin = qs('#admin-product-stock-min');
     if (id) id.value = '';
     if (active) active.value = 'true';
     if (file) file.value = '';
     if (type) type.value = 'produto';
     if (highlight) highlight.value = 'false';
+    if (stockMin) stockMin.value = siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold;
     setText('#admin-product-form-title', 'Criar produto');
     updateAdminProductPreview('');
     productImageUploadStatus('');
@@ -4622,6 +6133,27 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Preco atualizado.');
   }
 
+  async function saveAdminProductStock(id) {
+    const input = qs(`[data-admin-product-stock-input="${escapeSelectorValue(id)}"]`);
+    const estoque = input?.value === '' ? null : Math.max(0, Math.round(parsePrice(input?.value || 0)));
+    const client = ordersClient();
+    if (!client || !id) return;
+    if (!productExtendedColumnsReady) {
+      showToast('Execute o SQL de estoque para controlar quantidades.');
+      return;
+    }
+
+    const { error } = await client.from('produtos').update({ estoque }).eq('id', id);
+    if (error) {
+      showToast('Nao consegui atualizar o estoque.');
+      console.warn('[Supabase] Erro ao atualizar estoque.', error);
+      return;
+    }
+
+    await refreshAdminProducts({ force: true });
+    showToast('Estoque atualizado.');
+  }
+
   async function deleteAdminProduct(id) {
     if (!id || !confirm('Deseja excluir este produto do Supabase?')) return;
     const client = ordersClient();
@@ -4645,12 +6177,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const visibleProducts = filteredAdminProducts(products);
 
     if (!products.length) {
-      list.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum produto cadastrado.</p>');
+      list.insertAdjacentHTML('beforeend', `
+        <div class="admin-products-empty">
+          <i class="fa-solid fa-box-open"></i>
+          <strong>Nenhum produto apareceu aqui</strong>
+          <span>Se o catalogo ja existe, confirme se o usuario e admin e se a tabela public.produtos tem registros. Voce tambem pode criar um produto agora.</span>
+          <div class="settings-actions">
+            <button class="btn btn-primary" type="button" data-admin-create-product>
+              <i class="fa-solid fa-plus"></i>
+              Criar produto
+            </button>
+            <button class="btn btn-secondary" type="button" id="refresh-products-empty">
+              <i class="fa-solid fa-rotate"></i>
+              Recarregar
+            </button>
+          </div>
+        </div>
+      `);
+      qs('#refresh-products-empty')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
+      qs('[data-admin-create-product]', list)?.addEventListener('click', () => startAdminProductForm('produto'));
       return;
     }
 
     if (!visibleProducts.length) {
-      list.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum produto encontrado neste filtro.</p>');
+      list.insertAdjacentHTML('beforeend', `
+        <div class="admin-products-empty">
+          <i class="fa-solid fa-filter-circle-xmark"></i>
+          <strong>Nenhum produto encontrado neste filtro</strong>
+          <span>Limpe a busca ou selecione "Todos" para ver o catalogo inteiro.</span>
+        </div>
+      `);
       return;
     }
 
@@ -4658,12 +6214,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('article');
       card.className = 'admin-product-card';
       const active = product.ativo !== false;
-      const image = product.imagem ? assetHref(product.imagem) : '';
+      const normalized = normalizeProduct(product);
+      const image = productAssetPath(normalized);
       const type = productType(product);
       const offer = productOfferActive(product);
       const highlighted = adminProductHighlighted(product);
+      const local = Boolean(product.__local);
+      const stock = productStockLevel(product);
+      const stockState = productStockState(product);
+      const stockText = stock === null ? 'Sem controle de estoque' : (stock <= 0 ? 'Esgotado' : `${stock} em estoque`);
       card.classList.toggle('is-offer', offer);
       card.classList.toggle('is-kit', type === 'kit');
+      card.classList.toggle('is-local', local);
+      card.classList.toggle('is-low-stock', stockState === 'low');
+      card.classList.toggle('is-out-of-stock', stockState === 'out');
 
       card.innerHTML = `
         <div class="admin-product-media">
@@ -4676,26 +6240,38 @@ document.addEventListener('DOMContentLoaded', () => {
             ${type === 'kit' ? '<span class="badge is-kit">Kit</span>' : ''}
             ${offer ? '<span class="badge is-offer">Oferta</span>' : ''}
             ${highlighted && !offer ? '<span class="badge is-highlight">Destaque</span>' : ''}
+            ${stockState === 'low' ? '<span class="badge is-stock-low">Estoque baixo</span>' : ''}
+            ${stockState === 'out' ? '<span class="badge is-stock-out">Esgotado</span>' : ''}
+            ${local ? '<span class="badge is-local">Local</span>' : ''}
           </div>
           <p>${escapeHTML(product.categoria || 'Produtos')}</p>
           <small>${escapeHTML(product.descricao || 'Sem descricao')}</small>
+          <small><strong>Estoque:</strong> ${escapeHTML(stockText)}</small>
           ${product.kit_itens ? `<small><strong>Kit:</strong> ${escapeHTML(product.kit_itens)}</small>` : ''}
           ${offer ? `<small><strong>${escapeHTML(offerCountdownText(product.oferta_fim))}</strong> - de ${formatMoney(product.preco)} por ${formatMoney(product.preco_promocional)}</small>` : ''}
           <div class="admin-price-row">
             <label for="product-price-${escapeHTML(product.id)}">Preco</label>
-            <input id="product-price-${escapeHTML(product.id)}" type="number" min="0" step="0.01" value="${Number(product.preco || 0).toFixed(2)}" data-admin-product-price-input="${escapeHTML(product.id)}">
-            <button class="btn btn-secondary" type="button" data-admin-product-price-save="${escapeHTML(product.id)}">
+            <input id="product-price-${escapeHTML(product.id)}" type="number" min="0" step="0.01" value="${Number(product.preco || 0).toFixed(2)}" data-admin-product-price-input="${escapeHTML(product.id)}" ${local ? 'disabled' : ''}>
+            <button class="btn btn-secondary" type="button" data-admin-product-price-save="${escapeHTML(product.id)}" ${local ? 'disabled' : ''}>
               <i class="fa-solid fa-check"></i>
               Salvar preco
+            </button>
+          </div>
+          <div class="admin-stock-row">
+            <label for="product-stock-${escapeHTML(product.id)}">Estoque</label>
+            <input id="product-stock-${escapeHTML(product.id)}" type="number" min="0" step="1" value="${stock === null ? '' : escapeHTML(stock)}" data-admin-product-stock-input="${escapeHTML(product.id)}" ${local ? 'disabled' : ''}>
+            <button class="btn btn-secondary" type="button" data-admin-product-stock-save="${escapeHTML(product.id)}" ${local || !productExtendedColumnsReady ? 'disabled' : ''}>
+              <i class="fa-solid fa-box"></i>
+              Salvar estoque
             </button>
           </div>
         </div>
         <div class="admin-product-actions">
           <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
-            <i class="fa-solid fa-pen"></i>
-            Editar
+            <i class="fa-solid ${local ? 'fa-cloud-arrow-up' : 'fa-pen'}"></i>
+            ${local ? 'Salvar no Supabase' : 'Editar'}
           </button>
-          <button class="btn btn-secondary" type="button" data-admin-product-highlight="${escapeHTML(product.id)}" data-product-highlighted="${highlighted ? 'true' : 'false'}">
+          ${local ? '' : `<button class="btn btn-secondary" type="button" data-admin-product-highlight="${escapeHTML(product.id)}" data-product-highlighted="${highlighted ? 'true' : 'false'}">
             <i class="fa-solid fa-star"></i>
             ${highlighted ? 'Tirar destaque' : 'Destacar'}
           </button>
@@ -4720,7 +6296,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <button class="btn btn-secondary admin-danger" type="button" data-admin-product-delete="${escapeHTML(product.id)}">
             <i class="fa-solid fa-trash"></i>
             Excluir
-          </button>
+          </button>`}
         </div>
       `;
       list.appendChild(card);
@@ -4741,6 +6317,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       items: (row.pedido_itens || []).map(item => ({
         id: item.id,
+        productId: item.produto_id || '',
         name: item.nome,
         variant: item.variacao || '',
         quantity: item.quantidade,
@@ -4748,11 +6325,16 @@ document.addEventListener('DOMContentLoaded', () => {
         image: item.imagem || ''
       })),
       subtotal: Number(row.subtotal || 0),
+      discount: Number(row.desconto || 0),
+      coupon: row.cupom_codigo ? { code: row.cupom_codigo } : null,
       delivery: Number(row.entrega || 0),
       total: Number(row.total || 0),
       gift: Boolean(row.brinde),
       payment: row.pagamento || '',
-      status: row.status || 'Pedido enviado'
+      status: normalizeOrderStatus(row.status),
+      paymentStatus: normalizePaymentStatus(row.pagamento_status),
+      confirmed: Boolean(row.confirmado),
+      customerType: row.cliente_tipo || (row.user_id ? 'cliente' : 'visitante')
     };
   }
 
@@ -4763,10 +6345,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       await authReady.catch(() => null);
-      const { data, error } = await client
+      const extendedSelect = 'id, codigo, user_id, created_at, cliente_tipo, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, pagamento_status, confirmado, confirmado_em, subtotal, entrega, total, brinde, cupom_codigo, desconto, pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)';
+      const baseSelect = 'id, codigo, user_id, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, subtotal, entrega, total, brinde, pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)';
+      let { data, error } = await client
         .from('pedidos')
-        .select('id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, subtotal, entrega, total, brinde, pedido_itens(id, nome, variacao, quantidade, preco_unitario, total, imagem)')
+        .select(orderExtendedColumnsReady ? extendedSelect : baseSelect)
         .order('created_at', { ascending: false });
+
+      if (error && orderExtendedColumnsReady && isMissingOrderExtensionError(error)) {
+        orderExtendedColumnsReady = false;
+        const fallback = await client
+          .from('pedidos')
+          .select(baseSelect)
+          .order('created_at', { ascending: false });
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw error;
       remoteOrdersCache = (data || []).map(mapSupabaseOrder);
@@ -4787,12 +6381,96 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('#dash-orders-count', String(orders.length));
     setText('#dash-orders-total', formatMoney(orders.reduce((sum, order) => sum + Number(order.total || 0), 0)));
     setText('#dash-last-order', orders[0]?.id || 'Nenhum');
+    renderSalesReports(orders);
+    renderDeveloperDiagnostics();
     qsa('[data-profile-order-count]').forEach(el => {
       el.textContent = String(customerOrders.length);
     });
 
     qsa('[data-orders-container], #orders-list').forEach(container => {
       renderOrders(container, orders);
+    });
+  }
+
+  function sameLocalDate(value, date = new Date()) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return false;
+    return parsed.toLocaleDateString('pt-BR') === date.toLocaleDateString('pt-BR');
+  }
+
+  function renderMetricList(container, rows = []) {
+    if (!container) return;
+    container.innerHTML = rows.length
+      ? rows.map(row => `<div class="admin-metric-row"><span>${escapeHTML(row.label)}</span><strong>${escapeHTML(row.value)}</strong></div>`).join('')
+      : '<p class="empty-cart">Sem dados suficientes ainda.</p>';
+  }
+
+  function renderSalesReports(orders = []) {
+    const delivered = orders.filter(order => normalizeOrderStatus(order.status) === 'Entregue');
+    const paidBase = delivered.length ? delivered : orders;
+    const total = paidBase.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const todayOrders = orders.filter(order => sameLocalDate(order.createdAt));
+    const todayTotal = todayOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const averageTicket = paidBase.length ? total / paidBase.length : 0;
+    const pendingPayment = orders.filter(order => normalizePaymentStatus(order.paymentStatus) === 'Pendente');
+    const paidOrders = orders.filter(order => normalizePaymentStatus(order.paymentStatus) === 'Pago');
+    const unconfirmed = orders.filter(order => !order.confirmed);
+    const statusRows = ORDER_STATUS_OPTIONS.map(status => ({
+      label: status,
+      value: String(orders.filter(order => normalizeOrderStatus(order.status) === status).length)
+    }));
+
+    renderMetricList(qs('#sales-dashboard'), [
+      { label: 'Pedidos no periodo', value: String(orders.length) },
+      { label: 'Faturamento registrado', value: formatMoney(total) },
+      { label: 'Ticket medio', value: formatMoney(averageTicket) },
+      { label: 'Pedidos entregues', value: String(delivered.length) },
+      { label: 'Aguardando confirmacao', value: String(unconfirmed.length) },
+      { label: 'Pagamento pendente', value: String(pendingPayment.length) }
+    ]);
+
+    renderMetricList(qs('#daily-report'), [
+      { label: 'Pedidos de hoje', value: String(todayOrders.length) },
+      { label: 'Total de hoje', value: formatMoney(todayTotal) },
+      { label: 'Ticket medio hoje', value: formatMoney(todayOrders.length ? todayTotal / todayOrders.length : 0) },
+      { label: 'Pagos no painel', value: String(paidOrders.length) },
+      ...statusRows
+    ]);
+  }
+
+  function lowStockProducts(products = []) {
+    return products
+      .filter(product => product.ativo !== false && ['low', 'out'].includes(productStockState(product)))
+      .sort((a, b) => (productStockLevel(a) ?? 9999) - (productStockLevel(b) ?? 9999));
+  }
+
+  function renderStockAlerts(products = []) {
+    const container = qs('#stock-alerts');
+    const lowProducts = lowStockProducts(products);
+    if (container) {
+      container.innerHTML = lowProducts.length
+        ? lowProducts.map(product => {
+          const stock = productStockLevel(product) ?? 0;
+          return `
+            <div class="admin-stock-alert ${stock <= 0 ? 'is-out' : ''}">
+              <span>${escapeHTML(product.nome || 'Produto')}</span>
+              <strong>${stock <= 0 ? 'Esgotado' : `${stock} un.`}</strong>
+            </div>
+          `;
+        }).join('')
+        : '<p class="empty-cart">Nenhum produto em alerta de estoque.</p>';
+    }
+    notifyLowStock(lowProducts);
+  }
+
+  function notifyLowStock(products = []) {
+    if (!products.length || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const signature = products.map(product => `${product.id}:${productStockLevel(product)}`).join('|');
+    if (!signature || signature === lastLowStockSignature) return;
+    lastLowStockSignature = signature;
+    new Notification('Monte Sinai: estoque baixo', {
+      body: `${products.length} produto${products.length === 1 ? '' : 's'} precisam de reposicao.`,
+      icon: assetHref(siteConfig.logoUrl)
     });
   }
 
@@ -4806,7 +6484,7 @@ document.addEventListener('DOMContentLoaded', () => {
       container.insertAdjacentHTML('beforeend', `
         <div class="section-head">
           <span class="eyebrow">Histórico de pedidos</span>
-          <h3>Pedidos salvos neste navegador</h3>
+          <h3>Historico de pedidos do cliente</h3>
           <p>Acompanhe os pedidos já enviados e limpe o histórico quando quiser.</p>
         </div>
         <div class="settings-actions profile-history-actions">
@@ -4827,17 +6505,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!currentUser?.email) {
         container.insertAdjacentHTML('beforeend', `
           <div class="profile-guest-note">
-            <strong>Pedidos salvos aparecem depois do cadastro.</strong>
-            <p>Entre ou cadastre-se para vincular seus pedidos ao perfil deste aparelho.</p>
+            <strong>Pedidos deste aparelho</strong>
+            <p>Como visitante, seu historico fica salvo neste navegador. Entre ou cadastre-se para vincular seus pedidos ao perfil.</p>
             <div class="settings-actions">
               <a class="btn btn-primary" href="${loginHref({ mode: 'register', redirect: 'perfil.html' })}">Cadastrar</a>
               <a class="btn btn-secondary" href="${loginHref({ redirect: 'perfil.html' })}">Entrar</a>
             </div>
           </div>
         `);
-        return;
+        visibleOrders = orders;
+      } else {
+        visibleOrders = orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone);
       }
-      visibleOrders = orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone);
     }
 
     if (!visibleOrders.length) {
@@ -4848,32 +6527,66 @@ document.addEventListener('DOMContentLoaded', () => {
     visibleOrders.forEach(order => {
       const card = document.createElement('article');
       card.className = 'order-card';
+      const displayStatus = normalizeOrderStatus(order.status);
       const items = (order.items || []).map(item => `<li>${escapeHTML(item.quantity)} x ${escapeHTML(item.name)}</li>`).join('');
       const statusOptions = ORDER_STATUS_OPTIONS
-        .map(status => `<option value="${escapeHTML(status)}" ${status === order.status ? 'selected' : ''}>${escapeHTML(status)}</option>`)
+        .map(status => `<option value="${escapeHTML(status)}" ${status === displayStatus ? 'selected' : ''}>${escapeHTML(status)}</option>`)
+        .join('');
+      const paymentStatus = normalizePaymentStatus(order.paymentStatus);
+      const paymentOptions = PAYMENT_STATUS_OPTIONS
+        .map(status => `<option value="${escapeHTML(status)}" ${status === paymentStatus ? 'selected' : ''}>${escapeHTML(status)}</option>`)
         .join('');
       const statusControl = isAdminOrders && order.uuid
         ? `<label class="admin-order-status">Status<select data-order-status="${escapeHTML(order.uuid)}">${statusOptions}</select></label>`
-        : `<span class="badge">${escapeHTML(order.status || 'Pedido enviado')}</span>`;
+        : `<span class="badge">${escapeHTML(displayStatus)}</span>`;
+      const adminControls = isAdminOrders && order.uuid
+        ? `
+          <div class="admin-order-control-grid">
+            <label>Pagamento<select data-order-payment-status="${escapeHTML(order.uuid)}">${paymentOptions}</select></label>
+            <button class="btn btn-secondary ${order.confirmed ? 'is-confirmed' : ''}" type="button" data-order-confirm="${escapeHTML(order.uuid)}" ${order.confirmed ? 'disabled' : ''}>
+              <i class="fa-solid ${order.confirmed ? 'fa-circle-check' : 'fa-check-double'}"></i>
+              ${order.confirmed ? 'Confirmado' : 'Confirmar pedido'}
+            </button>
+          </div>
+        `
+        : '';
+      const statusIndex = Math.max(0, ORDER_STATUS_OPTIONS.indexOf(displayStatus));
+      const statusSteps = ORDER_STATUS_OPTIONS
+        .map((status, index) => `<span class="${index <= statusIndex ? 'active' : ''}">${escapeHTML(status)}</span>`)
+        .join('');
 
       card.innerHTML = `
         <header>
           <strong>${escapeHTML(order.id)}</strong>
           ${statusControl}
         </header>
+        <div class="order-admin-badges">
+          <span class="badge ${order.customerType === 'visitante' ? 'is-local' : ''}">${escapeHTML(order.customerType === 'visitante' ? 'Visitante' : 'Cliente logado')}</span>
+          <span class="badge ${order.confirmed ? 'is-paid' : 'is-pending'}">${escapeHTML(order.confirmed ? 'Pedido confirmado' : 'A confirmar')}</span>
+          <span class="badge ${paymentStatus === 'Pago' ? 'is-paid' : paymentStatus === 'Cancelado' ? 'is-canceled' : 'is-pending'}">Pagamento: ${escapeHTML(paymentStatus)}</span>
+        </div>
         <p>${escapeHTML(order.customer?.name || '')} - ${escapeHTML(order.customer?.phone || '')}</p>
         ${isAdminOrders ? `<p>${escapeHTML(order.customer?.email || 'Cliente sem email')}</p>` : ''}
         <p>${escapeHTML(order.customer?.address || '')}</p>
+        ${adminControls}
+        <div class="order-status-steps">${statusSteps}</div>
         <ul>${items}</ul>
+        ${order.discount ? `<p class="order-discount">Cupom ${escapeHTML(order.coupon?.code || '')}: - ${formatMoney(order.discount)}</p>` : ''}
         <footer>
           <div>
             <strong>${formatMoney(order.total || 0)}</strong>
             <small>${escapeHTML(formatDateTime(order.createdAt))}</small>
           </div>
-          <button class="btn btn-secondary" type="button" data-order-whatsapp="${escapeHTML(order.id)}">
-            <i class="fa-brands fa-whatsapp"></i>
-            Abrir WhatsApp
-          </button>
+          <div class="order-card-actions">
+            <button class="btn btn-secondary" type="button" data-repeat-order="${escapeHTML(order.id)}" data-repeat-checkout="${isProfileHistory ? 'true' : 'false'}">
+              <i class="fa-solid fa-repeat"></i>
+              Repetir pedido
+            </button>
+            <button class="btn btn-secondary" type="button" data-order-whatsapp="${escapeHTML(order.id)}">
+              <i class="fa-brands fa-whatsapp"></i>
+              Abrir WhatsApp
+            </button>
+          </div>
         </footer>
       `;
       container.appendChild(card);

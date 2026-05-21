@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260520-45">
+  <link rel="stylesheet" href="../css/style.css?v=20260521-03">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-3"></script>
-  <script defer src="../js/script.js?v=20260520-38"></script>
+  <script src="../js/supabase.js?v=20260520-4"></script>
+  <script defer src="../js/script.js?v=20260521-03"></script>
 </head>
 <body>
   <header class="navbar">
@@ -91,6 +91,10 @@
         <button type="button" data-admin-tab="store">
           <i class="fa-solid fa-sliders"></i>
           Loja
+        </button>
+        <button class="hidden" type="button" data-admin-tab="developer" data-developer-only>
+          <i class="fa-solid fa-code"></i>
+          Programador
         </button>
       </nav>
 
@@ -184,37 +188,217 @@
           </button>
         </div>
       </section>
+
+      <section class="admin-insights-grid" aria-label="Relatorios e alertas">
+        <article class="settings-section admin-report-card">
+          <h2><i class="fa-solid fa-chart-line"></i> Dashboard de vendas</h2>
+          <div id="sales-dashboard" class="admin-report-body"></div>
+        </article>
+        <article class="settings-section admin-report-card">
+          <h2><i class="fa-solid fa-calendar-day"></i> Relatorio diario</h2>
+          <div id="daily-report" class="admin-report-body"></div>
+        </article>
+        <article class="settings-section admin-report-card">
+          <h2><i class="fa-solid fa-boxes-packing"></i> Estoque e alertas</h2>
+          <div id="stock-alerts" class="admin-report-body"></div>
+        </article>
+      </section>
+      </section>
+
+      <section class="settings-section developer-panel admin-tab-panel hidden" data-admin-tab-panel="developer" data-developer-only>
+        <div class="admin-section-head">
+          <div>
+            <span class="eyebrow">Modo Marcelo</span>
+            <h2><i class="fa-solid fa-terminal"></i> Central do programador</h2>
+            <p>Diagnosticos, auditoria, cache, Supabase, estilo global e atalhos tecnicos para manter o site sob controle.</p>
+          </div>
+          <div class="orders-toolbar">
+            <button class="btn btn-secondary" type="button" data-admin-tab="store">
+              <i class="fa-solid fa-palette"></i>
+              Estudio do site
+            </button>
+            <button class="btn btn-secondary" type="button" data-admin-refresh-dashboard>
+              <i class="fa-solid fa-rotate"></i>
+              Atualizar dados
+            </button>
+          </div>
+        </div>
+        <div class="developer-grid">
+          <article class="developer-card">
+            <h3><i class="fa-solid fa-heart-pulse"></i> Diagnostico</h3>
+            <div id="developer-diagnostics" class="developer-diagnostics"></div>
+          </article>
+          <article class="developer-card">
+            <h3><i class="fa-solid fa-database"></i> Checklist Supabase</h3>
+            <ul class="developer-checklist">
+              <li>Executar schema-pedidos.sql</li>
+              <li>Confirmar RPC create_order para checkout visitante e logado</li>
+              <li>Executar storage-produtos.sql</li>
+              <li>Desativar confirmacao obrigatoria de email no Supabase Auth</li>
+              <li>Configurar Edge Function send-welcome-email com JWT ativo</li>
+            </ul>
+          </article>
+          <article class="developer-card">
+            <h3><i class="fa-solid fa-screwdriver-wrench"></i> Ferramentas rapidas</h3>
+            <div class="developer-actions">
+              <button class="btn btn-secondary" type="button" data-admin-export-orders>
+                <i class="fa-solid fa-file-export"></i>
+                Exportar pedidos
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-tab="products">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                Auditoria de produtos
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-tab="orders">
+                <i class="fa-solid fa-clipboard-check"></i>
+                Pedidos e pagamentos
+              </button>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section class="dashboard-layout">
         <article class="settings-section owner-settings admin-tab-panel" data-admin-tab-panel="store">
           <h2><i class="fa-solid fa-sliders"></i> Configuracao do negocio</h2>
-          <p>Preencha os dados que o checkout usa para Pix, WhatsApp e identificacao da loja.</p>
+          <p>Controle a identidade, vitrine, atendimento, entrega e textos principais que aparecem no site.</p>
           <form class="checkout-form" id="owner-config-form">
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label for="owner-whatsapp">WhatsApp de pedidos</label>
-                <input id="owner-whatsapp" type="tel" placeholder="5511960928234">
+            <div class="admin-control-group">
+              <h3><i class="fa-solid fa-store"></i> Identidade e atendimento</h3>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="owner-store-name">Nome da loja</label>
+                  <input id="owner-store-name" type="text" placeholder="Monte Sinai">
+                </div>
+                <div class="form-group">
+                  <label for="owner-footer-description">Descricao curta</label>
+                  <input id="owner-footer-description" type="text" placeholder="Agua, gas e produtos de limpeza para sua casa.">
+                </div>
+                <div class="form-group">
+                  <label for="owner-logo-url">URL do logo</label>
+                  <input id="owner-logo-url" type="text" placeholder="../assets/brand/monte-sinai-logo-3d.png">
+                </div>
               </div>
-              <div class="form-group">
-                <label for="owner-pix-key">Chave Pix</label>
-                <input id="owner-pix-key" type="text" placeholder="CPF, CNPJ, email, telefone ou chave aleatoria">
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="owner-whatsapp">WhatsApp de pedidos</label>
+                  <input id="owner-whatsapp" type="tel" placeholder="5511960928234">
+                </div>
+                <div class="form-group">
+                  <label for="owner-pix-key">Chave Pix</label>
+                  <input id="owner-pix-key" type="text" placeholder="CPF, CNPJ, email, telefone ou chave aleatoria">
+                </div>
+                <div class="form-group">
+                  <label for="owner-accent-color">Cor principal</label>
+                  <input id="owner-accent-color" type="color" value="#008cff">
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="owner-merchant-name">Nome no Pix</label>
+                  <input id="owner-merchant-name" type="text" maxlength="25" placeholder="MONTE SINAI">
+                </div>
+                <div class="form-group">
+                  <label for="owner-merchant-city">Cidade no Pix</label>
+                  <input id="owner-merchant-city" type="text" maxlength="15" placeholder="SAO PAULO">
+                </div>
               </div>
             </div>
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label for="owner-merchant-name">Nome no Pix</label>
-                <input id="owner-merchant-name" type="text" maxlength="25" placeholder="MONTE SINAI">
+
+            <div class="admin-control-group">
+              <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Vitrine principal</h3>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="owner-hero-eyebrow">Chamada pequena do topo</label>
+                  <input id="owner-hero-eyebrow" type="text" placeholder="Entrega rapida, segura e local">
+                </div>
+                <div class="form-group">
+                  <label for="owner-hero-button">Texto do botao principal</label>
+                  <input id="owner-hero-button" type="text" placeholder="Comprar agora">
+                </div>
               </div>
               <div class="form-group">
-                <label for="owner-merchant-city">Cidade no Pix</label>
-                <input id="owner-merchant-city" type="text" maxlength="15" placeholder="SAO PAULO">
+                <label for="owner-hero-title">Titulo da pagina inicial</label>
+                <input id="owner-hero-title" type="text" placeholder="Monte Sinai leva agua, gas e produtos de limpeza ate voce.">
+              </div>
+              <div class="form-group">
+                <label for="owner-hero-text">Texto abaixo do titulo</label>
+                <textarea id="owner-hero-text" rows="3" placeholder="Escolha os produtos, monte o carrinho e finalize pelo WhatsApp."></textarea>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="owner-hero-image">Imagem de fundo da vitrine</label>
+                  <input id="owner-hero-image" type="text" placeholder="assets/hero/hero-site-3d.png">
+                </div>
+                <div class="form-group">
+                  <label for="owner-announcement-active">Aviso no topo</label>
+                  <select id="owner-announcement-active">
+                    <option value="false">Aviso desligado</option>
+                    <option value="true">Mostrar aviso</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="owner-announcement">Texto do aviso</label>
+                <input id="owner-announcement" type="text" placeholder="Entrega rapida hoje para agua, gas e limpeza.">
+              </div>
+            </div>
+
+            <div class="admin-control-group">
+              <h3><i class="fa-solid fa-truck-fast"></i> Entrega e secoes do site</h3>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="owner-delivery-fee">Taxa de entrega</label>
+                  <input id="owner-delivery-fee" type="number" min="0" step="0.01" placeholder="3.00">
+                </div>
+                <div class="form-group">
+                  <label for="owner-free-shipping">Frete gratis acima de</label>
+                  <input id="owner-free-shipping" type="number" min="0" step="0.01" placeholder="50.00">
+                </div>
+                <div class="form-group">
+                  <label for="owner-gift-text">Brinde</label>
+                  <input id="owner-gift-text" type="text" placeholder="Compra de gas">
+                </div>
+              </div>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label for="owner-catalog-title">Titulo da loja completa</label>
+                  <input id="owner-catalog-title" type="text" placeholder="Essenciais para abastecer e cuidar da casa">
+                </div>
+                <div class="form-group">
+                  <label for="owner-showcase-title">Titulo dos mais vendidos</label>
+                  <input id="owner-showcase-title" type="text" placeholder="Role pelas laterais e escolha seus produtos">
+                </div>
+                <div class="form-group">
+                  <label for="owner-storefront-title">Titulo dos atalhos</label>
+                  <input id="owner-storefront-title" type="text" placeholder="Atalhos para resolver a casa em poucos toques">
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-control-group">
+              <h3><i class="fa-solid fa-ticket"></i> Cupons, bairros e alertas</h3>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="owner-coupons">Cupons de desconto</label>
+                  <textarea id="owner-coupons" rows="4" placeholder="BEMVINDO10 | 10% | 50 | 10% acima de R$ 50"></textarea>
+                  <small>Use uma linha por cupom: CODIGO | desconto ou % | minimo | descricao.</small>
+                </div>
+                <div class="form-group">
+                  <label for="owner-neighborhoods">Bairros atendidos</label>
+                  <textarea id="owner-neighborhoods" rows="4" placeholder="Centro&#10;Jardim Monte Sinai&#10;Vila Sao Jose"></textarea>
+                  <small>Use uma linha por bairro para mostrar no site.</small>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="owner-stock-threshold">Alerta padrao de estoque baixo</label>
+                <input id="owner-stock-threshold" type="number" min="0" step="1" placeholder="3">
               </div>
             </div>
             <div class="settings-actions">
               <button class="btn btn-primary" type="submit">
                 <i class="fa-solid fa-floppy-disk"></i>
-                Salvar configuracao
+                Salvar e aplicar no site
               </button>
               <button class="btn btn-secondary" type="button" id="request-notification">
                 <i class="fa-solid fa-bell"></i>
@@ -259,6 +443,10 @@
             <button class="btn btn-secondary" type="button" data-admin-create-product>
               <i class="fa-solid fa-plus"></i>
               Novo produto
+            </button>
+            <button class="btn btn-secondary" type="button" id="import-local-products">
+              <i class="fa-solid fa-file-import"></i>
+              Importar catalogo
             </button>
           </div>
         </div>
@@ -325,12 +513,22 @@
               </div>
               <div class="form-grid-2">
                 <div class="form-group">
+                  <label for="admin-product-stock">Estoque atual</label>
+                  <input id="admin-product-stock" type="number" min="0" step="1" placeholder="Ex: 12">
+                </div>
+                <div class="form-group">
+                  <label for="admin-product-stock-min">Avisar quando chegar em</label>
+                  <input id="admin-product-stock-min" type="number" min="0" step="1" placeholder="Ex: 3">
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
                   <label for="admin-product-image">URL da imagem</label>
                   <input id="admin-product-image" type="text" placeholder="https://.../storage/v1/object/public/produtos/...">
                 </div>
                 <div class="form-group admin-upload-group">
                   <label for="admin-product-file">Upload da imagem</label>
-                  <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                  <input id="admin-product-file" type="file" accept="image/png,image/jpeg,image/webp">
                   <div class="admin-image-preview" id="admin-product-image-preview">
                     <i class="fa-solid fa-image"></i>
                   </div>
