@@ -103,6 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue'];
   const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
   const DEVELOPER_EMAIL = 'marcelol527319@gmail.com';
+  const ADMIN_EMAIL_ROLES = {
+    'marcelol527319@gmail.com': 'developer',
+    'marcelol527319@gmail.co': 'developer',
+    'patriciapaula01234@gmail.com': 'owner',
+    'marcelo52731@gmail.com': 'owner'
+  };
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
@@ -548,12 +554,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveUser(user) {
+    adminProfileCache = null;
     currentUser = user;
     let saved = true;
     if (user) saved = saveJSON(STORAGE.user, user);
     else {
       localStorage.removeItem(STORAGE.user);
-      adminProfileCache = null;
       setAdminPanelLinksVisible(false);
     }
     updateAccountUI();
@@ -562,6 +568,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function authClient() {
     return supabaseProductClient();
+  }
+
+  function clearSupabaseAuthStorage() {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (/^sb-.*-auth-token$/.test(key) || key.includes('supabase.auth')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (_error) {}
+  }
+
+  async function signOutEverywhere(options = {}) {
+    const redirect = options.redirect || '';
+    const message = options.message === undefined ? 'Voce saiu da conta.' : options.message;
+    const client = authClient();
+
+    try {
+      if (client?.auth) await client.auth.signOut();
+    } catch (error) {
+      console.warn('[Supabase Auth] Nao foi possivel encerrar a sessao remota. Limpando sessao local.', error);
+    }
+
+    clearSupabaseAuthStorage();
+    saveUser(null);
+    updateAdminPanelLinks({ force: true }).catch(() => {});
+    if (message) showToast(message, { type: 'success' });
+    if (redirect) window.setTimeout(() => {
+      window.location.href = redirect;
+    }, 350);
   }
 
   function authMetadata(user = {}) {
@@ -711,15 +747,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'Pendente';
   }
 
+  function normalizeEmail(value = '') {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function knownAdminRoleForEmail(email = '') {
+    return ADMIN_EMAIL_ROLES[normalizeEmail(email)] || '';
+  }
+
   function adminRole(profile = adminProfileCache) {
     const role = normalizeText(profile?.admin_role || profile?.role || '');
     if (role) return role;
-    if (normalizeText(profile?.email) === normalizeText(DEVELOPER_EMAIL)) return 'developer';
+    const emailRole = knownAdminRoleForEmail(profile?.email);
+    if (emailRole) return emailRole;
+    if (normalizeEmail(profile?.email) === normalizeEmail(DEVELOPER_EMAIL)) return 'developer';
     return profile?.is_admin ? 'owner' : 'customer';
   }
 
   function isDeveloperProfile(profile = adminProfileCache) {
-    return adminRole(profile) === 'developer' || normalizeText(profile?.email) === normalizeText(DEVELOPER_EMAIL);
+    return adminRole(profile) === 'developer' || normalizeEmail(profile?.email) === normalizeEmail(DEVELOPER_EMAIL);
   }
 
   function roleLabel(role = adminRole()) {
@@ -1190,6 +1236,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return data;
   }
 
+  async function safeUpsertProfileRecord(user = null, source = currentUser || {}, context = 'perfil') {
+    try {
+      return await upsertProfileRecord(user, source);
+    } catch (error) {
+      console.warn(`[Supabase] Login ok, mas nao foi possivel sincronizar ${context}.`, error);
+      return null;
+    }
+  }
+
+  function fallbackAdminProfileFromAuthUser(authUser = null) {
+    const role = knownAdminRoleForEmail(authUser?.email);
+    if (!role) return null;
+    return {
+      id: authUser.id || '',
+      email: authUser.email || '',
+      nome: authMetadata(authUser).name || authMetadata(authUser).full_name || '',
+      is_admin: true,
+      admin_role: role,
+      __emailFallback: true
+    };
+  }
+
   async function upsertCheckoutAddress(userId, customer) {
     const client = ordersClient();
     if (!client || !userId || !customer?.address) return;
@@ -1234,14 +1302,32 @@ document.addEventListener('DOMContentLoaded', () => {
       error = fallback.error;
     }
 
-    if (error) throw error;
-    adminProfileCache = data || await upsertProfileRecord(authUser, userFromAuthUser(authUser));
+    if (error) {
+      const fallback = fallbackAdminProfileFromAuthUser(authUser);
+      if (fallback) {
+        console.warn('[Admin] Perfil admin nao foi lido no Supabase; usando fallback por email conhecido.', error);
+        adminProfileCache = fallback;
+        return adminProfileCache;
+      }
+      throw error;
+    }
+
+    if (data) {
+      const fallbackRole = knownAdminRoleForEmail(data.email || authUser.email);
+      adminProfileCache = fallbackRole
+        ? { ...data, email: data.email || authUser.email || '', is_admin: true, admin_role: fallbackRole }
+        : data;
+      return adminProfileCache;
+    }
+
+    adminProfileCache = await safeUpsertProfileRecord(authUser, userFromAuthUser(authUser), 'perfil admin')
+      || fallbackAdminProfileFromAuthUser(authUser);
     return adminProfileCache;
   }
 
   async function isCurrentUserAdmin({ force = true } = {}) {
     const profile = await currentAdminProfile({ force });
-    return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
+    return Boolean(profile?.is_admin || knownAdminRoleForEmail(profile?.email) || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
   }
 
   async function loadProductsFromSupabase() {
@@ -4141,6 +4227,23 @@ document.addEventListener('DOMContentLoaded', () => {
       submitButton.classList.toggle('is-loading', busy);
     };
 
+    if (!qs('[data-clear-auth-session]', form.parentElement || document)) {
+      form.insertAdjacentHTML('beforebegin', `
+        <div class="auth-session-tools">
+          <button class="auth-inline-link" type="button" data-clear-auth-session>
+            Sair ou limpar sessao atual
+          </button>
+        </div>
+      `);
+    }
+
+    qs('[data-clear-auth-session]', form.parentElement || document)?.addEventListener('click', () => {
+      signOutEverywhere({ message: 'Sessao limpa. Entre novamente com o email correto.' });
+      if (emailInput) emailInput.value = '';
+      if (passInput) passInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+    });
+
     form.addEventListener('submit', async event => {
       event.preventDefault();
       const mode = form.dataset.authMode || 'login';
@@ -4205,6 +4308,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const user = userFromAuthUser(data.user);
           if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
           saveUser(user);
+          await safeUpsertProfileRecord(data.user, user, 'recuperacao de senha');
           finishLogin(user, 'Senha atualizada com sucesso.');
         } catch (error) {
           showToast(authFriendlyError(error, 'Não consegui atualizar a senha. Tente abrir o link novamente.'));
@@ -4238,8 +4342,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
           if (data.session?.user) {
             const user = userFromAuthUser(data.session.user);
-            await upsertProfileRecord(data.session.user, user);
             saveUser(user);
+            await safeUpsertProfileRecord(data.session.user, user, 'cadastro');
             sendWelcomeEmail(user);
             finishLogin(user, 'Conta criada com sucesso.');
           } else {
@@ -4253,8 +4357,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) throw error;
         const user = userFromAuthUser(data.session?.user);
         if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
-        await upsertProfileRecord(data.session.user, user);
         saveUser(user);
+        await safeUpsertProfileRecord(data.session.user, user, 'login');
         finishLogin(user, profileComplete(user) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.');
       } catch (error) {
         showToast(authFriendlyError(error, 'Não foi possível entrar. Confira os dados e tente novamente.'));
@@ -5071,15 +5175,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       qs('[data-switch-account]')?.addEventListener('click', () => {
-        window.location.href = loginHref({ redirect: 'perfil.html' });
+        signOutEverywhere({
+          redirect: loginHref({ redirect: 'perfil.html' }),
+          message: 'Sessao anterior encerrada. Entre com a outra conta.'
+        });
       });
 
       qs('[data-logout-account]')?.addEventListener('click', async () => {
-        const client = authClient();
-        if (client?.auth) await client.auth.signOut();
-        saveUser(null);
-        showToast('Você saiu da conta.');
-        setTimeout(() => window.location.href = profileHref(), 500);
+        await signOutEverywhere({
+          redirect: profileHref(),
+          message: 'Voce saiu da conta.'
+        });
       });
 
       document.body.addEventListener('click', async event => {
@@ -5176,8 +5282,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const savedUser = userFromAuthUser(data.user);
         if (!savedUser?.email) throw new Error('Perfil não retornado pelo Supabase.');
-        await upsertProfileRecord(data.user, savedUser);
         saveUser(savedUser);
+        await safeUpsertProfileRecord(data.user, savedUser, 'edicao de perfil');
         showToast('Perfil atualizado com segurança.');
         setTimeout(() => window.location.href = profileHref(), 500);
       } catch (error) {

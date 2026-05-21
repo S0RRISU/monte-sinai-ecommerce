@@ -376,10 +376,29 @@ create trigger pedidos_notify_status_change
 after update of status, pagamento_status, confirmado on public.pedidos
 for each row execute function public.notify_order_status_change();
 
+insert into public.profiles (id, email, nome, apelido, telefone, endereco, foto)
+select
+  u.id,
+  u.email,
+  coalesce(u.raw_user_meta_data->>'name', u.raw_user_meta_data->>'full_name', ''),
+  coalesce(u.raw_user_meta_data->>'nick', ''),
+  coalesce(u.raw_user_meta_data->>'phone', ''),
+  coalesce(u.raw_user_meta_data->>'address', ''),
+  coalesce(u.raw_user_meta_data->>'photo', u.raw_user_meta_data->>'avatar_url', '')
+from auth.users u
+where lower(u.email) in (
+  'marcelol527319@gmail.com',
+  'marcelol527319@gmail.co',
+  'patriciapaula01234@gmail.com',
+  'marcelo52731@gmail.com'
+)
+on conflict (id) do update
+set email = excluded.email;
+
 update public.profiles
 set is_admin = true,
     admin_role = 'developer'
-where lower(email) = 'marcelol527319@gmail.com';
+where lower(email) in ('marcelol527319@gmail.com', 'marcelol527319@gmail.co');
 
 update public.profiles
 set is_admin = true,

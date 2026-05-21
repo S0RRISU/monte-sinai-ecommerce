@@ -20279,6 +20279,17 @@ body.app-is-installed .auth-install-button {
   display: none !important;
 }
 
+.auth-session-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 14px;
+}
+
+.auth-session-tools .auth-inline-link {
+  color: var(--ms-gold);
+  font-weight: 900;
+}
+
 @media (max-width: 760px) {
   .navbar .nav-search,
   .navbar .nav-actions,
