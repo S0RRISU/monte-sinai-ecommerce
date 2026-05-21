@@ -18284,3 +18284,217 @@ body:not(.light-mode) .navbar {
     height: 50px !important;
   }
 }
+
+/* Profile photo fix: circular avatar, larger photo, no blue selected background. */
+@media (max-width: 760px) {
+  .mobile-quick-dock .dock-profile-link,
+  .mobile-quick-dock .dock-profile-link.active,
+  .mobile-quick-dock [data-dock-section="account"],
+  .mobile-quick-dock [data-dock-section="account"].active,
+  .mobile-quick-dock [data-dock-section="account"].has-photo,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active,
+  .mobile-quick-dock [data-dock-section="account"].active {
+    color: var(--dock-item-active-text) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar,
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    display: block !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    aspect-ratio: 1 / 1 !important;
+    overflow: hidden !important;
+    border: 2px solid color-mix(in srgb, var(--primary) 34%, #ffffff) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    box-shadow: 0 7px 16px rgba(0, 42, 110, 0.12) !important;
+    clip-path: circle(50% at 50% 50%) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+    border-color: color-mix(in srgb, var(--accent) 74%, #ffffff) !important;
+    background: transparent !important;
+    box-shadow: 0 9px 18px rgba(0, 42, 110, 0.14) !important;
+  }
+
+  .mobile-quick-dock .dock-account-avatar img,
+  .mobile-quick-dock .dock-profile-link .dock-account-avatar img,
+  .mobile-quick-dock [data-dock-section="account"] .dock-account-avatar img {
+    display: block !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    aspect-ratio: 1 / 1 !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    border-radius: 999px !important;
+    clip-path: circle(50% at 50% 50%) !important;
+  }
+}
+
+/* Profile avatar final lock: no clipping when selected. */
+@media (max-width: 760px) {
+  .mobile-quick-dock .dock-profile-link,
+  .mobile-quick-dock .dock-profile-link.active,
+  .mobile-quick-dock [data-dock-section="account"],
+  .mobile-quick-dock [data-dock-section="account"].active,
+  .mobile-quick-dock [data-dock-section="account"].has-photo,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo {
+    height: 92px !important;
+    min-height: 92px !important;
+    grid-template-rows: 60px 18px !important;
+    align-content: center !important;
+    overflow: visible !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar {
+    display: block !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    justify-self: center !important;
+    align-self: center !important;
+    overflow: hidden !important;
+    border: 2px solid color-mix(in srgb, var(--primary) 32%, #ffffff) !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    box-shadow: 0 8px 18px rgba(0, 42, 110, 0.12) !important;
+    clip-path: circle(50% at 50% 50%) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 56px !important;
+    min-width: 56px !important;
+    max-width: 56px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    border-color: color-mix(in srgb, var(--accent) 70%, #ffffff) !important;
+    background: transparent !important;
+    box-shadow: 0 9px 20px rgba(0, 42, 110, 0.15) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar img,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar img {
+    display: block !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    border-radius: 50% !important;
+    clip-path: circle(50% at 50% 50%) !important;
+  }
+}
+
+/* Profile avatar refined fit: larger, centered, and not clipped by the dock item. */
+@media (max-width: 760px) {
+  .mobile-quick-dock .dock-profile-link,
+  .mobile-quick-dock .dock-profile-link.active,
+  .mobile-quick-dock [data-dock-section="account"],
+  .mobile-quick-dock [data-dock-section="account"].active,
+  .mobile-quick-dock [data-dock-section="account"].has-photo,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo {
+    height: 90px !important;
+    min-height: 90px !important;
+    grid-template-rows: 58px 17px !important;
+    align-content: center !important;
+    justify-items: center !important;
+    gap: 3px !important;
+    overflow: visible !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar,
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+    border: 2px solid color-mix(in srgb, var(--primary) 30%, #ffffff) !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: 0 8px 18px rgba(0, 42, 110, 0.12) !important;
+    clip-path: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 54px !important;
+    min-width: 54px !important;
+    max-width: 54px !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    border-color: color-mix(in srgb, var(--accent) 66%, #ffffff) !important;
+    background: transparent !important;
+    box-shadow: 0 9px 20px rgba(0, 42, 110, 0.14) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar img,
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar img,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar img,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar img {
+    display: block !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    object-position: center center !important;
+    border-radius: 50% !important;
+    clip-path: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link .dock-profile-label,
+  .mobile-quick-dock [data-dock-section="account"] .dock-profile-label {
+    align-self: start !important;
+    line-height: 1.05 !important;
+  }
+}
