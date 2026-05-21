@@ -1,12 +1,23 @@
 .DS_Store
 Thumbs.db
 desktop.ini
+.env
 
 node_modules/
 dist/
 build/
 .netlify/
 tmp/
+.venv/
+generated/
+generated_test/
+generated_stability_test/
+!assets/generated/
+!assets/generated/v2/
+!assets/generated/v2/manifest.json
+__pycache__/
+*.pyc
 
 *.log
 *.tmp
+foto_produto*.jpg

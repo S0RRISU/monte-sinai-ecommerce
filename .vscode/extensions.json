@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "ms-vscode.live-server",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "github.vscode-pull-request-github",
+    "M455YN.task-runner-explorer"
+  ]
+}

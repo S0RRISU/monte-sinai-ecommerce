@@ -1,4 +1,47 @@
 {
-    "livePreview.defaultPreviewPath": "/html/index.html",
-    "codeiumEnterprise.portalUrl": "http://127.0.0.1:5500/pages/index.htmld"
+  "livePreview.defaultPreviewPath": "/index.html",
+  "livePreview.serverRoot": ".",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.exclude": {
+    ".venv/": true,
+    "tmp/": true,
+    "generated/": true,
+    "generated_test/": true,
+    "generated_stability_test/": true,
+    "node_modules/": true,
+    ".netlify/": true
+  },
+  "search.exclude": {
+    ".venv/": true,
+    "tmp/": true,
+    "generated/": true
+  },
+  "html.validate.scripts": true,
+  "html.validate.styles": true,
+  "javascript.validate.enable": true,
+  "css.validate": true,
+  "prettier.singleQuote": true,
+  "prettier.tabWidth": 2,
+  "prettier.printWidth": 120,
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }

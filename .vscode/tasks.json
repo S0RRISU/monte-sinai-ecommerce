@@ -1,0 +1,273 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Publicar site online (Netlify)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\publicar-netlify.ps1"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Gerar preview Netlify",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\publicar-netlify.ps1",
+        "-Preview"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Netlify: login",
+      "type": "shell",
+      "command": "npx.cmd",
+      "args": ["--yes", "netlify-cli", "login"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Netlify: vincular site",
+      "type": "shell",
+      "command": "npx.cmd",
+      "args": ["--yes", "netlify-cli", "link"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Netlify: login e vincular site",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Netlify: login", "Netlify: vincular site"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Instalar dependencias do gerador",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "pip", "install", "-r", "requirements.txt"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Gerar imagem teste (4 variacoes)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".\\gerar_foto.py",
+        "--object",
+        "generic unbranded cleaning product bottle, clean catalog packshot, pure white background, full product visible",
+        "--style",
+        "studio",
+        "--views",
+        "front,three_quarter",
+        "--count",
+        "4",
+        "--output-dir",
+        "generated",
+        "--base-name",
+        "teste-produto",
+        "--provider",
+        "pollinations",
+        "--model",
+        "flux",
+        "--width",
+        "900",
+        "--height",
+        "900"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Gerar imagens de um produto (IA)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".\\gerar_foto.py",
+        "--catalog",
+        "--products",
+        "${input:produtoSlug}",
+        "--provider",
+        "pollinations",
+        "--model",
+        "flux",
+        "--width",
+        "900",
+        "--height",
+        "900"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Gerar catalogo completo com IA",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".\\gerar_foto.py",
+        "--catalog",
+        "--provider",
+        "pollinations",
+        "--model",
+        "flux",
+        "--width",
+        "900",
+        "--height",
+        "900"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Otimizar imagens do site",
+      "type": "shell",
+      "command": "python",
+      "args": [".\\gerar_foto.py", "--optimize-assets"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Preparar showcase dos produtos",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\generate-product-showcase-assets.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Gerar artes de divulgacao",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\generate-marketing-assets.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Formatar arquivos",
+      "type": "shell",
+      "command": "npx.cmd",
+      "args": ["--yes", "prettier", "--write", "**/*.{html,css,js,json,md}"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Instalar editores de imagem gratuitos",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\install-free-dev-tools.ps1",
+        "-ImageEditorsOnly"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Instalar ferramentas base gratuitas",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\install-free-dev-tools.ps1",
+        "-SkipImageEditors"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "produtoSlug",
+      "type": "promptString",
+      "description": "Produto para gerar, exemplo: gas, agua, detergente, vassoura",
+      "default": "gas"
+    }
+  ]
+}

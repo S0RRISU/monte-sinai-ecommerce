@@ -136,6 +136,8 @@ as $$
 declare
   caller_id uuid := auth.uid();
   new_order_id uuid;
+  existing_order public.pedidos%rowtype;
+  existing_phone text;
   item jsonb;
   item_count integer;
   item_product_id uuid;
@@ -185,6 +187,30 @@ begin
   item_count := jsonb_array_length(items_payload);
   if item_count = 0 or item_count > 80 then
     raise exception 'Quantidade de itens do pedido invalida.';
+  end if;
+
+  select *
+  into existing_order
+  from public.pedidos
+  where upper(codigo) = upper(order_code)
+  for update;
+
+  if found then
+    existing_phone := regexp_replace(coalesce(existing_order.cliente_telefone, ''), '\D', '', 'g');
+    if existing_phone <> customer_phone then
+      raise exception 'Codigo de pedido ja existe para outro telefone.';
+    end if;
+
+    return jsonb_build_object(
+      'order_id', existing_order.id,
+      'codigo', existing_order.codigo,
+      'subtotal', existing_order.subtotal,
+      'desconto', existing_order.desconto,
+      'entrega', existing_order.entrega,
+      'total', existing_order.total,
+      'cliente_tipo', existing_order.cliente_tipo,
+      'idempotent', true
+    );
   end if;
 
   perform set_config('monte_sinai.skip_stock_trigger', 'true', true);

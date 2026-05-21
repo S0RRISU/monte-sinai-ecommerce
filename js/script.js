@@ -35,13 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const DEFAULT_SITE_CONFIG = {
     storeName: 'Monte Sinai',
     footerDescription: 'Água, gás e produtos de limpeza para sua casa.',
-    logoUrl: 'assets/brand/monte-sinai-logo-3d.png',
+    logoUrl: 'assets/brand/v2/monte-sinai-logo-v2.png',
     accentColor: '#008cff',
     heroEyebrow: 'Entrega rápida, segura e local',
     heroTitle: 'Monte Sinai leva água, gás e produtos de limpeza até você.',
     heroText: 'Escolha os produtos, monte o carrinho, entre com sua conta e finalize com pagamento na entrega ou atendimento pelo WhatsApp.',
     heroButton: 'Comprar agora',
-    heroImage: 'assets/hero/hero-site-3d.png',
+    heroImage: 'assets/hero/v2/hero-site-3d-v2.png',
     announcementActive: false,
     announcement: 'Entrega rápida hoje para água, gás e limpeza.',
     catalogTitle: 'Essenciais para abastecer e cuidar da casa',
@@ -1607,9 +1607,51 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFullCatalogPage();
     renderPromotionsPage();
     renderDynamicProductRail();
+    injectProductJsonLd();
     optimizeImageLoading();
+    applyCatalogHashFilter(false);
     applyCatalogFilters();
     renderSmartSearchResults(qs('[data-smart-search-input]')?.value || '');
+  }
+
+  function injectProductJsonLd() {
+    const page = currentPage();
+    if (!['index.html', 'produtos.html', 'catalogo.html', 'promocoes.html'].includes(page)) return;
+
+    const products = storeProducts().slice(0, 80).map(product => {
+      const normalized = normalizeProduct(product);
+      const image = productAssetPath(normalized);
+      return {
+        '@type': 'Product',
+        name: normalized.name,
+        description: normalized.description || `Produto de ${normalized.category}.`,
+        category: normalized.category,
+        sku: normalized.id || normalized.name,
+        image: image ? new URL(assetHref(image), window.location.href).href : undefined,
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: 'BRL',
+          price: Number(normalized.price || 0).toFixed(2),
+          availability: normalized.stockState === 'out'
+            ? 'https://schema.org/OutOfStock'
+            : 'https://schema.org/InStock',
+          url: new URL(productHref(normalized.name), window.location.href).href
+        }
+      };
+    });
+
+    if (!products.length) return;
+    let script = qs('#monte-sinai-products-jsonld');
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'monte-sinai-products-jsonld';
+      script.type = 'application/ld+json';
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': products
+    });
   }
 
   function searchTokens(value) {
@@ -1959,38 +2001,38 @@ document.addEventListener('DOMContentLoaded', () => {
   function productAssetFallback(productName) {
     const name = normalizeText(productName);
     const images = [
-      ['agua', 'assets/produtos/agua-mineral-20l.png'],
-      ['gas', 'assets/produtos/gas-p13.png'],
-      ['alcool', 'assets/produtos/alcool-perfumado.png'],
-      ['amaciante', 'assets/produtos/amaciante-2l.png'],
-      ['candida colorida', 'assets/produtos/candida-colorida.png'],
-      ['candida', 'assets/produtos/candida-2l.png'],
-      ['cloro 1', 'assets/produtos/cloro-1l.png'],
-      ['cloro 2', 'assets/produtos/cloro-2l.png'],
-      ['detergente', 'assets/produtos/detergente-2l.png'],
-      ['desinfetante', 'assets/produtos/desinfetante-2l.png'],
-      ['limpa aluminio', 'assets/produtos/limpa-aluminio.png'],
-      ['limpa pedra 500', 'assets/produtos/limpa-pedra-500ml.png'],
-      ['limpa pedra', 'assets/produtos/limpa-pedra-2l.png'],
-      ['sabao de coco', 'assets/produtos/sabao-coco.png'],
-      ['sabao omo', 'assets/produtos/sabao-omo.png'],
-      ['sabonete', 'assets/produtos/sabonete-liquido.png'],
-      ['escova de roupa', 'assets/produtos/escova-roupa.png'],
-      ['escova de vaso', 'assets/produtos/escova-vaso.png'],
-      ['esponja de aco', 'assets/produtos/esponja-aco.png'],
-      ['esponja de louca', 'assets/produtos/esponja-louca.png'],
-      ['esponjao', 'assets/produtos/esponjao.png'],
-      ['bombril', 'assets/produtos/bombril.png'],
-      ['pasta de brilho', 'assets/produtos/pasta-brilho.png'],
-      ['pedra de vaso', 'assets/produtos/pedra-vaso.png'],
-      ['prendedor de madeira', 'assets/produtos/prendedor-madeira.png'],
-      ['prendedor plastico', 'assets/produtos/prendedor-plastico.png'],
-      ['rodo grande', 'assets/produtos/rodo-grande.png'],
-      ['rodo pequeno', 'assets/produtos/rodo-pequeno.png'],
-      ['rodinho', 'assets/produtos/rodinho-pia.png'],
-      ['saco de lixo', 'assets/produtos/saco-lixo.png'],
-      ['vassoura', 'assets/produtos/vassoura.png'],
-      ['pa', 'assets/produtos/pa.png']
+      ['agua', 'assets/produtos/v2/agua-mineral-20l.png'],
+      ['gas', 'assets/produtos/v2/gas-p13.png'],
+      ['alcool', 'assets/produtos/v2/alcool-perfumado.png'],
+      ['amaciante', 'assets/produtos/v2/amaciante-2l.png'],
+      ['candida colorida', 'assets/produtos/v2/candida-colorida.png'],
+      ['candida', 'assets/produtos/v2/candida-2l.png'],
+      ['cloro 1', 'assets/produtos/v2/cloro-1l.png'],
+      ['cloro 2', 'assets/produtos/v2/cloro-2l.png'],
+      ['detergente', 'assets/produtos/v2/detergente-2l.png'],
+      ['desinfetante', 'assets/produtos/v2/desinfetante-2l.png'],
+      ['limpa aluminio', 'assets/produtos/v2/limpa-aluminio.png'],
+      ['limpa pedra 500', 'assets/produtos/v2/limpa-pedra-500ml.png'],
+      ['limpa pedra', 'assets/produtos/v2/limpa-pedra-2l.png'],
+      ['sabao de coco', 'assets/produtos/v2/sabao-coco.png'],
+      ['sabao omo', 'assets/produtos/v2/sabao-omo.png'],
+      ['sabonete', 'assets/produtos/v2/sabonete-liquido.png'],
+      ['escova de roupa', 'assets/produtos/v2/escova-roupa.png'],
+      ['escova de vaso', 'assets/produtos/v2/escova-vaso.png'],
+      ['esponja de aco', 'assets/produtos/v2/esponja-aco.png'],
+      ['esponja de louca', 'assets/produtos/v2/esponja-louca.png'],
+      ['esponjao', 'assets/produtos/v2/esponjao.png'],
+      ['bombril', 'assets/produtos/v2/bombril.png'],
+      ['pasta de brilho', 'assets/produtos/v2/pasta-brilho.png'],
+      ['pedra de vaso', 'assets/produtos/v2/pedra-vaso.png'],
+      ['prendedor de madeira', 'assets/produtos/v2/prendedor-madeira.png'],
+      ['prendedor plastico', 'assets/produtos/v2/prendedor-plastico.png'],
+      ['rodo grande', 'assets/produtos/v2/rodo-grande.png'],
+      ['rodo pequeno', 'assets/produtos/v2/rodo-pequeno.png'],
+      ['rodinho', 'assets/produtos/v2/rodinho-pia.png'],
+      ['saco de lixo', 'assets/produtos/v2/saco-lixo.png'],
+      ['vassoura', 'assets/produtos/v2/vassoura.png'],
+      ['pa', 'assets/produtos/v2/pa.png']
     ];
 
     return images.find(([term]) => name.includes(term))?.[1] || '';
@@ -2193,9 +2235,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function activateCatalogFilter(filter = 'all') {
-    qsa('[data-filter]').forEach(chip => {
-      chip.classList.toggle('active', chip.dataset.filter === filter);
+    const chips = qsa('[data-filter]');
+    const target = chips.some(chip => chip.dataset.filter === filter) ? filter : 'all';
+    chips.forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.filter === target);
     });
+    return target;
+  }
+
+  function catalogFilterFromHash(hash = location.hash) {
+    const slug = categorySlug(decodeURIComponent(String(hash || '').replace(/^#/, '')));
+    if (!slug || ['todos-produtos', 'todos', 'catalogo', 'produtos'].includes(slug)) return 'all';
+    if (['aguas', 'agua-mineral', 'agua-minerais'].includes(slug)) return 'agua';
+    if (['gases', 'gas-de-cozinha'].includes(slug)) return 'gas';
+    if (['oferta', 'ofertas', 'promocoes', 'promocao'].includes(slug)) return 'ofertas';
+    if (['kit', 'kits'].includes(slug)) return 'kits';
+    if (slug === 'recomendados') return 'recommended';
+    return slug;
+  }
+
+  function applyCatalogHashFilter(shouldApplyFilters = true) {
+    if (currentPage() !== 'produtos.html' || !location.hash) return false;
+    const filter = catalogFilterFromHash(location.hash);
+    activateCatalogFilter(filter);
+    if (shouldApplyFilters) applyCatalogFilters();
+    return true;
   }
 
   function updateCatalogSearchURL(term) {
@@ -2415,9 +2479,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const clean = String(src).trim().replaceAll('\\', '/').replace(/^\/+/, '');
     if (!clean) return '';
     if (clean.includes('assets/')) return canonicalAssetPath(clean);
-    if (clean.startsWith('produtos/')) return `assets/${clean}`;
-    if (clean.startsWith('site/')) return `assets/produtos/${clean}`;
-    if (/\.(png|jpe?g|webp|svg|gif)$/i.test(clean)) return `assets/produtos/${clean}`;
+    if (clean.startsWith('produtos/v2/')) return `assets/${clean}`;
+    if (clean.startsWith('produtos/')) return `assets/produtos/v2/${clean.replace(/^produtos\//, '')}`;
+    if (clean.startsWith('site/v2/')) return `assets/produtos/${clean}`;
+    if (clean.startsWith('site/')) return `assets/produtos/site/v2/${clean.replace(/^site\//, '')}`;
+    if (/\.(png|jpe?g|webp|svg|gif)$/i.test(clean)) return `assets/produtos/v2/${clean}`;
 
     const fallback = productAssetFallback(productName || clean);
     return fallback || clean;
@@ -3673,8 +3739,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
           </select>
         ` : ''}
-        <strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
-        <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>${outOfStock ? 'Indisponivel' : 'Adicionar'}</button>
+        <strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <div class="product-card-actions">
+          ${outOfStock
+            ? '<button disabled class="btn btn-esgotado" type="button">Esgotado</button>'
+            : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">Adicionar</button>`}
+          <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
+            Ver detalhes
+          </button>
+        </div>
       </article>
     `;
   }
@@ -3856,11 +3929,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
             </select>
           ` : ''}
-          <strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
-          <button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>
-            <i class="fa-solid fa-cart-plus"></i>
-            Adicionar
-          </button>
+          <strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+          ${outOfStock
+            ? `<button disabled class="btn btn-esgotado" type="button">
+                <i class="fa-solid fa-ban"></i>
+                Esgotado
+              </button>`
+            : `<span class="catalog-availability-note">
+                <i class="fa-solid fa-circle-check"></i>
+                Disponivel na loja
+              </span>`}
           <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
             <i class="fa-solid fa-circle-info"></i>
             Ver detalhes
@@ -3982,6 +4060,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
+    const catalogOnly = currentPage() === 'catalogo.html';
 
     if (body) {
       body.innerHTML = `
@@ -4001,7 +4080,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
             <div><span>Estoque</span><strong>${escapeHTML(stockText)}</strong></div>
             <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
           </div>
@@ -4014,10 +4093,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </label>
           ` : ''}
           <div class="catalog-detail-actions">
-            ${outOfStock ? '' : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
+            ${outOfStock ? `<button disabled class="btn btn-esgotado" type="button">
+              <i class="fa-solid fa-ban"></i>
+              Esgotado
+            </button>` : (catalogOnly ? `<span class="catalog-availability-note catalog-detail-note">
+              <i class="fa-solid fa-circle-check"></i>
+              Disponivel para comprar na loja
+            </span>` : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
               <i class="fa-solid fa-cart-plus"></i>
               Adicionar ao carrinho
-            </button>`}
+            </button>`)}
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
               <i class="fa-solid fa-store"></i>
               Ver na loja
@@ -4075,6 +4160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialQuery = params.get('q') || '';
     if (input && initialQuery) input.value = initialQuery;
     if (initialQuery) activateCatalogFilter('all');
+    else applyCatalogHashFilter(false);
 
     input?.addEventListener('input', () => {
       if (input.value.trim()) activateCatalogFilter('all');
@@ -4088,8 +4174,13 @@ document.addEventListener('DOMContentLoaded', () => {
       applyCatalogFilters();
     });
 
+    window.addEventListener('hashchange', () => {
+      if (!applyCatalogHashFilter(true)) return;
+      scrollCatalogToTop('smooth');
+    });
+
     applyCatalogFilters();
-    if (initialQuery || location.hash === '#todos-produtos') {
+    if (initialQuery || location.hash) {
       setTimeout(() => scrollCatalogToTop('auto'), 80);
     }
   }
@@ -4156,6 +4247,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('click', event => {
       const button = event.target.closest('.btn-add-cart');
       if (!button) {
+        const detailButton = event.target.closest('[data-catalog-detail]');
+        if (detailButton) {
+          event.preventDefault();
+          openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+          return;
+        }
+
         const cardDetail = event.target.closest('.catalog-product');
         if (!cardDetail || event.target.closest('button, select, input, label, a')) return;
         openCatalogDetailModal(cardDetail.dataset.catalogDetailKey || cardDetail.dataset.productId || cardDetail.dataset.name);
@@ -5027,7 +5125,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Dados liberados para edição neste pedido.');
     });
 
-    qs('#payment-confirm')?.addEventListener('click', finalizeOrder);
+    qs('#payment-confirm')?.addEventListener('click', finalizarPedido);
 
     renderPaymentSummary();
     applyCheckoutProfile();
@@ -5188,7 +5286,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return customer;
   }
 
-  async function finalizeOrder() {
+  async function finalizarPedido() {
     if (!cart.length) {
       showToast('Seu carrinho está vazio.');
       return;
@@ -5251,7 +5349,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    openWhatsAppOrder(order);
+    dispararWhatsApp({
+      nome_cliente: order.customer.name,
+      forma_pagamento: order.payment,
+      total: order.total
+    }, order.uuid || order.id);
     cart = [];
     saveCart();
     renderCart();
@@ -5278,6 +5380,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Pedido finalizado.');
   }
 
+  async function finalizeOrder() {
+    return finalizarPedido();
+  }
+
   function createOrderId() {
     const date = new Date().toISOString().slice(2, 10).replaceAll('-', '');
     const random = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -5299,6 +5405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const saved = await saveOrderThroughRpc(order);
+    if (saved?.order_id) order.uuid = saved.order_id;
     if (saved?.codigo) order.id = saved.codigo;
     if (Number.isFinite(Number(saved?.subtotal))) order.subtotal = Number(saved.subtotal);
     if (Number.isFinite(Number(saved?.desconto))) order.discount = Number(saved.desconto);
@@ -5354,9 +5461,62 @@ document.addEventListener('DOMContentLoaded', () => {
     return data || {};
   }
 
+  function orderKeyCandidates(order = {}) {
+    const values = [
+      order.uuid,
+      order.order_id,
+      order.pedido_id,
+      order.codigo,
+      order.id
+    ];
+    return values
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+      .map(value => value.toLowerCase());
+  }
+
+  function orderHasRemoteIdentity(order = {}) {
+    return isUUID(order.uuid || order.order_id || order.pedido_id || '');
+  }
+
+  function preferredOrder(nextOrder, currentOrder) {
+    if (!currentOrder) return nextOrder;
+    const nextRemote = orderHasRemoteIdentity(nextOrder);
+    const currentRemote = orderHasRemoteIdentity(currentOrder);
+    if (nextRemote !== currentRemote) return nextRemote ? nextOrder : currentOrder;
+
+    const nextTime = new Date(nextOrder.createdAt || nextOrder.created_at || 0).getTime();
+    const currentTime = new Date(currentOrder.createdAt || currentOrder.created_at || 0).getTime();
+    return nextTime >= currentTime ? nextOrder : currentOrder;
+  }
+
+  function dedupeOrders(orders = []) {
+    const visible = [];
+    const keyIndex = new Map();
+
+    orders.filter(Boolean).forEach(order => {
+      const keys = orderKeyCandidates(order);
+      const existingIndex = keys.map(key => keyIndex.get(key)).find(index => Number.isInteger(index));
+      if (Number.isInteger(existingIndex)) {
+        visible[existingIndex] = preferredOrder(order, visible[existingIndex]);
+        orderKeyCandidates(visible[existingIndex]).forEach(key => keyIndex.set(key, existingIndex));
+        return;
+      }
+
+      const nextIndex = visible.length;
+      visible.push(order);
+      keys.forEach(key => keyIndex.set(key, nextIndex));
+    });
+
+    return visible;
+  }
+
+  function loadLocalOrders() {
+    return dedupeOrders(loadJSON(STORAGE.orders, []).map(trackedOrderFromPayload));
+  }
+
   function saveOrderLocally(order) {
-    const orders = loadJSON(STORAGE.orders, []);
-    orders.unshift(order);
+    const orders = dedupeOrders([trackedOrderFromPayload(order), ...loadLocalOrders()]);
     saveJSON(STORAGE.orders, orders.slice(0, 20));
   }
 
@@ -5604,6 +5764,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openWhatsAppOrder(order) {
     window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}`, '_blank');
+  }
+
+  function dispararWhatsApp(dadosPedido, idDoBanco) {
+    const shortId = String(idDoBanco || '')
+      .replace(/[^a-z0-9]/gi, '')
+      .substring(0, 5)
+      .toUpperCase() || 'NOVO';
+    const mensagem = `Olá! Fiz um pedido no site da Monte Sinai.
+*Código do Pedido:* #${shortId}
+*Nome:* ${dadosPedido.nome_cliente}
+*Forma de Pagamento:* ${dadosPedido.forma_pagamento}
+*Total:* R$ ${Number(dadosPedido.total || 0).toFixed(2).replace('.', ',')}
+
+Obrigado! Aguardo a confirmação pelo painel.`;
+
+    window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(mensagem)}`, '_blank');
   }
 
   function buildOrderUpdateMessage(order) {
@@ -7854,8 +8030,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadOrdersFromSupabase({ force = false } = {}) {
     const client = ordersClient();
-    if (!client) return loadJSON(STORAGE.orders, []);
-    if (remoteOrdersLoaded && !force) return remoteOrdersCache;
+    if (!client) return loadLocalOrders();
+    if (remoteOrdersLoaded && !force) return dedupeOrders(remoteOrdersCache);
 
     try {
       await authReady.catch(() => null);
@@ -7877,12 +8053,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (error) throw error;
-      remoteOrdersCache = (data || []).map(mapSupabaseOrder);
+      remoteOrdersCache = dedupeOrders((data || []).map(mapSupabaseOrder));
       remoteOrdersLoaded = true;
       return remoteOrdersCache;
     } catch (error) {
       console.warn('[Supabase] Nao foi possivel carregar pedidos. Usando cache local.', error);
-      return loadJSON(STORAGE.orders, []);
+      return loadLocalOrders();
     }
   }
 
@@ -7939,9 +8115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function rememberTrackedOrder(order) {
     if (!order?.id) return;
-    const orders = loadJSON(STORAGE.orders, []);
-    const next = [order, ...orders.filter(item => item.id !== order.id)].slice(0, 20);
-    saveJSON(STORAGE.orders, next);
+    saveOrderLocally(order);
   }
 
   function orderBelongsToCurrentUser(order) {
@@ -8044,7 +8218,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function renderOrdersEverywhere(options = {}) {
-    const orders = await loadOrdersFromSupabase(options);
+    const orders = dedupeOrders(await loadOrdersFromSupabase(options));
     const customerOrders = currentUser?.email
       ? orders.filter(orderBelongsToCurrentUser)
       : [];
@@ -8151,7 +8325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     const isProfileHistory = container.id === 'profile-orders';
     const isCustomerOrdersPage = container.id === 'customer-orders-list';
-    const isAdminOrders = container.id === 'orders-list';
+    const isAdminOrders = false;
     container.innerHTML = '';
 
     if (isProfileHistory) {

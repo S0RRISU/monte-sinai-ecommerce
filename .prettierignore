@@ -1,0 +1,13 @@
+.git
+.netlify
+.venv
+node_modules
+tmp
+generated
+generated_test
+generated_stability_test
+assets/**/*.png
+assets/**/*.jpg
+assets/**/*.jpeg
+assets/**/*.webp
+assets/**/*.gif

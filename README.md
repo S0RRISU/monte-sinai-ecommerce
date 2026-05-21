@@ -94,3 +94,31 @@ O projeto inclui imagens em `assets/hero`, `assets/brand` e `assets/produtos`. P
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\generate-marketing-assets.ps1
 ```
+
+Para gerar imagens avulsas ou atualizar o catalogo de produtos com IA, instale as dependencias e use o gerador unico:
+
+```powershell
+python -m pip install -r requirements.txt
+python .\gerar_foto.py --object "generic 3d product" --style 3d --views front,three_quarter --output-dir generated --base-name produto3d
+python .\gerar_foto.py --catalog --provider pollinations --brand-aware
+```
+
+O modo `--catalog` grava por padrao em `assets/produtos/v2`, copia a versao de vitrine para `assets/produtos/site/v2` e atualiza `assets/generated/v2/manifest.json`. Para aplicar o manifest nas paginas, rode:
+
+```powershell
+python .\tools\update_asset_refs.py --write --check
+```
+
+O gerador tambem aceita `--model`, `--negative`, `--padding`, `--private`, `--legacy-output` e cria um `*_preview.png` quando voce gera varias variacoes. Para reduzir o peso das imagens existentes, rode:
+
+```powershell
+python .\gerar_foto.py --optimize-assets
+```
+
+Veja `GUIA-DESENVOLVEDOR.md` para a rotina recomendada no VS Code.
+
+## Publicar pelo VS Code
+
+O projeto inclui a task **Publicar site online (Netlify)** em `.vscode/tasks.json`. No primeiro uso, rode a task **Netlify: login e vincular site** para entrar na sua conta e ligar esta pasta ao site correto. Depois disso, basta rodar **Publicar site online (Netlify)** para enviar a versao atual para producao.
+
+Para ter um botao visual no VS Code, instale a extensao recomendada **Task Runner Explorer**. Ela mostra as tasks do workspace para execucao rapida.

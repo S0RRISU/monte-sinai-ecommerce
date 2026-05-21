@@ -2,43 +2,47 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Catalogo completo Monte Sinai com produtos, quantidades em estoque e itens indisponiveis.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="description" content="Catálogo completo Monte Sinai com produtos, quantidades em estoque e itens indisponíveis.">
   <meta name="theme-color" content="#00061f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
   <meta name="color-scheme" content="dark light">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://monte-sinai.netlify.app/catalogo">
   <meta property="og:url" content="https://monte-sinai.netlify.app/catalogo">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Catalogo | Monte Sinai">
-  <meta property="og:description" content="Veja todos os produtos da Monte Sinai, estoque atual e itens indisponiveis.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/hero-banner.png">
-  <title>Catalogo | Monte Sinai</title>
+  <meta property="og:title" content="Catálogo | Monte Sinai">
+  <meta property="og:description" content="Veja todos os produtos da Monte Sinai, estoque atual e itens indisponíveis.">
+  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
+  <title>Catálogo | Monte Sinai</title>
   <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/monte-sinai-logo-3d.png">
-  <link rel="apple-touch-icon" href="../assets/brand/monte-sinai-logo-3d.png">
+  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
+  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260521-30">
+  <link rel="stylesheet" href="../css/style.css?v=20260521-37">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260521-34"></script>
+  <script defer src="../js/script.js?v=20260521-36"></script>
 </head>
 <body>
   <header class="navbar">
     <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - inicio">
-        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
+      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
       </a>
-      <nav class="nav-menu" aria-label="Navegacao principal">
-        <a href="../index.html">Inicio</a>
+      <nav class="nav-menu" aria-label="Navegação principal">
+        <a href="../index.html">Início</a>
         <a href="produtos.html">Produtos</a>
         <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catalogo</a>
-        <a href="promocoes.html">Promocoes</a>
+        <a href="catalogo.html">Catálogo</a>
+        <a href="promocoes.html">Promoções</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
       </nav>
@@ -49,11 +53,11 @@
   </header>
 
   <div class="mobile-menu">
-    <a href="../index.html">Inicio</a>
+    <a href="../index.html">Início</a>
     <a href="produtos.html">Produtos</a>
     <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-    <a href="catalogo.html">Catalogo</a>
-    <a href="promocoes.html">Promocoes</a>
+    <a href="catalogo.html">Catálogo</a>
+    <a href="promocoes.html">Promoções</a>
     <a href="sobre.html">Sobre</a>
     <a href="contato.html">Contato</a>
   </div>
@@ -61,13 +65,13 @@
   <main class="container catalog-page">
     <section class="hero hero-small catalog-hero">
       <div class="hero-copy">
-        <span class="eyebrow">Catalogo completo</span>
+        <span class="eyebrow">Catálogo completo</span>
         <h1>Todos os produtos da loja</h1>
-        <p>Consulte produtos, precos, ofertas e disponibilidade antes de comprar. Toque em um item para ver os detalhes.</p>
+        <p>Consulte produtos, preços, ofertas e disponibilidade antes de comprar. Toque em um item para ver os detalhes.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#catalogo-completo">
             <i class="fa-solid fa-list-check"></i>
-            Consultar catalogo
+            Consultar catálogo
           </a>
           <a class="btn btn-secondary" href="produtos.html#todos-produtos">
             <i class="fa-solid fa-store"></i>
@@ -77,17 +81,17 @@
       </div>
     </section>
 
-    <section class="catalog-dashboard" aria-label="Resumo do catalogo">
+    <section class="catalog-dashboard" aria-label="Resumo do catálogo">
       <article>
-        <span>Total no catalogo</span>
+        <span>Total no catálogo</span>
         <strong data-full-catalog-total>0</strong>
       </article>
       <article>
-        <span>Disponiveis</span>
+        <span>Disponíveis</span>
         <strong data-full-catalog-available>0</strong>
       </article>
       <article>
-        <span>Indisponiveis</span>
+        <span>Indisponíveis</span>
         <strong data-full-catalog-out>0</strong>
       </article>
     </section>
@@ -96,19 +100,19 @@
       <div class="full-catalog-toolbar">
         <form class="full-catalog-search" role="search" data-full-catalog-form>
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-          <input type="search" data-full-catalog-search placeholder="Buscar no catalogo" aria-label="Buscar no catalogo">
+          <input type="search" data-full-catalog-search placeholder="Buscar no catálogo" aria-label="Buscar no catálogo">
         </form>
-        <div class="full-catalog-filters" role="group" aria-label="Filtros do catalogo">
+        <div class="full-catalog-filters" role="group" aria-label="Filtros do catálogo">
           <button class="active" type="button" data-full-catalog-filter="all">Todos</button>
-          <button type="button" data-full-catalog-filter="available">Disponiveis</button>
-          <button type="button" data-full-catalog-filter="out">Indisponiveis</button>
+          <button type="button" data-full-catalog-filter="available">Disponíveis</button>
+          <button type="button" data-full-catalog-filter="out">Indisponíveis</button>
           <button type="button" data-full-catalog-filter="low">Estoque baixo</button>
           <button type="button" data-full-catalog-filter="offers">Ofertas</button>
           <button type="button" data-full-catalog-filter="kits">Kits</button>
         </div>
       </div>
 
-      <p class="catalog-results" data-full-catalog-results>Carregando catalogo...</p>
+      <p class="catalog-results" data-full-catalog-results>Carregando catálogo...</p>
       <div class="full-catalog-list" data-full-catalog-list></div>
       <p class="empty-cart hidden" data-full-catalog-empty>Nenhum produto encontrado neste filtro.</p>
     </section>
@@ -118,14 +122,14 @@
     <div class="container footer-inner">
       <div>
         <h3>Monte Sinai</h3>
-        <p>Agua, gas e produtos de limpeza para sua casa.</p>
+        <p>água, gás e produtos de limpeza para sua casa.</p>
       </div>
       <div class="footer-links">
-        <a href="../index.html">Inicio</a>
+        <a href="../index.html">Início</a>
         <a href="produtos.html">Produtos</a>
         <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catalogo</a>
-        <a href="promocoes.html">Promocoes</a>
+        <a href="catalogo.html">Catálogo</a>
+        <a href="promocoes.html">Promoções</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
       </div>

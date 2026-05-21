@@ -2,40 +2,44 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Acompanhe seus pedidos Monte Sinai, veja status de entrega e consulte atualizacoes pelo codigo do pedido.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="description" content="Acompanhe seus pedidos Monte Sinai, veja status de entrega e consulte atualizações pelo código do pedido.">
   <meta name="theme-color" content="#00061f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
   <meta name="color-scheme" content="dark light">
   <meta name="robots" content="noindex, nofollow">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Monte Sinai">
   <meta property="og:title" content="Meus Pedidos | Monte Sinai">
-  <meta property="og:description" content="Veja o andamento dos pedidos e acompanhe as atualizacoes feitas pela loja.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/hero-banner.png">
+  <meta property="og:description" content="Veja o andamento dos pedidos e acompanhe as atualizações feitas pela loja.">
+  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
   <title>Meus Pedidos | Monte Sinai</title>
   <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/monte-sinai-logo-3d.png">
-  <link rel="apple-touch-icon" href="../assets/brand/monte-sinai-logo-3d.png">
+  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
+  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260521-30">
+  <link rel="stylesheet" href="../css/style.css?v=20260521-37">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260521-34"></script>
+  <script defer src="../js/script.js?v=20260521-36"></script>
 </head>
 <body>
   <header class="navbar">
     <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - inicio">
-        <img class="brand-logo" src="../assets/brand/monte-sinai-logo-3d.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
+      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
       </a>
-      <nav class="nav-menu" aria-label="Navegacao principal">
-        <a href="../index.html">Inicio</a>
+      <nav class="nav-menu" aria-label="Navegação principal">
+        <a href="../index.html">Início</a>
         <a href="produtos.html">Produtos</a>
         <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catalogo</a>
+        <a href="catalogo.html">Catálogo</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
       </nav>
@@ -46,10 +50,10 @@
   </header>
 
   <div class="mobile-menu">
-    <a href="../index.html">Inicio</a>
+    <a href="../index.html">Início</a>
     <a href="produtos.html">Produtos</a>
     <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-    <a href="catalogo.html">Catalogo</a>
+    <a href="catalogo.html">Catálogo</a>
     <a href="sobre.html">Sobre</a>
     <a href="contato.html">Contato</a>
   </div>
@@ -77,9 +81,9 @@
       <article class="settings-section customer-orders-panel">
         <div class="admin-section-head">
           <div>
-            <span class="eyebrow">Historico</span>
+            <span class="eyebrow">Histórico</span>
             <h2><i class="fa-solid fa-clipboard-list"></i> Pedidos vinculados ao cliente</h2>
-            <p>Clientes logados veem os pedidos salvos no Supabase. Visitantes veem o historico deste aparelho.</p>
+            <p>Clientes logados veem os pedidos salvos no Supabase. Visitantes veem o histórico deste aparelho.</p>
           </div>
           <a class="btn btn-secondary" href="login.html?redirect=pedidos.html" data-orders-login>
             <i class="fa-solid fa-right-to-bracket"></i>
@@ -91,14 +95,14 @@
 
       <article class="settings-section track-order-panel">
         <div class="section-head">
-          <span class="eyebrow">Consulta rapida</span>
-          <h2><i class="fa-solid fa-magnifying-glass-location"></i> Acompanhar por codigo</h2>
-          <p>Use o codigo do pedido e o WhatsApp usado na compra para buscar o status direto no Supabase.</p>
+          <span class="eyebrow">Consulta rápida</span>
+          <h2><i class="fa-solid fa-magnifying-glass-location"></i> Acompanhar por código</h2>
+          <p>Use o código do pedido e o WhatsApp usado na compra para buscar o status direto no Supabase.</p>
         </div>
         <form class="checkout-form track-order-form" id="track-order-form">
           <div class="form-grid-2">
             <div class="form-group">
-              <label for="track-order-code">Codigo do pedido</label>
+              <label for="track-order-code">Código do pedido</label>
               <input id="track-order-code" name="codigo" type="text" placeholder="MS-260521-ABC123" autocomplete="off">
             </div>
             <div class="form-group">
@@ -121,13 +125,13 @@
     <div class="container footer-inner">
       <div>
         <h3>Monte Sinai</h3>
-        <p>Agua, gas e produtos de limpeza para sua casa.</p>
+        <p>água, gás e produtos de limpeza para sua casa.</p>
       </div>
       <div class="footer-links">
-        <a href="../index.html">Inicio</a>
+        <a href="../index.html">Início</a>
         <a href="produtos.html">Produtos</a>
         <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catalogo</a>
+        <a href="catalogo.html">Catálogo</a>
         <a href="sobre.html">Sobre</a>
         <a href="contato.html">Contato</a>
       </div>

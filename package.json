@@ -1,0 +1,12 @@
+{
+  "name": "monte-sinai-static-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static Monte Sinai storefront checks.",
+  "scripts": {
+    "check:js": "node --check js/script.js && node --check js/admin.js",
+    "check:python": "python -m py_compile gerar_foto.py tools/update_asset_refs.py",
+    "check:assets": "python tools/update_asset_refs.py --check",
+    "test": "npm run check:js && npm run check:python && npm run check:assets"
+  }
+}
