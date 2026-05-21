@@ -16666,6 +16666,395 @@ body.cart-open .app-install-banner {
   }
 }
 
+/* Final responsive alignment pass for admin, nav and profile surfaces. */
+@media (min-width: 1101px) {
+  .navbar {
+    min-height: 104px !important;
+  }
+
+  .navbar .nav-inner {
+    display: grid !important;
+    width: min(1840px, calc(100vw - 56px)) !important;
+    min-height: 104px !important;
+    grid-template-columns: 220px minmax(620px, max-content) minmax(340px, 1fr) max-content !important;
+    gap: 16px !important;
+    align-items: center !important;
+    margin-inline: auto !important;
+  }
+
+  .navbar .brand {
+    justify-self: start !important;
+    width: 210px !important;
+    min-width: 210px !important;
+    padding: 0 !important;
+  }
+
+  .navbar .brand-logo {
+    width: 190px !important;
+    max-width: 190px !important;
+    height: 68px !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+  }
+
+  .navbar .nav-menu {
+    justify-self: start !important;
+    display: flex !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 6px !important;
+    padding: 7px !important;
+    overflow: visible !important;
+    border-radius: 14px !important;
+  }
+
+  .navbar .nav-menu a {
+    display: inline-flex !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 12px !important;
+    padding: 0 15px !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+  }
+
+  .navbar .nav-orders-link {
+    min-width: 126px !important;
+  }
+
+  .navbar .nav-search {
+    justify-self: stretch !important;
+    display: grid !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 62px !important;
+    min-height: 62px !important;
+    grid-template-columns: 24px minmax(0, 1fr) 56px !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 5px 7px 5px 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .navbar .nav-actions {
+    justify-self: end !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    min-width: max-content !important;
+  }
+
+  .navbar .nav-pill {
+    width: 260px !important;
+    min-width: 260px !important;
+    height: 62px !important;
+    min-height: 62px !important;
+    justify-content: center !important;
+    border-radius: 14px !important;
+  }
+
+  .navbar .nav-cart-link {
+    width: 74px !important;
+    min-width: 74px !important;
+    height: 74px !important;
+    min-height: 74px !important;
+    border-radius: 999px !important;
+  }
+
+  .navbar .mobile-menu-toggle,
+  .navbar .nav-search-trigger {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1101px) and (max-width: 1450px) {
+  .navbar .nav-inner {
+    width: min(100% - 32px, 1360px) !important;
+    grid-template-columns: 158px minmax(0, 590px) minmax(240px, 1fr) max-content !important;
+    gap: 8px !important;
+  }
+
+  .navbar .brand {
+    width: 152px !important;
+    min-width: 152px !important;
+  }
+
+  .navbar .brand-logo {
+    width: 144px !important;
+    max-width: 144px !important;
+  }
+
+  .navbar .nav-menu {
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .navbar .nav-menu a {
+    padding-inline: 9px !important;
+    font-size: 0.82rem !important;
+  }
+
+  .navbar .nav-orders-link {
+    min-width: 104px !important;
+  }
+
+  .navbar .admin-order-badge {
+    min-width: 20px !important;
+    height: 20px !important;
+    padding-inline: 5px !important;
+  }
+
+  .navbar .nav-pill {
+    width: 92px !important;
+    min-width: 92px !important;
+  }
+
+  .navbar .nav-account-label {
+    display: none !important;
+  }
+
+  .navbar .nav-cart-link {
+    width: 60px !important;
+    min-width: 60px !important;
+    height: 60px !important;
+    min-height: 60px !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .navbar {
+    min-height: 86px !important;
+  }
+
+  .navbar .nav-inner {
+    display: grid !important;
+    width: min(100% - 28px, 1040px) !important;
+    min-height: 86px !important;
+    grid-template-columns: 170px minmax(260px, 1fr) 60px !important;
+    gap: 14px !important;
+    align-items: center !important;
+  }
+
+  .navbar .brand {
+    width: 165px !important;
+    min-width: 165px !important;
+  }
+
+  .navbar .brand-logo {
+    width: 154px !important;
+    max-width: 154px !important;
+    height: 58px !important;
+    object-fit: contain !important;
+  }
+
+  .navbar .nav-menu,
+  .navbar .nav-actions {
+    display: none !important;
+  }
+
+  .navbar .nav-search {
+    display: grid !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    grid-template-columns: 22px minmax(0, 1fr) 50px !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .navbar .mobile-menu-toggle {
+    position: static !important;
+    display: inline-grid !important;
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    transform: none !important;
+  }
+}
+
+.profile-avatar-stack::before,
+.profile-avatar-stack::after,
+.profile-summary::before,
+.profile-summary::after {
+  display: none !important;
+}
+
+.profile-avatar-circle {
+  border-radius: 50% !important;
+  background: color-mix(in srgb, var(--surface-soft) 78%, var(--ms-neon-blue)) !important;
+  box-shadow: 0 12px 30px rgba(0, 40, 120, 0.22) !important;
+  outline: 4px solid color-mix(in srgb, var(--surface) 82%, #fff) !important;
+}
+
+.profile-avatar-circle img,
+.nav-account-avatar img,
+.mobile-account-avatar img,
+.dock-account-avatar img {
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.admin-modal {
+  z-index: 2200 !important;
+  padding: clamp(10px, 2vw, 24px) !important;
+  place-items: center !important;
+}
+
+.admin-modal:not(.hidden) {
+  display: grid !important;
+}
+
+.admin-modal-backdrop {
+  background: rgba(0, 8, 30, 0.78) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.admin-modal-panel {
+  width: min(1120px, calc(100vw - 32px)) !important;
+  max-height: min(900px, calc(100dvh - 32px)) !important;
+  overflow: hidden !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--surface) 96%, #fff 4%) !important;
+}
+
+.admin-modal-panel .admin-product-form {
+  display: block !important;
+  max-height: min(900px, calc(100dvh - 32px)) !important;
+  overflow: auto !important;
+  padding: clamp(18px, 2vw, 28px) !important;
+  border: 0 !important;
+}
+
+.admin-product-form .admin-form-intro {
+  position: sticky !important;
+  top: calc(-1 * clamp(18px, 2vw, 28px)) !important;
+  z-index: 3 !important;
+  margin: calc(-1 * clamp(18px, 2vw, 28px)) calc(-1 * clamp(18px, 2vw, 28px)) 20px !important;
+  padding: clamp(16px, 2vw, 24px) !important;
+  border-bottom: 1px solid var(--line) !important;
+  background: color-mix(in srgb, var(--surface) 96%, #fff 4%) !important;
+}
+
+.admin-product-form .form-grid-2,
+.admin-product-form .form-grid-3 {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.admin-product-form .form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.admin-product-form .form-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.admin-product-form #admin-product-image {
+  height: 52px !important;
+  min-height: 52px !important;
+  align-self: start !important;
+}
+
+.admin-product-form .form-group:has(#admin-product-image) {
+  display: grid !important;
+  align-content: start !important;
+  justify-content: stretch !important;
+  grid-auto-rows: max-content !important;
+}
+
+.admin-products-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(540px, 100%), 1fr)) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.admin-product-card {
+  grid-template-columns: 112px minmax(0, 1fr) !important;
+  gap: 14px !important;
+  align-items: start !important;
+  overflow: hidden !important;
+}
+
+.admin-product-media {
+  width: 112px !important;
+  height: 112px !important;
+}
+
+.admin-price-row,
+.admin-stock-row {
+  display: grid !important;
+  grid-template-columns: minmax(72px, 0.45fr) minmax(120px, 1fr) minmax(148px, auto) !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.admin-price-row .btn,
+.admin-stock-row .btn,
+.admin-product-actions .btn {
+  min-width: 0 !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.18 !important;
+}
+
+.admin-product-actions {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+@media (max-width: 760px) {
+  .admin-modal {
+    align-items: end !important;
+    padding: 0 !important;
+  }
+
+  .admin-modal-panel {
+    width: 100vw !important;
+    max-height: 94dvh !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-radius: 22px 22px 0 0 !important;
+  }
+
+  .admin-modal-panel .admin-product-form {
+    max-height: 94dvh !important;
+    padding: 16px !important;
+  }
+
+  .admin-product-form .admin-form-intro {
+    top: -16px !important;
+    margin: -16px -16px 16px !important;
+    padding: 16px !important;
+  }
+
+  .admin-product-form .form-grid-2,
+  .admin-product-form .form-grid-3,
+  .admin-price-row,
+  .admin-stock-row,
+  .admin-product-card,
+  .admin-product-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-product-media {
+    width: 92px !important;
+    height: 92px !important;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .login-shell .auth-card,
   .login-shell .auth-brand,

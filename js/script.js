@@ -2646,8 +2646,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function updateAdminPanelLinks({ force = false } = {}) {
-    setAdminPanelLinksVisible(false);
-    setAdminOrderLinksVisible(false);
+    const knownAdmin = Boolean(knownAdminRoleForEmail(currentUser?.email));
+    setAdminPanelLinksVisible(knownAdmin);
+    setAdminOrderLinksVisible(knownAdmin);
     if (!currentUser?.email) return false;
 
     try {
