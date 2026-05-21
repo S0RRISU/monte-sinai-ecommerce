@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     appInstalled: 'ms_app_installed_v1',
     profiles: 'ms_saved_profiles_v1',
     pendingProfile: 'ms_pending_profile_email_v1',
-    pendingProfileSavePassword: 'ms_pending_profile_save_password_v1'
+    pendingProfileSavePassword: 'ms_pending_profile_save_password_v1',
+    authSessions: 'ms_saved_auth_sessions_v1'
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -578,17 +579,59 @@ document.addEventListener('DOMContentLoaded', () => {
     return normalizeText(user.email || user.id || '');
   }
 
+  function authSessionKey(email = '') {
+    return normalizeText(email);
+  }
+
+  function savedAuthSessions() {
+    const sessions = loadJSON(STORAGE.authSessions, {});
+    return sessions && typeof sessions === 'object' && !Array.isArray(sessions) ? sessions : {};
+  }
+
+  function savedAuthSessionForEmail(email = '') {
+    const key = authSessionKey(email);
+    if (!key) return null;
+    const session = savedAuthSessions()[key];
+    return session?.access_token && session?.refresh_token ? session : null;
+  }
+
+  function saveAuthSessionForEmail(email = '', session = null) {
+    const key = authSessionKey(email);
+    if (!key || !session?.access_token || !session?.refresh_token) return false;
+    const sessions = savedAuthSessions();
+    sessions[key] = {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at || 0,
+      token_type: session.token_type || 'bearer',
+      savedAt: new Date().toISOString()
+    };
+    return saveJSON(STORAGE.authSessions, sessions);
+  }
+
+  function removeSavedAuthSession(email = '') {
+    const key = authSessionKey(email);
+    if (!key) return false;
+    const sessions = savedAuthSessions();
+    if (!sessions[key]) return false;
+    delete sessions[key];
+    saveJSON(STORAGE.authSessions, sessions);
+    return true;
+  }
+
   function profileSummary(user = {}, previous = {}) {
+    const email = String(user.email || previous.email || '').trim().toLowerCase();
+    const savedSession = Boolean(savedAuthSessionForEmail(email));
     return {
       id: user.id || '',
-      email: String(user.email || '').trim().toLowerCase(),
+      email,
       name: user.name || '',
       nick: user.nick || '',
       phone: user.phone || '',
       address: user.address || '',
       photo: user.photo || '',
       provider: user.provider || 'Supabase Auth',
-      passwordSaved: user.passwordSaved ?? previous.passwordSaved ?? false,
+      passwordSaved: user.passwordSaved ?? savedSession,
       updatedAt: user.updatedAt || new Date().toISOString(),
       lastUsedAt: new Date().toISOString()
     };
@@ -597,6 +640,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function savedProfiles() {
     return loadJSON(STORAGE.profiles, [])
       .filter(profile => profile?.email)
+      .map(profile => ({
+        ...profile,
+        passwordSaved: Boolean(profile.passwordSaved && savedAuthSessionForEmail(profile.email))
+      }))
       .slice(0, 3);
   }
 
@@ -614,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function removeSavedProfile(email = '') {
     const target = normalizeText(email);
     const saved = savedProfiles().filter(profile => normalizeText(profile.email) !== target);
+    removeSavedAuthSession(email);
     saveJSON(STORAGE.profiles, saved);
     renderProfileChoices();
     return saved;
@@ -658,16 +706,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function userWithPasswordPreference(user = {}, { email = '', password = '', name = '', shouldSave = false } = {}) {
+  async function userWithPasswordPreference(user = {}, { email = '', password = '', name = '', shouldSave = null, session = null } = {}) {
     if (!user?.email) return user;
 
-    const nextUser = { ...user, passwordSaved: false };
-    if (shouldSave) {
-      nextUser.passwordSaved = await rememberBrowserPassword({
+    const accountEmail = user.email || email;
+    const nextUser = { ...user, passwordSaved: Boolean(savedAuthSessionForEmail(accountEmail)) };
+
+    if (shouldSave === true) {
+      const sessionSaved = saveAuthSessionForEmail(accountEmail, session);
+      const browserSaved = await rememberBrowserPassword({
         email: user.email || email,
         password,
         name: user.name || name || email
       });
+      nextUser.passwordSaved = Boolean(sessionSaved || browserSaved || savedAuthSessionForEmail(accountEmail));
+    } else if (shouldSave === false) {
+      removeSavedAuthSession(accountEmail);
+      nextUser.passwordSaved = false;
     }
 
     saveUser(nextUser);
@@ -699,29 +754,27 @@ document.addEventListener('DOMContentLoaded', () => {
   async function signInWithSavedBrowserProfile(profile = {}, options = {}) {
     const email = String(profile.email || '').trim().toLowerCase();
     if (!profile.passwordSaved) return null;
-
-    const credential = await savedBrowserPasswordForEmail(email, { mediation: options.mediation });
-    if (!credential?.password) return null;
+    const savedSession = savedAuthSessionForEmail(email);
+    if (!savedSession) return null;
 
     const client = authClient();
     if (!client?.auth) throw new Error('Autenticacao indisponivel.');
 
-    const { data, error } = await client.auth.signInWithPassword({
-      email,
-      password: credential.password
+    const { data, error } = await client.auth.setSession({
+      access_token: savedSession.access_token,
+      refresh_token: savedSession.refresh_token
     });
-    if (error) throw error;
+    if (error) {
+      removeSavedAuthSession(email);
+      throw error;
+    }
 
     const user = userFromAuthUser(data.session?.user);
     if (!user?.email) throw new Error('Sessao nao retornada pelo Supabase.');
-    saveUser(user);
+    saveAuthSessionForEmail(user.email || email, data.session);
+    saveUser({ ...user, passwordSaved: true });
     await safeUpsertProfileRecord(data.session.user, user, options.context || 'login com senha salva');
-    await rememberBrowserPassword({
-      email: user.email || email,
-      password: credential.password,
-      name: user.name || credential.name || profile.name || email
-    });
-    return user;
+    return { ...user, passwordSaved: true };
   }
 
   function authClient() {
@@ -741,10 +794,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function signOutEverywhere(options = {}) {
     const redirect = options.redirect || '';
     const message = options.message === undefined ? 'Voce saiu da conta.' : options.message;
+    const localOnly = Boolean(options.localOnly);
     const client = authClient();
 
     try {
-      if (client?.auth) await client.auth.signOut();
+      if (client?.auth) await client.auth.signOut(localOnly ? { scope: 'local' } : undefined);
     } catch (error) {
       console.warn('[Supabase Auth] Nao foi possivel encerrar a sessao remota. Limpando sessao local.', error);
     }
@@ -2829,7 +2883,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
             <span class="eyebrow">Trocar conta</span>
             <h2 id="profile-switcher-title">Escolha um perfil</h2>
-            <p>Voce pode manter ate 3 perfis neste aparelho. O site nao guarda senhas; o navegador pode preencher se o cliente permitir.</p>
+            <p>Voce pode manter ate 3 perfis neste aparelho. Marque a opcao abaixo para guardar o acesso automatico deste perfil.</p>
           </div>
           <button class="icon-button" type="button" data-close-profile-switcher aria-label="Fechar">
             <i class="fa-solid fa-xmark"></i>
@@ -2905,6 +2959,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await signOutEverywhere({
           redirect: loginHref({ redirect: 'perfil.html' }),
+          localOnly: true,
           message: allowSavedPassword && profile.passwordSaved
             ? 'Escolha o perfil. Se o navegador liberar a senha salva, a entrada sera automatica.'
             : 'Digite a senha para entrar neste perfil.'
@@ -4711,7 +4766,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pendingProfile = pendingEmail
       ? savedProfiles().find(profile => normalizeText(profile.email) === normalizeText(pendingEmail))
       : null;
-    const shouldSavePasswordAfterProfileSwitch = sessionStorage.getItem(STORAGE.pendingProfileSavePassword) === 'true';
+    const savePasswordPreference = sessionStorage.getItem(STORAGE.pendingProfileSavePassword);
+    const shouldSavePasswordAfterProfileSwitch = savePasswordPreference === null ? null : savePasswordPreference === 'true';
     if (currentUser?.email) applyProfileToForm(currentUser);
     if (pendingProfile) applyProfileToForm(pendingProfile);
     if (pendingEmail) sessionStorage.removeItem(STORAGE.pendingProfile);
@@ -4850,9 +4906,10 @@ document.addEventListener('DOMContentLoaded', () => {
             email,
             password,
             name: user.name || email,
-            shouldSave: shouldSavePasswordAfterProfileSwitch
+            shouldSave: shouldSavePasswordAfterProfileSwitch,
+            session: sessionData.session
           });
-          finishLogin(nextUser, nextUser.passwordSaved ? 'Senha atualizada e guardada neste navegador.' : 'Senha atualizada com sucesso.');
+          finishLogin(nextUser, nextUser.passwordSaved ? 'Acesso automatico atualizado neste navegador.' : 'Senha atualizada com sucesso.');
         } catch (error) {
           showToast(authFriendlyError(error, 'Não consegui atualizar a senha. Tente abrir o link novamente.'));
         } finally {
@@ -4891,12 +4948,13 @@ document.addEventListener('DOMContentLoaded', () => {
               email,
               password,
               name,
-              shouldSave: shouldSavePasswordAfterProfileSwitch
+              shouldSave: shouldSavePasswordAfterProfileSwitch,
+              session: data.session
             });
             sendWelcomeEmail(user);
-            finishLogin(nextUser, nextUser.passwordSaved ? 'Conta criada e senha guardada neste navegador.' : 'Conta criada com sucesso.');
+            finishLogin(nextUser, nextUser.passwordSaved ? 'Conta criada e acesso automatico guardado neste navegador.' : 'Conta criada com sucesso.');
           } else {
-            if (shouldSavePasswordAfterProfileSwitch) await rememberBrowserPassword({ email, password, name });
+            if (shouldSavePasswordAfterProfileSwitch === true) await rememberBrowserPassword({ email, password, name });
             showToast('Conta criada. Entre com email e senha para receber a boas-vindas e salvar seus dados.');
             setMode('login');
           }
@@ -4913,10 +4971,11 @@ document.addEventListener('DOMContentLoaded', () => {
           email,
           password,
           name: user.name || email,
-          shouldSave: shouldSavePasswordAfterProfileSwitch
+          shouldSave: shouldSavePasswordAfterProfileSwitch,
+          session: data.session
         });
         finishLogin(nextUser, nextUser.passwordSaved
-          ? 'Login realizado. Senha guardada neste navegador.'
+          ? 'Login realizado. Acesso automatico guardado neste navegador.'
           : (profileComplete(nextUser) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.'));
       } catch (error) {
         showToast(authFriendlyError(error, 'Não foi possível entrar. Confira os dados e tente novamente.'));
