@@ -2172,7 +2172,7 @@ document.addEventListener('DOMContentLoaded', () => {
       search.dataset.siteSearchForm = '';
       search.innerHTML = `
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input type="search" name="busca" data-site-search-input placeholder="Pesquisar produto">
+        <input type="search" name="busca" data-site-search-input placeholder="Pesquisar agua, gas ou limpeza">
         <button type="submit" aria-label="Buscar produto">
           <i class="fa-solid fa-arrow-right"></i>
         </button>
@@ -2186,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
       trigger.type = 'button';
       trigger.dataset.openSearch = '';
       trigger.setAttribute('aria-label', 'Abrir pesquisa');
-      trigger.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+      trigger.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><span>Buscar produto</span>';
       navInner.insertBefore(trigger, mobileToggle);
     }
     syncTopNavControls();
@@ -2212,25 +2212,8 @@ document.addEventListener('DOMContentLoaded', () => {
       navInner.insertBefore(actions, mobileToggle || null);
     }
 
-    if (!qs('.mobile-top-actions')) {
-      const topActions = document.createElement('div');
-      topActions.className = 'mobile-top-actions';
-      topActions.setAttribute('aria-label', 'Acoes rapidas do topo');
-      topActions.innerHTML = `
-        <button class="mobile-top-action" type="button" data-open-search aria-label="Abrir busca">
-          <i class="fa-solid fa-magnifying-glass"></i>
-        </button>
-        <button class="mobile-top-action mobile-menu-proxy" type="button" data-mobile-menu-proxy aria-label="Abrir menu">
-          <i class="fa-solid fa-bars"></i>
-        </button>
-      `;
-      document.body.appendChild(topActions);
-      document.body.classList.add('has-mobile-top-actions');
-      qs('[data-mobile-menu-proxy]', topActions)?.addEventListener('click', event => {
-        event.preventDefault();
-        mobileToggle?.click();
-      });
-    }
+    qsa('.mobile-top-actions').forEach(actions => actions.remove());
+    document.body.classList.remove('has-mobile-top-actions');
 
     const mobileMenu = qs('.mobile-menu');
     if (mobileMenu && !qs('[data-mobile-extra]', mobileMenu)) {
@@ -2271,10 +2254,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>Carrinho</span>
           <strong data-cart-count>0</strong>
         </button>
-        <button class="dock-search" type="button" data-open-search data-dock-section="search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <span>Pesquisa</span>
-        </button>
+        <a class="dock-offers" href="${promotionsHref()}" data-dock-section="promos">
+          <i class="fa-solid fa-tags"></i>
+          <span>Ofertas</span>
+        </a>
         <a class="nav-account-link dock-profile-link" href="${profileHref()}" data-dock-section="account">
           <span class="dock-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span class="dock-profile-label" data-account-label>Perfil</span>
@@ -2297,6 +2280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!brand && !trigger && !mobileToggle && !dock) return;
 
     const compact = window.matchMedia?.('(max-width: 760px)').matches;
+    const veryCompact = window.matchMedia?.('(max-width: 360px)').matches;
     const placeFixed = (element, styles = {}) => {
       if (!element) return;
       element.removeAttribute('style');
@@ -2310,7 +2294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         position: 'fixed',
         left: '10px',
         top: '38px',
-        width: 'min(156px, 48vw)',
+        width: veryCompact ? 'min(112px, 35vw)' : 'min(142px, 44vw)',
         'z-index': '760',
         transform: 'translateY(-50%)'
       });
@@ -2321,9 +2305,9 @@ document.addEventListener('DOMContentLoaded', () => {
         display: 'inline-grid',
         visibility: 'visible',
         opacity: '1',
-        width: '46px',
+        width: veryCompact ? '98px' : '108px',
         height: '46px',
-        'min-width': '46px',
+        'min-width': veryCompact ? '98px' : '108px',
         'min-height': '46px',
         'z-index': '761',
         transform: 'translateY(-50%)'
