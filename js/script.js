@@ -3422,10 +3422,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
           </div>
           <div class="catalog-detail-actions">
-            <a class="btn btn-primary" href="${productHref(normalized.name)}">
+            ${outOfStock ? '' : `<a class="btn btn-primary" href="${productHref(normalized.name)}">
               <i class="fa-solid fa-store"></i>
               Comprar este produto
-            </a>
+            </a>`}
             <button class="btn btn-secondary" type="button" data-catalog-detail-close>
               <i class="fa-solid fa-arrow-left"></i>
               Voltar ao catalogo
