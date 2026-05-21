@@ -2305,9 +2305,9 @@ document.addEventListener('DOMContentLoaded', () => {
         display: 'inline-grid',
         visibility: 'visible',
         opacity: '1',
-        width: veryCompact ? '98px' : '108px',
+        width: veryCompact ? '118px' : '132px',
         height: '46px',
-        'min-width': veryCompact ? '98px' : '108px',
+        'min-width': veryCompact ? '118px' : '132px',
         'min-height': '46px',
         'z-index': '761',
         transform: 'translateY(-50%)'

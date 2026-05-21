@@ -18137,3 +18137,150 @@ body:not(.light-mode) .navbar {
     max-height: 78px !important;
   }
 }
+
+/* Final mobile nav/search polish: keep normal states blue and expand only active profile. */
+@media (max-width: 1180px) {
+  .navbar .nav-search-trigger {
+    width: 132px !important;
+    min-width: 132px !important;
+    grid-template-columns: 18px minmax(0, max-content) !important;
+    padding: 0 12px !important;
+  }
+
+  .navbar .nav-search-trigger span {
+    display: inline-block !important;
+    max-width: none !important;
+    overflow: visible !important;
+    font-size: 0.7rem !important;
+    line-height: 1 !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  .smart-search-panel .smart-search-form {
+    min-height: 68px !important;
+    gap: 10px !important;
+    border: 2px solid color-mix(in srgb, var(--primary) 24%, var(--line)) !important;
+    border-radius: 24px !important;
+    padding: 7px 8px 7px 18px !important;
+    background: color-mix(in srgb, var(--surface) 90%, #ffffff 8%) !important;
+    box-shadow: 0 14px 30px rgba(0, 42, 110, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  }
+
+  body:not(.light-mode) .smart-search-panel .smart-search-form {
+    background: rgba(8, 24, 56, 0.96) !important;
+    box-shadow: 0 16px 34px rgba(0, 5, 22, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .smart-search-panel .smart-search-form i {
+    width: 32px !important;
+    min-width: 32px !important;
+    color: var(--primary) !important;
+    font-size: 1.25rem !important;
+  }
+
+  .smart-search-panel .smart-search-form input {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    font-weight: 850 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .smart-search-panel .smart-search-form input::placeholder {
+    color: color-mix(in srgb, var(--muted) 82%, var(--text)) !important;
+    opacity: 1 !important;
+  }
+
+  .smart-search-panel .smart-search-form button {
+    min-width: 104px !important;
+    height: 54px !important;
+    border-radius: 16px !important;
+    font-weight: 950 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .navbar .brand {
+    width: min(118px, 34vw) !important;
+  }
+
+  .navbar .brand-logo {
+    max-width: 118px !important;
+  }
+
+  .navbar .nav-search-trigger {
+    right: 72px !important;
+    width: 132px !important;
+    min-width: 132px !important;
+  }
+
+  .mobile-quick-dock .dock-offers i,
+  .mobile-quick-dock .dock-offers:not(.active) i,
+  .mobile-quick-dock [data-dock-section="promos"]:not(.active) i {
+    color: var(--blue) !important;
+  }
+
+  .mobile-quick-dock .dock-offers.active i,
+  .mobile-quick-dock [data-dock-section="promos"].active i {
+    color: var(--accent) !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-quick-dock .dock-profile-link.active.has-photo .dock-account-avatar,
+  .mobile-quick-dock [data-dock-section="account"].active.has-photo .dock-account-avatar {
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    border: 2px solid color-mix(in srgb, var(--primary) 58%, #ffffff) !important;
+    background: color-mix(in srgb, var(--primary) 10%, var(--surface)) !important;
+    box-shadow: 0 8px 18px rgba(0, 42, 110, 0.16) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .navbar .brand {
+    width: min(102px, 30vw) !important;
+  }
+
+  .navbar .brand-logo {
+    max-width: 102px !important;
+  }
+
+  .navbar .nav-search-trigger {
+    width: 118px !important;
+    min-width: 118px !important;
+  }
+
+  .navbar .nav-search-trigger span {
+    font-size: 0.64rem !important;
+  }
+
+  .smart-search-panel .smart-search-form {
+    gap: 7px !important;
+    padding-left: 13px !important;
+  }
+
+  .smart-search-panel .smart-search-form button {
+    min-width: 82px !important;
+    height: 50px !important;
+  }
+}
