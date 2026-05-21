@@ -12,7 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     theme: 'ms_theme_v2',
     legacyTheme: 'ms_theme_v1',
     installPromptDismissed: 'ms_install_prompt_dismissed_v1',
-    appInstalled: 'ms_app_installed_v1'
+    appInstalled: 'ms_app_installed_v1',
+    profiles: 'ms_saved_profiles_v1',
+    pendingProfile: 'ms_pending_profile_email_v1',
+    pendingProfileSavePassword: 'ms_pending_profile_save_password_v1'
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -192,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
   upgradeProductImages();
   syncProductsFromRenderedCards();
   enhanceNavigation();
+  bindProfilePhotoPreview();
   applySiteConfig();
   bindMobileMenu();
   setActiveNavigation();
@@ -210,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindAccountPage();
   initPaymentPage();
   initProfilePage();
+  initOrdersPage();
   initProfileEditPage();
   initSettingsPage();
   initOwnerDashboard();
@@ -557,13 +562,166 @@ document.addEventListener('DOMContentLoaded', () => {
     adminProfileCache = null;
     currentUser = user;
     let saved = true;
-    if (user) saved = saveJSON(STORAGE.user, user);
+    if (user) {
+      saved = saveJSON(STORAGE.user, user);
+      rememberProfile(user);
+    }
     else {
       localStorage.removeItem(STORAGE.user);
       setAdminPanelLinksVisible(false);
     }
     updateAccountUI();
     return saved;
+  }
+
+  function profileKey(user = {}) {
+    return normalizeText(user.email || user.id || '');
+  }
+
+  function profileSummary(user = {}, previous = {}) {
+    return {
+      id: user.id || '',
+      email: String(user.email || '').trim().toLowerCase(),
+      name: user.name || '',
+      nick: user.nick || '',
+      phone: user.phone || '',
+      address: user.address || '',
+      photo: user.photo || '',
+      provider: user.provider || 'Supabase Auth',
+      passwordSaved: user.passwordSaved ?? previous.passwordSaved ?? false,
+      updatedAt: user.updatedAt || new Date().toISOString(),
+      lastUsedAt: new Date().toISOString()
+    };
+  }
+
+  function savedProfiles() {
+    return loadJSON(STORAGE.profiles, [])
+      .filter(profile => profile?.email)
+      .slice(0, 3);
+  }
+
+  function rememberProfile(user = currentUser) {
+    if (!user?.email) return [];
+    const profiles = savedProfiles();
+    const previous = profiles.find(profile => profileKey(profile) === profileKey(user));
+    const next = profileSummary(user, previous);
+    const saved = [next, ...profiles.filter(profile => profileKey(profile) !== profileKey(next))].slice(0, 3);
+    saveJSON(STORAGE.profiles, saved);
+    renderProfileChoices();
+    return saved;
+  }
+
+  function removeSavedProfile(email = '') {
+    const target = normalizeText(email);
+    const saved = savedProfiles().filter(profile => normalizeText(profile.email) !== target);
+    saveJSON(STORAGE.profiles, saved);
+    renderProfileChoices();
+    return saved;
+  }
+
+  function displayProfileName(profile = {}) {
+    return profile.nick || profile.name || profile.email?.split('@')[0] || 'Perfil';
+  }
+
+  function profileAvatarMarkup(profile = {}) {
+    if (profile.photo) return `<img src="${escapeHTML(profile.photo)}" alt="" loading="lazy" decoding="async">`;
+    const initial = displayProfileName(profile).trim().charAt(0).toUpperCase() || 'P';
+    return `<span>${escapeHTML(initial)}</span>`;
+  }
+
+  function profilePasswordHint(profile = {}) {
+    return profile.passwordSaved
+      ? '<small class="saved-profile-auth-hint"><i class="fa-solid fa-key"></i> Troca automatica</small>'
+      : '<small class="saved-profile-auth-hint"><i class="fa-solid fa-lock"></i> Pede senha</small>';
+  }
+
+  function selectSavedProfile(email = '') {
+    const profile = savedProfiles().find(item => normalizeText(item.email) === normalizeText(email));
+    if (!profile) return null;
+    sessionStorage.setItem(STORAGE.pendingProfile, profile.email);
+    return profile;
+  }
+
+  async function rememberBrowserPassword({ email = '', password = '', name = '' } = {}) {
+    if (!email || !password || !navigator.credentials?.store || typeof window.PasswordCredential !== 'function') return false;
+
+    try {
+      await navigator.credentials.store(new window.PasswordCredential({
+        id: email,
+        name: name || email,
+        password
+      }));
+      return true;
+    } catch (error) {
+      console.debug('[Auth] Navegador nao salvou a senha automaticamente.', error);
+      return false;
+    }
+  }
+
+  async function userWithPasswordPreference(user = {}, { email = '', password = '', name = '', shouldSave = false } = {}) {
+    if (!user?.email) return user;
+
+    const nextUser = { ...user, passwordSaved: false };
+    if (shouldSave) {
+      nextUser.passwordSaved = await rememberBrowserPassword({
+        email: user.email || email,
+        password,
+        name: user.name || name || email
+      });
+    }
+
+    saveUser(nextUser);
+    return nextUser;
+  }
+
+  async function savedBrowserPasswordForEmail(email = '', options = {}) {
+    const targetEmail = normalizeText(email);
+    if (!targetEmail || !navigator.credentials?.get) return null;
+
+    try {
+      const credential = await navigator.credentials.get({
+        password: true,
+        mediation: options.mediation || 'optional'
+      });
+
+      if (!credential?.password || normalizeText(credential.id || '') !== targetEmail) return null;
+      return {
+        email: String(credential.id || email).trim().toLowerCase(),
+        password: credential.password,
+        name: credential.name || ''
+      };
+    } catch (error) {
+      console.debug('[Auth] Navegador nao liberou a senha salva.', error);
+      return null;
+    }
+  }
+
+  async function signInWithSavedBrowserProfile(profile = {}, options = {}) {
+    const email = String(profile.email || '').trim().toLowerCase();
+    if (!profile.passwordSaved) return null;
+
+    const credential = await savedBrowserPasswordForEmail(email, { mediation: options.mediation });
+    if (!credential?.password) return null;
+
+    const client = authClient();
+    if (!client?.auth) throw new Error('Autenticacao indisponivel.');
+
+    const { data, error } = await client.auth.signInWithPassword({
+      email,
+      password: credential.password
+    });
+    if (error) throw error;
+
+    const user = userFromAuthUser(data.session?.user);
+    if (!user?.email) throw new Error('Sessao nao retornada pelo Supabase.');
+    saveUser(user);
+    await safeUpsertProfileRecord(data.session.user, user, options.context || 'login com senha salva');
+    await rememberBrowserPassword({
+      email: user.email || email,
+      password: credential.password,
+      name: user.name || credential.name || profile.name || email
+    });
+    return user;
   }
 
   function authClient() {
@@ -629,7 +787,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function initSupabaseAuth() {
-    localStorage.removeItem('ms_accounts_v1');
     const client = authClient();
     if (!client?.auth) {
       saveUser(null);
@@ -1521,7 +1678,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentPage() {
-    return location.pathname.split('/').pop() || 'index.html';
+    const page = location.pathname.split('/').pop() || 'index.html';
+    const cleanRoutes = new Set([
+      'produtos',
+      'catalogo',
+      'promocoes',
+      'pedidos',
+      'sobre',
+      'contato',
+      'login',
+      'pagamento',
+      'perfil',
+      'editar-perfil',
+      'configuracoes',
+      'painel'
+    ]);
+    return cleanRoutes.has(page) ? `${page}.html` : page;
   }
 
   function insidePages() {
@@ -1547,6 +1719,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function promotionsHref() {
     return pageHref('promocoes.html');
+  }
+
+  function ordersHref() {
+    return pageHref('pedidos.html');
   }
 
   function featuredSearchProducts(limit = 6) {
@@ -2023,6 +2199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'promocoes.html',
         'pagamento.html',
         'perfil.html',
+        'pedidos.html',
         'editar-perfil.html',
         'configuracoes.html',
         'painel.html',
@@ -2057,7 +2234,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentLocationForRedirect() {
-    const path = insidePages() ? currentPage() : '../index.html';
+    const page = currentPage();
+    const path = insidePages() ? page : (page === 'index.html' ? 'index.html' : page);
     return `${path}${location.search}${location.hash}`;
   }
 
@@ -2347,6 +2525,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function navLinkPage(link) {
+    return (link?.getAttribute('href') || '').split(/[?#]/)[0].split('/').pop() || 'index.html';
+  }
+
+  function ensureClientOrdersLink(container) {
+    if (!container || qsa('a', container).some(link => navLinkPage(link) === 'pedidos.html')) return;
+
+    const markup = `<a href="${ordersHref()}" data-client-orders-link>Pedidos</a>`;
+    const productsLink = qsa('a', container).find(link => navLinkPage(link) === 'produtos.html');
+    if (productsLink) productsLink.insertAdjacentHTML('afterend', markup);
+    else container.insertAdjacentHTML('beforeend', markup);
+  }
+
   function enhanceNavigation() {
     const navInner = qs('.nav-inner');
     if (!navInner) return;
@@ -2359,13 +2550,14 @@ document.addEventListener('DOMContentLoaded', () => {
       brand.insertAdjacentHTML('beforeend', '<span class="brand-text">Monte Sinai</span>');
     }
 
+    ensureClientOrdersLink(navMenu);
+
     if (navMenu && !qs('[data-admin-panel-link="nav"]', navMenu)) {
       navMenu.insertAdjacentHTML('beforeend', `
-        <a class="hidden nav-orders-link" href="${adminPanelHref()}#orders" data-admin-orders-link="nav" aria-label="Abrir pedidos pendentes">
-          Pedidos
-          <span class="admin-order-badge" data-admin-order-count>0</span>
+        <a class="hidden nav-admin-link" href="${adminPanelHref()}" data-admin-panel-link="nav">
+          Painel Admin
+          <span class="admin-order-badge is-empty" data-admin-order-count aria-label="0 pedidos pendentes">0</span>
         </a>
-        <a class="hidden" href="${adminPanelHref()}" data-admin-panel-link="nav">Painel Admin</a>
       `);
     }
     if (!qs('.nav-search', navInner)) {
@@ -2419,6 +2611,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('has-mobile-top-actions');
 
     const mobileMenu = qs('.mobile-menu');
+    ensureClientOrdersLink(mobileMenu);
+    qsa('.footer-links').forEach(ensureClientOrdersLink);
     if (mobileMenu && !qs('[data-mobile-extra]', mobileMenu)) {
       mobileMenu.insertAdjacentHTML('beforeend', `
         <div class="mobile-menu-divider" data-mobile-extra></div>
@@ -2432,7 +2626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </a>
         <a class="mobile-only-link hidden mobile-admin-orders-link" href="${adminPanelHref()}#orders" data-admin-orders-link="mobile" data-mobile-extra>
           <i class="fa-solid fa-clipboard-list"></i>
-          Pedidos
+          Pedidos do painel
           <strong class="admin-order-badge" data-admin-order-count>0</strong>
         </a>
         <button class="mobile-only-link mobile-menu-button" type="button" data-open-cart data-mobile-extra>
@@ -2593,22 +2787,243 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function renderProfileChoices(scope = document) {
+    qsa('[data-saved-profiles]', scope).forEach(container => {
+      const profiles = savedProfiles();
+      container.classList.toggle('hidden', profiles.length === 0);
+      container.innerHTML = profiles.length
+        ? profiles.map(profile => `
+          <article class="saved-profile-card ${normalizeText(profile.email) === normalizeText(currentUser?.email || '') ? 'is-current' : ''}">
+            <button type="button" class="saved-profile-select" data-select-saved-profile="${escapeHTML(profile.email)}">
+              <span class="saved-profile-avatar">${profileAvatarMarkup(profile)}</span>
+              <span class="saved-profile-copy">
+                <strong>${escapeHTML(displayProfileName(profile))}</strong>
+                <small>${escapeHTML(profile.email)}</small>
+                ${profilePasswordHint(profile)}
+              </span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <button type="button" class="saved-profile-remove" data-remove-saved-profile="${escapeHTML(profile.email)}" aria-label="Remover perfil salvo">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </article>
+        `).join('')
+        : '<p class="empty-cart">Nenhum perfil salvo neste aparelho.</p>';
+    });
+  }
+
+  function ensureProfileSwitcherShell() {
+    let modal = qs('#profile-switcher-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-switcher-modal';
+    modal.className = 'profile-switcher-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'profile-switcher-title');
+    modal.innerHTML = `
+      <button class="profile-switcher-backdrop" type="button" data-close-profile-switcher aria-label="Fechar perfis"></button>
+      <div class="profile-switcher-panel">
+        <div class="profile-switcher-head">
+          <div>
+            <span class="eyebrow">Trocar conta</span>
+            <h2 id="profile-switcher-title">Escolha um perfil</h2>
+            <p>Voce pode manter ate 3 perfis neste aparelho. O site nao guarda senhas; o navegador pode preencher se o cliente permitir.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-profile-switcher aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="saved-profile-list" data-saved-profiles></div>
+        <label class="profile-switcher-save-password">
+          <input type="checkbox" data-profile-switch-save-password autocomplete="off">
+          <span>
+            <strong>Usar ou guardar senha neste navegador</strong>
+            <small>Deixe marcado para trocar automaticamente. Desmarque para pedir senha na proxima vez.</small>
+          </span>
+        </label>
+        <div class="profile-switcher-actions">
+          <a class="btn btn-primary" href="${loginHref({ redirect: 'perfil.html' })}" data-login-other-profile>
+            <i class="fa-solid fa-user-plus"></i>
+            Usar outro email
+          </a>
+          <button class="btn btn-secondary" type="button" data-switch-signout>
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Sair da sessao atual
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', async event => {
+      const close = event.target.closest('[data-close-profile-switcher]');
+      if (close) {
+        closeProfileSwitcher();
+        return;
+      }
+
+      const remove = event.target.closest('[data-remove-saved-profile]');
+      if (remove) {
+        event.preventDefault();
+        event.stopPropagation();
+        removeSavedProfile(remove.dataset.removeSavedProfile);
+        return;
+      }
+
+      const select = event.target.closest('[data-select-saved-profile]');
+      if (select) {
+        const profile = selectSavedProfile(select.dataset.selectSavedProfile);
+        if (!profile) return;
+        const allowSavedPassword = Boolean(qs('[data-profile-switch-save-password]', modal)?.checked);
+        sessionStorage.setItem(STORAGE.pendingProfileSavePassword, allowSavedPassword ? 'true' : 'false');
+        select.disabled = true;
+        try {
+          if (allowSavedPassword && profile.passwordSaved) {
+            const user = await signInWithSavedBrowserProfile(profile, {
+              mediation: 'required',
+              context: 'troca de perfil'
+            });
+            if (user) {
+              sessionStorage.removeItem(STORAGE.pendingProfile);
+              sessionStorage.removeItem(STORAGE.pendingProfileSavePassword);
+              closeProfileSwitcher();
+              showToast(`Perfil de ${displayProfileName(user)} aberto com a senha salva.`);
+              window.setTimeout(() => {
+                window.location.href = profileHref();
+              }, 350);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('[Auth] Nao foi possivel trocar usando a senha salva.', error);
+          showToast(authFriendlyError(error, 'A senha salva nao funcionou. Digite a senha para entrar.'));
+        } finally {
+          select.disabled = false;
+        }
+
+        await signOutEverywhere({
+          redirect: loginHref({ redirect: 'perfil.html' }),
+          message: allowSavedPassword && profile.passwordSaved
+            ? 'Escolha o perfil. Se o navegador liberar a senha salva, a entrada sera automatica.'
+            : 'Digite a senha para entrar neste perfil.'
+        });
+        return;
+      }
+
+      const signout = event.target.closest('[data-switch-signout]');
+      if (signout) {
+        sessionStorage.removeItem(STORAGE.pendingProfileSavePassword);
+        await signOutEverywhere({ redirect: loginHref({ redirect: 'perfil.html' }) });
+      }
+    });
+
+    return modal;
+  }
+
+  function openProfileSwitcher() {
+    const modal = ensureProfileSwitcherShell();
+    renderProfileChoices(modal);
+    const savePassword = qs('[data-profile-switch-save-password]', modal);
+    if (savePassword) savePassword.checked = true;
+    modal.classList.remove('hidden');
+    document.body.classList.add('profile-switcher-open');
+  }
+
+  function closeProfileSwitcher() {
+    qs('#profile-switcher-modal')?.classList.add('hidden');
+    document.body.classList.remove('profile-switcher-open');
+  }
+
+  function ensurePhotoPreviewShell() {
+    let modal = qs('#profile-photo-preview-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-photo-preview-modal';
+    modal.className = 'profile-photo-preview-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.innerHTML = `
+      <button class="profile-photo-backdrop" type="button" data-close-photo-preview aria-label="Fechar foto"></button>
+      <div class="profile-photo-panel">
+        <button class="icon-button profile-photo-close" type="button" data-close-photo-preview aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img src="" alt="Foto do perfil ampliada" data-photo-preview-img>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-close-photo-preview]')) closeProfilePhotoPreview();
+    });
+    return modal;
+  }
+
+  function openProfilePhotoPreview(src = currentUser?.photo) {
+    if (!src) return;
+    const modal = ensurePhotoPreviewShell();
+    const img = qs('[data-photo-preview-img]', modal);
+    if (img) img.src = src;
+    modal.classList.remove('hidden');
+    document.body.classList.add('profile-photo-open');
+  }
+
+  function closeProfilePhotoPreview() {
+    qs('#profile-photo-preview-modal')?.classList.add('hidden');
+    document.body.classList.remove('profile-photo-open');
+  }
+
+  function bindProfilePhotoPreview() {
+    if (document.body.dataset.profilePhotoPreviewBound === 'true') return;
+    document.body.addEventListener('click', event => {
+      const desktopAccount = event.target.closest('.navbar .nav-account-link');
+      if (desktopAccount && currentUser?.photo && window.matchMedia?.('(min-width: 1021px)').matches) {
+        event.preventDefault();
+        openProfilePhotoPreview(currentUser.photo);
+        return;
+      }
+
+      const profileAvatar = event.target.closest('#profile-avatar');
+      if (profileAvatar && currentUser?.photo) {
+        event.preventDefault();
+        openProfilePhotoPreview(currentUser.photo);
+      }
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        closeProfileSwitcher();
+        closeProfilePhotoPreview();
+      }
+    });
+    document.body.dataset.profilePhotoPreviewBound = 'true';
+  }
+
+  function setForcedElementVisible(element, visible) {
+    element.classList.toggle('hidden', !visible);
+    element.hidden = !visible;
+    element.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    if (!visible) {
+      element.setAttribute('tabindex', '-1');
+      element.style.setProperty('display', 'none', 'important');
+    } else {
+      element.removeAttribute('tabindex');
+      element.style.removeProperty('display');
+    }
+  }
+
   function setAdminPanelLinksVisible(visible) {
     qsa('[data-admin-panel-link]').forEach(link => {
-      link.classList.toggle('hidden', !visible);
-      link.setAttribute('aria-hidden', visible ? 'false' : 'true');
-      if (!visible) link.setAttribute('tabindex', '-1');
-      else link.removeAttribute('tabindex');
+      setForcedElementVisible(link, visible);
       if (link instanceof HTMLAnchorElement) link.href = adminPanelHref();
     });
   }
 
   function setAdminOrderLinksVisible(visible) {
     qsa('[data-admin-orders-link]').forEach(link => {
-      link.classList.toggle('hidden', !visible);
-      link.setAttribute('aria-hidden', visible ? 'false' : 'true');
-      if (!visible) link.setAttribute('tabindex', '-1');
-      else link.removeAttribute('tabindex');
+      setForcedElementVisible(link, visible);
       if (link instanceof HTMLAnchorElement) link.href = `${adminPanelHref()}#orders`;
     });
     qs('.mobile-menu-toggle')?.classList.toggle('has-admin-order-alert', false);
@@ -2646,9 +3061,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function updateAdminPanelLinks({ force = false } = {}) {
-    const knownAdmin = Boolean(knownAdminRoleForEmail(currentUser?.email));
-    setAdminPanelLinksVisible(knownAdmin);
-    setAdminOrderLinksVisible(knownAdmin);
+    setAdminPanelLinksVisible(false);
+    setAdminOrderLinksVisible(false);
     if (!currentUser?.email) return false;
 
     try {
@@ -2762,9 +3176,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setActiveNavigation() {
     const page = currentPage();
+    const adminOrderHashes = ['#orders', '#orders-list'];
     qsa('.nav-menu a, .mobile-menu a, .footer-links a').forEach(link => {
-      const linkPage = (link.getAttribute('href') || '').split(/[?#]/)[0].split('/').pop() || 'index.html';
-      link.classList.toggle('active', linkPage === page);
+      const href = link.getAttribute('href') || '';
+      const linkPage = navLinkPage(link);
+      let active = linkPage === page;
+
+      if (link.hasAttribute('data-client-orders-link')) {
+        active = page === 'pedidos.html';
+      } else if (link.hasAttribute('data-admin-orders-link')) {
+        active = page === 'painel.html' && adminOrderHashes.includes(location.hash);
+      } else if (link.hasAttribute('data-admin-panel-link')) {
+        active = page === 'painel.html' && !(link.closest('.mobile-menu') && adminOrderHashes.includes(location.hash));
+      } else if (href.includes('#') && page === 'painel.html') {
+        active = linkPage === page && location.hash === `#${href.split('#')[1]}`;
+      }
+
+      link.classList.toggle('active', active);
     });
     updateDockActive();
   }
@@ -2775,7 +3203,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'index.html') return 'home';
       if (page === 'produtos.html' || page === 'catalogo.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
-      if (['login.html', 'perfil.html', 'editar-perfil.html', 'configuracoes.html', 'criar.html'].includes(page)) return 'account';
+      if (['login.html', 'perfil.html', 'pedidos.html', 'editar-perfil.html', 'configuracoes.html', 'criar.html'].includes(page)) return 'account';
       return '';
     })();
 
@@ -3156,6 +3584,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstOption = options[0] || { price: normalized.price };
     const outOfStock = normalized.stockState === 'out';
     const lowStock = normalized.stockState === 'low';
+    const detailKey = normalized.id || normalized.name;
     const cardClass = [
       'product-card',
       mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
@@ -3167,7 +3596,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ].filter(Boolean).join(' ');
 
     return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}">
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
         ${outOfStock
           ? '<span class="recommended-badge stock-badge">Esgotado</span>'
           : (lowStock
@@ -3189,7 +3618,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
           </select>
         ` : ''}
-        <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
+        <strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
         <button class="btn btn-primary btn-add-cart" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>${outOfStock ? 'Indisponivel' : 'Adicionar'}</button>
       </article>
     `;
@@ -3342,6 +3771,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const key = normalized.id || normalized.name;
+    const options = productOptions(normalized);
+    const firstOption = options[0] || { price: normalized.price };
 
     return `
       <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
@@ -3365,7 +3796,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>${escapeHTML(normalized.category)}</span>
         </div>
         <div class="full-catalog-action">
-          <strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(normalized.price)}</strong>
+          ${options.length > 1 ? `
+            <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
+              ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+            </select>
+          ` : ''}
+          <strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong>
+          <button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}" ${outOfStock ? 'disabled' : ''}>
+            <i class="fa-solid fa-cart-plus"></i>
+            Adicionar
+          </button>
           <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
             <i class="fa-solid fa-circle-info"></i>
             Ver detalhes
@@ -3485,6 +3925,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
+    const options = productOptions(normalized);
+    const firstOption = options[0] || { price: normalized.price };
 
     if (body) {
       body.innerHTML = `
@@ -3504,15 +3946,27 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(normalized.price)}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display>${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}</strong></div>
             <div><span>Estoque</span><strong>${escapeHTML(stockText)}</strong></div>
             <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
           </div>
+          ${options.length > 1 ? `
+            <label class="product-choice catalog-detail-choice">
+              <span>Escolha a opcao</span>
+              <select class="product-option" aria-label="Escolher opcao do produto">
+                ${options.map(option => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+              </select>
+            </label>
+          ` : ''}
           <div class="catalog-detail-actions">
-            ${outOfStock ? '' : `<a class="btn btn-primary" href="${productHref(normalized.name)}">
+            ${outOfStock ? '' : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
+              <i class="fa-solid fa-cart-plus"></i>
+              Adicionar ao carrinho
+            </button>`}
+            <a class="btn btn-secondary" href="${productHref(normalized.name)}">
               <i class="fa-solid fa-store"></i>
-              Comprar este produto
-            </a>`}
+              Ver na loja
+            </a>
             <button class="btn btn-secondary" type="button" data-catalog-detail-close>
               <i class="fa-solid fa-arrow-left"></i>
               Voltar ao catalogo
@@ -3547,8 +4001,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
     list.addEventListener('click', event => {
-      const trigger = event.target.closest('[data-catalog-detail], [data-full-catalog-product]');
+      const detailButton = event.target.closest('[data-catalog-detail]');
+      const trigger = detailButton || event.target.closest('[data-full-catalog-product]');
       if (!trigger) return;
+      if (!detailButton && event.target.closest('button, select, input, label, a')) return;
       event.preventDefault();
       const key = trigger.dataset.catalogDetail || trigger.dataset.catalogProductKey;
       openCatalogDetailModal(key);
@@ -3633,9 +4089,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!select) return;
 
       const option = select.selectedOptions[0];
-      const card = select.closest('.product-card');
+      const card = select.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
       const price = Number(option?.dataset.price || card?.querySelector('.btn-add-cart')?.dataset.price || 0);
-      const priceEl = card?.querySelector('strong');
+      const priceEl = card?.querySelector('[data-product-price-display]') || card?.querySelector('strong');
       const button = card?.querySelector('.btn-add-cart');
 
       if (priceEl) priceEl.textContent = formatMoney(price);
@@ -3644,9 +4100,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('click', event => {
       const button = event.target.closest('.btn-add-cart');
-      if (!button) return;
+      if (!button) {
+        const cardDetail = event.target.closest('.catalog-product');
+        if (!cardDetail || event.target.closest('button, select, input, label, a')) return;
+        openCatalogDetailModal(cardDetail.dataset.catalogDetailKey || cardDetail.dataset.productId || cardDetail.dataset.name);
+        return;
+      }
 
-      const card = button.closest('.product-card');
+      const card = button.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
       const select = card?.querySelector('.product-option');
       const option = select?.selectedOptions[0];
       const baseName = button.dataset.name || card?.dataset.name || card?.querySelector('h3')?.textContent.trim();
@@ -3664,6 +4125,7 @@ document.addEventListener('DOMContentLoaded', () => {
         image,
         stock: button.dataset.stock === '' ? null : Number(button.dataset.stock)
       });
+      closeCatalogDetailModal();
 
       const original = button.dataset.originalText || button.textContent.trim();
       button.dataset.originalText = original;
@@ -4152,7 +4614,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const client = authClient();
     const params = new URLSearchParams(location.search);
-    const tabs = qsa('[data-auth-mode]');
+    const tabs = qsa('.auth-mode-tab[data-auth-mode]');
     const submitLabel = qs('[data-auth-submit-label]');
     const status = qs('#account-status');
     const title = qs('#account-title');
@@ -4165,6 +4627,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const passwordGroup = qs('[data-password-group]');
     const confirmGroup = qs('[data-confirm-password-group]');
     const submitButton = qs('button[type="submit"]', form);
+    const resetLink = qs('[data-reset-password-link]', form);
 
     const setMode = mode => {
       form.dataset.authMode = mode;
@@ -4172,6 +4635,14 @@ document.addEventListener('DOMContentLoaded', () => {
       qsa('[data-register-only]').forEach(field => field.classList.toggle('hidden', mode !== 'register'));
       passwordGroup?.classList.toggle('hidden', mode === 'reset-request');
       confirmGroup?.classList.toggle('hidden', !['register', 'reset-password'].includes(mode));
+      resetLink?.classList.toggle('hidden', mode !== 'login');
+      const passwordLabel = qs('label', passwordGroup || document);
+      if (passwordLabel) {
+        passwordLabel.textContent = {
+          register: 'Criar senha',
+          'reset-password': 'Nova senha'
+        }[mode] || 'Senha';
+      }
 
       if (submitLabel) {
         submitLabel.textContent = {
@@ -4197,12 +4668,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }[mode] || 'Entre com Supabase Auth para usar seus dados salvos e finalizar pedidos mais rápido.';
       }
 
+      form.setAttribute('autocomplete', 'on');
+      emailInput?.setAttribute('name', 'username');
+      emailInput?.setAttribute('autocomplete', 'username');
+      passInput?.setAttribute('name', 'password');
       passInput?.setAttribute('autocomplete', ['register', 'reset-password'].includes(mode) ? 'new-password' : 'current-password');
-      passInput?.setAttribute('placeholder', mode === 'reset-password' ? 'Nova senha' : 'Sua senha');
-      confirmInput?.setAttribute('placeholder', mode === 'reset-password' ? 'Repita a nova senha' : 'Repita a senha');
+      passInput?.setAttribute('placeholder', mode === 'register' ? 'Crie uma senha' : (mode === 'reset-password' ? 'Nova senha' : 'Sua senha'));
+      confirmInput?.setAttribute('name', 'password_confirmation');
+      confirmInput?.setAttribute('autocomplete', 'new-password');
+      confirmInput?.setAttribute('placeholder', mode === 'reset-password' ? 'Repita a nova senha' : 'Repita a senha criada');
     };
 
     tabs.forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.authMode || 'login')));
+    resetLink?.addEventListener('click', () => setMode('reset-request'));
     qsa('[data-toggle-password]', form).forEach(button => {
       button.addEventListener('click', () => {
         const input = qs(button.dataset.togglePassword);
@@ -4215,12 +4693,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     window.addEventListener('monte-sinai-password-recovery', () => setMode('reset-password'));
 
-    if (currentUser?.email) {
-      emailInput.value = currentUser.email || '';
-      nameInput.value = currentUser.name || '';
-      phoneInput.value = currentUser.phone || '';
-      addressInput.value = currentUser.address || '';
-    }
+    const applyProfileToForm = profile => {
+      if (!profile) return;
+      if (emailInput) emailInput.value = profile.email || '';
+      if (nameInput) nameInput.value = profile.name || '';
+      if (phoneInput) phoneInput.value = profile.phone || '';
+      if (addressInput) addressInput.value = profile.address || '';
+      if (passInput) passInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+      emailInput?.dispatchEvent(new Event('input', { bubbles: true }));
+      emailInput?.dispatchEvent(new Event('change', { bubbles: true }));
+      setMode('login');
+      setTimeout(() => passInput?.focus(), 80);
+    };
+
+    const pendingEmail = sessionStorage.getItem(STORAGE.pendingProfile);
+    const pendingProfile = pendingEmail
+      ? savedProfiles().find(profile => normalizeText(profile.email) === normalizeText(pendingEmail))
+      : null;
+    const shouldSavePasswordAfterProfileSwitch = sessionStorage.getItem(STORAGE.pendingProfileSavePassword) === 'true';
+    if (currentUser?.email) applyProfileToForm(currentUser);
+    if (pendingProfile) applyProfileToForm(pendingProfile);
+    if (pendingEmail) sessionStorage.removeItem(STORAGE.pendingProfile);
+    sessionStorage.removeItem(STORAGE.pendingProfileSavePassword);
+    renderProfileChoices(form.parentElement || document);
 
     const setBusy = busy => {
       if (!submitButton) return;
@@ -4228,21 +4724,61 @@ document.addEventListener('DOMContentLoaded', () => {
       submitButton.classList.toggle('is-loading', busy);
     };
 
-    if (!qs('[data-clear-auth-session]', form.parentElement || document)) {
-      form.insertAdjacentHTML('beforebegin', `
-        <div class="auth-session-tools">
-          <button class="auth-inline-link" type="button" data-clear-auth-session>
-            Sair ou limpar sessao atual
-          </button>
-        </div>
-      `);
+    const trySavedProfileLogin = async (profile, mediation = 'optional') => {
+      if (!profile?.email || form.dataset.authMode !== 'login') return false;
+      if (!profile.passwordSaved) {
+        if (status) status.textContent = 'Digite a senha para entrar neste perfil.';
+        return false;
+      }
+      let completed = false;
+      setBusy(true);
+      if (status) status.textContent = 'Verificando senha salva no navegador...';
+      try {
+        const user = await signInWithSavedBrowserProfile(profile, {
+          mediation,
+          context: 'login com perfil salvo'
+        });
+        if (!user) return false;
+        completed = true;
+        finishLogin(user, `Login realizado com a senha salva de ${displayProfileName(user)}.`);
+        return true;
+      } catch (error) {
+        console.warn('[Auth] Nao foi possivel entrar com a senha salva.', error);
+        showToast(authFriendlyError(error, 'A senha salva nao funcionou. Digite a senha para entrar.'));
+        if (passInput) passInput.value = '';
+        return false;
+      } finally {
+        setBusy(false);
+        if (!completed && status) {
+          status.textContent = 'Digite sua senha para entrar. Se o navegador oferecer uma senha salva, voce pode usar.';
+        }
+      }
+    };
+
+    if (pendingProfile) {
+      window.setTimeout(() => {
+        trySavedProfileLogin(pendingProfile, 'required').then(signedIn => {
+          if (!signedIn) passInput?.focus();
+        });
+      }, 120);
     }
 
-    qs('[data-clear-auth-session]', form.parentElement || document)?.addEventListener('click', () => {
-      signOutEverywhere({ message: 'Sessao limpa. Entre novamente com o email correto.' });
-      if (emailInput) emailInput.value = '';
-      if (passInput) passInput.value = '';
-      if (confirmInput) confirmInput.value = '';
+    (form.parentElement || document).addEventListener('click', async event => {
+      const select = event.target.closest('[data-select-saved-profile]');
+      if (select) {
+        const profile = selectSavedProfile(select.dataset.selectSavedProfile);
+        applyProfileToForm(profile);
+        sessionStorage.removeItem(STORAGE.pendingProfile);
+        if (profile) await trySavedProfileLogin(profile, 'required');
+        return;
+      }
+
+      const remove = event.target.closest('[data-remove-saved-profile]');
+      if (remove) {
+        event.preventDefault();
+        event.stopPropagation();
+        removeSavedProfile(remove.dataset.removeSavedProfile);
+      }
     });
 
     form.addEventListener('submit', async event => {
@@ -4310,7 +4846,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
           saveUser(user);
           await safeUpsertProfileRecord(data.user, user, 'recuperacao de senha');
-          finishLogin(user, 'Senha atualizada com sucesso.');
+          const nextUser = await userWithPasswordPreference(user, {
+            email,
+            password,
+            name: user.name || email,
+            shouldSave: shouldSavePasswordAfterProfileSwitch
+          });
+          finishLogin(nextUser, nextUser.passwordSaved ? 'Senha atualizada e guardada neste navegador.' : 'Senha atualizada com sucesso.');
         } catch (error) {
           showToast(authFriendlyError(error, 'Não consegui atualizar a senha. Tente abrir o link novamente.'));
         } finally {
@@ -4345,9 +4887,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const user = userFromAuthUser(data.session.user);
             saveUser(user);
             await safeUpsertProfileRecord(data.session.user, user, 'cadastro');
+            const nextUser = await userWithPasswordPreference(user, {
+              email,
+              password,
+              name,
+              shouldSave: shouldSavePasswordAfterProfileSwitch
+            });
             sendWelcomeEmail(user);
-            finishLogin(user, 'Conta criada com sucesso.');
+            finishLogin(nextUser, nextUser.passwordSaved ? 'Conta criada e senha guardada neste navegador.' : 'Conta criada com sucesso.');
           } else {
+            if (shouldSavePasswordAfterProfileSwitch) await rememberBrowserPassword({ email, password, name });
             showToast('Conta criada. Entre com email e senha para receber a boas-vindas e salvar seus dados.');
             setMode('login');
           }
@@ -4360,7 +4909,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!user?.email) throw new Error('Sessão não retornada pelo Supabase.');
         saveUser(user);
         await safeUpsertProfileRecord(data.session.user, user, 'login');
-        finishLogin(user, profileComplete(user) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.');
+        const nextUser = await userWithPasswordPreference(user, {
+          email,
+          password,
+          name: user.name || email,
+          shouldSave: shouldSavePasswordAfterProfileSwitch
+        });
+        finishLogin(nextUser, nextUser.passwordSaved
+          ? 'Login realizado. Senha guardada neste navegador.'
+          : (profileComplete(nextUser) ? 'Login realizado.' : 'Login realizado. Complete seu endereço quando finalizar.'));
       } catch (error) {
         showToast(authFriendlyError(error, 'Não foi possível entrar. Confira os dados e tente novamente.'));
       } finally {
@@ -5037,7 +5594,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const count = cartCount();
       return count
         ? `Você tem ${count} item${count === 1 ? '' : 's'} no carrinho para finalizar.`
-        : 'Use seus dados salvos para comprar sem repetir informações.';
+        : 'Acompanhe seus pedidos e veja cada mudanca de status atualizada pela loja.';
     }
 
     if (action === 'privacy') {
@@ -5090,10 +5647,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     setProfileActionCard('orders', {
-      href: cartHasItems ? checkoutHref() : productHref(),
+      href: cartHasItems ? checkoutHref() : ordersHref(),
       text: profileActionText(signed, 'orders'),
-      cta: cartHasItems ? 'Finalizar carrinho' : 'Abrir catálogo',
-      label: cartHasItems ? 'Finalizar pedido no carrinho' : 'Abrir catálogo de produtos'
+      cta: cartHasItems ? 'Finalizar carrinho' : 'Ver meus pedidos',
+      label: cartHasItems ? 'Finalizar pedido no carrinho' : 'Acompanhar pedidos'
     });
 
     setProfileActionCard('privacy', {
@@ -5176,10 +5733,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       qs('[data-switch-account]')?.addEventListener('click', () => {
-        signOutEverywhere({
-          redirect: loginHref({ redirect: 'perfil.html' }),
-          message: 'Sessao anterior encerrada. Entre com a outra conta.'
-        });
+        rememberProfile(currentUser);
+        openProfileSwitcher();
       });
 
       qs('[data-logout-account]')?.addEventListener('click', async () => {
@@ -5201,6 +5756,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderOrdersEverywhere({ force: true });
+  }
+
+  function initOrdersPage() {
+    if (currentPage() !== 'pedidos.html') return;
+    if (document.body.dataset.ordersPageBound === 'true') return;
+
+    qsa('[data-orders-login]').forEach(link => {
+      if (link instanceof HTMLAnchorElement) link.href = loginHref({ redirect: 'pedidos.html' });
+    });
+
+    const refresh = () => renderOrdersEverywhere({ force: true });
+    qs('[data-refresh-customer-orders]')?.addEventListener('click', () => {
+      refresh();
+      showToast('Pedidos atualizados.');
+    });
+
+    const form = qs('#track-order-form');
+    const result = qs('[data-track-order-result]');
+    const status = qs('[data-track-order-status]');
+    form?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = qs('button[type="submit"]', form);
+      const code = qs('#track-order-code')?.value || '';
+      const phone = qs('#track-order-phone')?.value || '';
+      if (submit) submit.disabled = true;
+      if (status) status.textContent = 'Consultando pedido...';
+
+      try {
+        const order = await trackOrderByCode(code, phone);
+        rememberTrackedOrder(order);
+        if (result) renderOrders(result, [order]);
+        if (status) status.textContent = 'Pedido encontrado. O status abaixo vem do Supabase.';
+      } catch (error) {
+        console.warn('[Pedidos] Nao foi possivel consultar o pedido por codigo.', error);
+        if (result) result.innerHTML = '';
+        if (status) status.textContent = 'Nao encontrei este pedido. Confira o codigo e o WhatsApp, ou execute o SQL atualizado no Supabase.';
+        showToast('Nao encontrei este pedido pelo codigo informado.');
+      } finally {
+        if (submit) submit.disabled = false;
+      }
+    });
+
+    window.setInterval(() => {
+      if (document.hidden) return;
+      refresh();
+    }, ADMIN_ORDER_POLL_MS);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refresh();
+    });
+
+    refresh();
+    document.body.dataset.ordersPageBound = 'true';
   }
 
 
@@ -5719,13 +6327,25 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#refresh-products')?.addEventListener('click', () => refreshAdminProducts({ force: true }));
     qs('#import-local-products')?.addEventListener('click', importLocalCatalogProducts);
     qsa('[data-admin-create-product]').forEach(button => {
-      button.addEventListener('click', () => startAdminProductForm('produto'));
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        startAdminProductForm('produto');
+      });
     });
     qsa('[data-admin-create-kit]').forEach(button => {
-      button.addEventListener('click', () => startAdminProductForm('kit'));
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        startAdminProductForm('kit');
+      });
     });
     qsa('[data-admin-create-offer]').forEach(button => {
-      button.addEventListener('click', () => startAdminOfferForm());
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        startAdminOfferForm();
+      });
     });
     qsa('[data-offer-duration]').forEach(button => {
       button.addEventListener('click', () => setAdminOfferDuration(Number(button.dataset.offerDuration || 24)));
@@ -5863,8 +6483,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function openAdminModal(name = 'product') {
     const modal = adminModalElement(name);
     if (!modal) return;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    if (modal.parentElement !== document.body) document.body.appendChild(modal);
     modal.classList.remove('hidden');
     document.body.classList.add('admin-modal-open');
+    requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
   }
 
   function closeAdminModal(name = '') {
@@ -5873,27 +6497,97 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('admin-modal-open');
   }
 
+  function configureAdminProductFormMode(mode = 'produto') {
+    const form = qs('#admin-product-form');
+    const title = qs('#admin-product-form-title');
+    const intro = qs('.admin-product-form .admin-form-intro p');
+    const eyebrow = qs('.admin-product-form .admin-form-intro .eyebrow');
+    const name = qs('#admin-product-name');
+    const price = qs('#admin-product-price');
+    const category = qs('#admin-product-category');
+    const description = qs('#admin-product-description');
+    const kitItems = qs('#admin-product-kit-items');
+    const detailDescription = qs('#admin-product-detail-description');
+    const offerActive = qs('#admin-product-offer-active');
+    const highlight = qs('#admin-product-highlight');
+    const catalogHighlight = qs('#admin-product-catalog-highlight');
+
+    form?.setAttribute('data-product-mode', mode);
+    if (eyebrow) {
+      eyebrow.textContent = {
+        kit: 'Montagem de kit',
+        offer: 'Promocao com tempo'
+      }[mode] || 'Cadastro do catalogo';
+    }
+    if (title) {
+      title.textContent = {
+        kit: 'Criar kit de produtos',
+        offer: 'Criar oferta com tempo'
+      }[mode] || 'Criar produto';
+    }
+    if (intro) {
+      intro.textContent = {
+        kit: 'Agrupe varios produtos em uma oferta unica, com nome, preco final e lista de itens do pacote.',
+        offer: 'Escolha o produto, defina preco promocional e programe quando a oferta comeca e termina.',
+        produto: 'Cadastre um item comum da loja com preco, estoque, imagem e detalhes para o cliente.'
+      }[mode] || 'Cadastre um item comum da loja com preco, estoque, imagem e detalhes para o cliente.';
+    }
+
+    name?.setAttribute('placeholder', mode === 'kit' ? 'Kit limpeza completa' : (mode === 'offer' ? 'Agua mineral 20L em oferta' : 'Agua mineral 20L'));
+    price?.setAttribute('placeholder', mode === 'kit' ? '49,90' : '15,00');
+    category?.setAttribute('placeholder', mode === 'kit' ? 'Kits' : 'Agua, Gas, Limpeza');
+    description?.setAttribute('placeholder', mode === 'kit'
+      ? 'Resumo do kit exibido na loja'
+      : (mode === 'offer' ? 'Resumo da promocao exibido na vitrine' : 'Descricao curta exibida no catalogo'));
+    kitItems?.setAttribute('placeholder', mode === 'kit'
+      ? 'Ex: 1 Agua 20L + 1 Detergente 2L + 1 Esponja'
+      : 'Opcional: descreva itens inclusos se este produto virar kit');
+    detailDescription?.setAttribute('placeholder', mode === 'offer'
+      ? 'Explique a oferta, condicoes e validade para o cliente'
+      : 'Texto maior exibido no modal de detalhes');
+
+    if (mode === 'offer') {
+      if (offerActive) offerActive.checked = true;
+      if (highlight) highlight.value = 'true';
+      if (catalogHighlight) catalogHighlight.value = 'true';
+    } else if (offerActive) {
+      offerActive.checked = false;
+    }
+  }
+
   function startAdminProductForm(type = 'produto') {
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
     resetAdminProductForm();
     const typeInput = qs('#admin-product-type');
     const category = qs('#admin-product-category');
-    const title = qs('#admin-product-form-title');
     if (typeInput) typeInput.value = type;
     if (type === 'kit' && category && !category.value) category.value = 'Kits';
-    if (title) title.textContent = type === 'kit' ? 'Criar kit de produtos' : 'Criar produto';
-    setAdminTab('products');
+    configureAdminProductFormMode(type === 'kit' ? 'kit' : 'produto');
     openAdminModal('product');
-    setTimeout(() => qs('#admin-product-name')?.focus(), 80);
+    setTimeout(() => {
+      window.scrollTo(scrollX, scrollY);
+      qs(type === 'kit' ? '#admin-product-kit-items' : '#admin-product-name')?.focus({ preventScroll: true });
+    }, 80);
   }
 
   function startAdminOfferForm() {
-    startAdminProductForm('produto');
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    resetAdminProductForm();
+    const typeInput = qs('#admin-product-type');
+    if (typeInput) typeInput.value = 'produto';
+    configureAdminProductFormMode('offer');
     const active = qs('#admin-product-offer-active');
     const highlight = qs('#admin-product-highlight');
     if (active) active.checked = true;
     if (highlight) highlight.value = 'true';
     setAdminOfferDuration(24);
-    qs('#admin-product-promo-price')?.focus();
+    openAdminModal('product');
+    setTimeout(() => {
+      window.scrollTo(scrollX, scrollY);
+      qs('#admin-product-promo-price')?.focus({ preventScroll: true });
+    }, 80);
   }
 
   function setAdminOfferDuration(hours = 24) {
@@ -6712,6 +7406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (catalogHighlight) catalogHighlight.value = product.catalogo_destaque ? 'true' : 'false';
     if (catalogOrder) catalogOrder.value = product.catalogo_ordem ?? '';
     if (detailDescription) detailDescription.value = product.descricao_detalhada || '';
+    configureAdminProductFormMode(productType(product) === 'kit' ? 'kit' : 'produto');
     setText('#admin-product-form-title', productType(product) === 'kit' ? 'Editar kit' : 'Editar produto');
     setAdminTab('products');
     openAdminModal('product');
@@ -6737,7 +7432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (storeVisible) storeVisible.value = 'true';
     if (catalogHighlight) catalogHighlight.value = 'false';
     if (stockMin) stockMin.value = siteConfig.stockAlertThreshold ?? DEFAULT_SITE_CONFIG.stockAlertThreshold;
-    setText('#admin-product-form-title', 'Criar produto');
+    configureAdminProductFormMode('produto');
     updateAdminProductPreview('');
     productImageUploadStatus('');
   }
@@ -6981,7 +7676,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       card.innerHTML = `
         <div class="admin-product-media">
-          ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
+          ${image ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
         </div>
         <div class="admin-product-info">
           <div class="admin-product-title">
@@ -7132,6 +7827,76 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function trackedOrderFromPayload(raw = {}) {
+    const customer = raw.customer || {};
+    return {
+      id: raw.id || raw.codigo || '',
+      uuid: raw.uuid || raw.order_id || raw.pedido_id || '',
+      createdAt: raw.createdAt || raw.created_at || '',
+      customer: {
+        name: customer.name || raw.cliente_nome || '',
+        email: customer.email || raw.cliente_email || '',
+        phone: customer.phone || raw.cliente_telefone || '',
+        address: customer.address || raw.endereco_entrega || '',
+        note: customer.note || raw.observacao || ''
+      },
+      items: (raw.items || raw.pedido_itens || []).map(item => ({
+        id: item.id || '',
+        productId: item.productId || item.produto_id || '',
+        name: item.name || item.nome || 'Produto',
+        variant: item.variant || item.variacao || '',
+        quantity: Number(item.quantity ?? item.quantidade ?? 1),
+        price: Number(item.price ?? item.preco_unitario ?? 0),
+        image: item.image || item.imagem || ''
+      })),
+      subtotal: Number(raw.subtotal || 0),
+      discount: Number(raw.discount ?? raw.desconto ?? 0),
+      coupon: raw.coupon || (raw.cupom_codigo ? { code: raw.cupom_codigo } : null),
+      delivery: Number(raw.delivery ?? raw.entrega ?? 0),
+      total: Number(raw.total || 0),
+      gift: Boolean(raw.gift ?? raw.brinde),
+      payment: raw.payment || raw.pagamento || '',
+      status: normalizeOrderStatus(raw.status),
+      paymentStatus: normalizePaymentStatus(raw.paymentStatus || raw.pagamento_status),
+      confirmed: Boolean(raw.confirmed ?? raw.confirmado),
+      customerType: raw.customerType || raw.cliente_tipo || 'visitante'
+    };
+  }
+
+  async function trackOrderByCode(code, phone) {
+    const client = ordersClient();
+    const cleanCode = String(code || '').trim();
+    const cleanPhone = onlyDigits(phone || '');
+    if (!client) throw new Error('Supabase indisponivel.');
+    if (!cleanCode || cleanPhone.length < 10) throw new Error('Informe o codigo do pedido e o WhatsApp usado na compra.');
+
+    const { data, error } = await client.rpc('track_order', {
+      p_codigo: cleanCode,
+      p_cliente_telefone: cleanPhone
+    });
+    if (error) throw error;
+    return trackedOrderFromPayload(data || {});
+  }
+
+  function rememberTrackedOrder(order) {
+    if (!order?.id) return;
+    const orders = loadJSON(STORAGE.orders, []);
+    const next = [order, ...orders.filter(item => item.id !== order.id)].slice(0, 20);
+    saveJSON(STORAGE.orders, next);
+  }
+
+  function orderBelongsToCurrentUser(order) {
+    if (!currentUser?.email && !currentUser?.phone) return false;
+    const userEmail = normalizeText(currentUser.email || '');
+    const userPhone = onlyDigits(currentUser.phone || '');
+    const orderEmail = normalizeText(order.customer?.email || '');
+    const orderPhone = onlyDigits(order.customer?.phone || '');
+    return Boolean(
+      (userEmail && orderEmail && userEmail === orderEmail)
+      || (userPhone && orderPhone && userPhone === orderPhone)
+    );
+  }
+
   async function loadCustomerOrderNotifications({ force = false } = {}) {
     if (!force && orderNotificationsCache.length) return orderNotificationsCache;
     if (!orderNotificationsReady) return [];
@@ -7222,7 +7987,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function renderOrdersEverywhere(options = {}) {
     const orders = await loadOrdersFromSupabase(options);
     const customerOrders = currentUser?.email
-      ? orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone)
+      ? orders.filter(orderBelongsToCurrentUser)
       : [];
 
     setText('#dash-orders-count', String(orders.length));
@@ -7326,6 +8091,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderOrders(container, orders) {
     if (!container) return;
     const isProfileHistory = container.id === 'profile-orders';
+    const isCustomerOrdersPage = container.id === 'customer-orders-list';
     const isAdminOrders = container.id === 'orders-list';
     container.innerHTML = '';
 
@@ -7350,9 +8116,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let visibleOrders = orders;
-    if (isProfileHistory) {
+    if (isProfileHistory || isCustomerOrdersPage) {
       if (!currentUser?.email) {
-        container.insertAdjacentHTML('beforeend', `
+        if (isProfileHistory) container.insertAdjacentHTML('beforeend', `
           <div class="profile-guest-note">
             <strong>Pedidos deste aparelho</strong>
             <p>Como visitante, seu historico fica salvo neste navegador. Entre ou cadastre-se para vincular seus pedidos ao perfil.</p>
@@ -7362,9 +8128,15 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
         `);
+        if (isCustomerOrdersPage) container.insertAdjacentHTML('beforeend', `
+          <div class="profile-guest-note">
+            <strong>Pedidos deste aparelho</strong>
+            <p>Entre com sua conta para ver pedidos salvos no Supabase, ou use o codigo e WhatsApp abaixo para consultar um pedido especifico.</p>
+          </div>
+        `);
         visibleOrders = orders;
       } else {
-        visibleOrders = orders.filter(order => order.customer?.email === currentUser.email || order.customer?.phone === currentUser.phone);
+        visibleOrders = orders.filter(orderBelongsToCurrentUser);
       }
     }
 
@@ -7431,7 +8203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <small>${escapeHTML(formatDateTime(order.createdAt))}</small>
           </div>
           <div class="order-card-actions">
-            <button class="btn btn-secondary" type="button" data-repeat-order="${escapeHTML(order.id)}" data-repeat-checkout="${isProfileHistory ? 'true' : 'false'}">
+            <button class="btn btn-secondary" type="button" data-repeat-order="${escapeHTML(order.id)}" data-repeat-checkout="${isProfileHistory || isCustomerOrdersPage ? 'true' : 'false'}">
               <i class="fa-solid fa-repeat"></i>
               Repetir pedido
             </button>

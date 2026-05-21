@@ -531,6 +531,91 @@ revoke all on function public.create_guest_order(jsonb, jsonb) from public;
 grant execute on function public.create_guest_order(jsonb, jsonb) to anon;
 grant execute on function public.create_guest_order(jsonb, jsonb) to authenticated;
 
+create or replace function public.track_order(
+  p_codigo text,
+  p_cliente_telefone text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  order_row public.pedidos%rowtype;
+  clean_code text := upper(btrim(coalesce(p_codigo, '')));
+  clean_phone text := regexp_replace(coalesce(p_cliente_telefone, ''), '\D', '', 'g');
+  items jsonb;
+begin
+  if clean_code = '' or length(clean_phone) < 10 then
+    raise exception 'Informe codigo do pedido e telefone.';
+  end if;
+
+  select *
+  into order_row
+  from public.pedidos
+  where upper(codigo) = clean_code
+    and regexp_replace(coalesce(cliente_telefone, ''), '\D', '', 'g') = clean_phone
+  limit 1;
+
+  if not found then
+    raise exception 'Pedido nao encontrado.';
+  end if;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'id', i.id,
+        'produto_id', i.produto_id,
+        'nome', i.nome,
+        'variacao', coalesce(i.variacao, ''),
+        'quantidade', i.quantidade,
+        'preco_unitario', i.preco_unitario,
+        'total', i.total,
+        'imagem', coalesce(i.imagem, '')
+      )
+      order by i.created_at
+    ),
+    '[]'::jsonb
+  )
+  into items
+  from public.pedido_itens i
+  where i.pedido_id = order_row.id;
+
+  return jsonb_build_object(
+    'id', order_row.codigo,
+    'uuid', order_row.id,
+    'createdAt', order_row.created_at,
+    'customer', jsonb_build_object(
+      'name', order_row.cliente_nome,
+      'email', coalesce(order_row.cliente_email, ''),
+      'phone', order_row.cliente_telefone,
+      'address', order_row.endereco_entrega,
+      'note', coalesce(order_row.observacao, '')
+    ),
+    'items', items,
+    'subtotal', order_row.subtotal,
+    'discount', order_row.desconto,
+    'coupon', case
+      when coalesce(order_row.cupom_codigo, '') <> ''
+      then jsonb_build_object('code', order_row.cupom_codigo)
+      else null
+    end,
+    'delivery', order_row.entrega,
+    'total', order_row.total,
+    'gift', order_row.brinde,
+    'payment', order_row.pagamento,
+    'status', order_row.status,
+    'paymentStatus', order_row.pagamento_status,
+    'confirmed', order_row.confirmado,
+    'customerType', order_row.cliente_tipo
+  );
+end;
+$$;
+
+revoke all on function public.track_order(text, text) from public;
+grant execute on function public.track_order(text, text) to anon;
+grant execute on function public.track_order(text, text) to authenticated;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql

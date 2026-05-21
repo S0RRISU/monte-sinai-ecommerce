@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260521-22';
+const CACHE_VERSION = 'monte-sinai-20260521-28';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -10,8 +10,8 @@ const STATIC_ASSETS = [
   '/promocoes',
   '/sobre',
   '/contato',
-  '/css/style.css?v=20260521-22',
-  '/js/script.js?v=20260521-22',
+  '/css/style.css?v=20260521-28',
+  '/js/script.js?v=20260521-28',
   '/js/supabase.js?v=20260520-4',
   '/site.webmanifest',
   '/assets/brand/monte-sinai-logo-3d.png',
@@ -25,6 +25,8 @@ const PRIVATE_PATHS = [
   '/login.html',
   '/pagamento',
   '/pagamento.html',
+  '/pedidos',
+  '/pedidos.html',
   '/perfil',
   '/perfil.html',
   '/editar-perfil',
@@ -35,6 +37,7 @@ const PRIVATE_PATHS = [
   '/painel.html',
   '/pages/login.html',
   '/pages/pagamento.html',
+  '/pages/pedidos.html',
   '/pages/perfil.html',
   '/pages/editar-perfil.html',
   '/pages/configuracoes.html',

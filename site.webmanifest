@@ -55,7 +55,7 @@
     {
       "name": "Meus pedidos",
       "short_name": "Pedidos",
-      "url": "/pages/perfil.html#orders",
+      "url": "/pedidos",
       "icons": [
         {
           "src": "/assets/brand/monte-sinai-logo-3d.png",

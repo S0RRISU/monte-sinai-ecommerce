@@ -4,6 +4,8 @@ Disallow: /login
 Disallow: /login.html
 Disallow: /pagamento
 Disallow: /pagamento.html
+Disallow: /pedidos
+Disallow: /pedidos.html
 Disallow: /perfil
 Disallow: /perfil.html
 Disallow: /editar-perfil
@@ -14,6 +16,7 @@ Disallow: /painel
 Disallow: /painel.html
 Disallow: /pages/login.html
 Disallow: /pages/pagamento.html
+Disallow: /pages/pedidos.html
 Disallow: /pages/perfil.html
 Disallow: /pages/editar-perfil.html
 Disallow: /pages/configuracoes.html

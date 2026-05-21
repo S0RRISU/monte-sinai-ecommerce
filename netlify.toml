@@ -32,6 +32,16 @@
   status = 200
 
 [[redirects]]
+  from = "/pedidos"
+  to = "/pages/pedidos.html"
+  status = 200
+
+[[redirects]]
+  from = "/pedidos.html"
+  to = "/pages/pedidos.html"
+  status = 200
+
+[[redirects]]
   from = "/sobre"
   to = "/pages/sobre.html"
   status = 200

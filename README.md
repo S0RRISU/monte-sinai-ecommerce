@@ -53,7 +53,7 @@ As policies de RLS deixam cada cliente ver seus proprios dados e pedidos. Admini
 1. O cliente adiciona produtos ao carrinho.
 2. No checkout, o pedido e salvo no Supabase. O cliente pode finalizar logado ou como visitante.
 3. Depois que o pedido e salvo, o site abre o WhatsApp com a mensagem pronta.
-4. O cliente logado acompanha os pedidos em `pages/perfil.html`; o visitante ve o historico salvo naquele aparelho.
+4. O cliente acompanha os pedidos em `pages/pedidos.html`; logados veem os pedidos do Supabase e visitantes podem consultar por codigo + WhatsApp ou ver o historico salvo naquele aparelho.
 5. O lojista gerencia pedidos e produtos em `pages/painel.html`.
 
 ## Painel administrativo
