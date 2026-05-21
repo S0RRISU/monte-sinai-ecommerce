@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     installPromptDismissed: 'ms_install_prompt_dismissed_v1'
   };
 
+  const THEME_MODES = ['system', 'light', 'dark'];
+
   const DEFAULT_OWNER = {
     whatsapp: '5511960928234',
     altWhatsapp: '5511982690871',
@@ -2053,13 +2055,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applySavedTheme() {
     if (!localStorage.getItem(STORAGE.theme)) localStorage.removeItem(STORAGE.legacyTheme);
-    const stored = localStorage.getItem(STORAGE.theme);
-    setTheme(stored || preferredSystemTheme(), false);
+    setThemeMode(currentThemeMode(), false);
     bindSystemThemeSync();
+  }
+
+  function currentThemeMode() {
+    const stored = localStorage.getItem(STORAGE.theme);
+    return THEME_MODES.includes(stored) ? stored : 'system';
   }
 
   function preferredSystemTheme() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function resolveThemeMode(mode = currentThemeMode()) {
+    return mode === 'system' ? preferredSystemTheme() : mode;
   }
 
   function bindSystemThemeSync() {
@@ -2067,9 +2077,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!media || bindSystemThemeSync.bound) return;
 
     bindSystemThemeSync.bound = true;
-    const syncTheme = event => {
-      if (localStorage.getItem(STORAGE.theme)) return;
-      setTheme(event.matches ? 'dark' : 'light', false);
+    const syncTheme = () => {
+      if (currentThemeMode() !== 'system') return;
+      setThemeMode('system', false);
     };
 
     if (media.addEventListener) media.addEventListener('change', syncTheme);
@@ -2077,14 +2087,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setTheme(theme, persist = true) {
-    const isLight = theme !== 'dark';
+    setThemeMode(THEME_MODES.includes(theme) ? theme : 'system', persist);
+  }
+
+  function setThemeMode(mode, persist = true) {
+    const themeMode = THEME_MODES.includes(mode) ? mode : 'system';
+    const resolvedTheme = resolveThemeMode(themeMode);
+    const isLight = resolvedTheme !== 'dark';
     document.body.classList.toggle('light-mode', isLight);
-    if (persist) localStorage.setItem(STORAGE.theme, isLight ? 'light' : 'dark');
+    document.body.dataset.themeMode = themeMode;
+    document.body.dataset.themeResolved = resolvedTheme;
+    qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#f4f9ff' : '#00061f');
+    if (persist) localStorage.setItem(STORAGE.theme, themeMode);
     updateThemeControls();
   }
 
   function updateThemeControls() {
-    const isLight = document.body.classList.contains('light-mode');
+    const themeMode = document.body.dataset.themeMode || currentThemeMode();
+    const resolvedTheme = document.body.dataset.themeResolved || resolveThemeMode(themeMode);
+    const isLight = resolvedTheme !== 'dark';
     const darkToggle = qs('#dark-mode-toggle');
     const current = qs('#theme-current');
     const preview = qs('#theme-preview');
@@ -2094,8 +2115,23 @@ document.addEventListener('DOMContentLoaded', () => {
       darkToggle.setAttribute('aria-pressed', String(!isLight));
     }
 
-    if (current) current.textContent = isLight ? 'Modo claro ativado' : 'Modo noturno ativado';
-    if (preview) preview.textContent = isLight ? 'Claro' : 'Noturno';
+    qsa('[data-theme-choice]').forEach(button => {
+      const active = button.dataset.themeChoice === themeMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-checked', String(active));
+      button.setAttribute('aria-pressed', String(active));
+    });
+
+    if (current) {
+      current.textContent = themeMode === 'system'
+        ? `Seguindo o dispositivo: modo ${isLight ? 'claro' : 'noturno'}`
+        : `Modo ${isLight ? 'claro' : 'noturno'} ativado`;
+    }
+
+    if (preview) {
+      preview.textContent = themeMode === 'system' ? 'Sistema' : (isLight ? 'Claro' : 'Noturno');
+      preview.className = `badge theme-badge theme-${themeMode}`;
+    }
   }
 
   function upgradeProductImages() {
@@ -4669,7 +4705,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initSettingsPage() {
     qs('#dark-mode-toggle')?.addEventListener('click', () => {
-      setTheme(document.body.classList.contains('light-mode') ? 'dark' : 'light');
+      setThemeMode(resolveThemeMode() === 'light' ? 'dark' : 'light');
+    });
+
+    qsa('[data-theme-choice]').forEach(choice => {
+      choice.addEventListener('click', () => {
+        setThemeMode(choice.dataset.themeChoice || 'system');
+      });
+      choice.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const choices = qsa('[data-theme-choice]');
+        const currentIndex = choices.indexOf(choice);
+        const direction = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1;
+        const next = choices[(currentIndex + direction + choices.length) % choices.length];
+        next?.focus();
+        next?.click();
+      });
     });
     updateThemeControls();
 

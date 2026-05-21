@@ -19,11 +19,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260521-03">
+  <link rel="stylesheet" href="../css/style.css?v=20260521-04">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260521-03"></script>
+  <script defer src="../js/script.js?v=20260521-04"></script>
 </head>
 <body>
   <header class="navbar">
@@ -60,21 +60,42 @@
     </section>
 
     <section class="section container settings-page">
-      <div class="settings-section">
-        <h2><i class="fa-solid fa-palette"></i> Aparência</h2>
-        <div class="settings-item">
-          <div>
-            <div class="settings-item-title">Modo noturno</div>
-            <div class="settings-item-desc">Use o modo escuro para reduzir brilho e deixar a navegação mais confortável.</div>
-          </div>
-          <button class="toggle-switch active" id="dark-mode-toggle" type="button" aria-label="Alternar modo noturno" aria-pressed="true"></button>
+      <div class="settings-section appearance-settings">
+        <div class="settings-section-head">
+          <h2><i class="fa-solid fa-palette"></i> Aparência</h2>
+          <p>Escolha o visual que combina com o ambiente ou deixe o site seguir o padrão do seu dispositivo.</p>
         </div>
-        <div class="settings-item">
+
+        <div class="theme-mode-grid" role="radiogroup" aria-label="Tema do site">
+          <button class="theme-choice" type="button" role="radio" data-theme-choice="system" aria-label="Usar padrão do dispositivo" aria-checked="false">
+            <span class="theme-choice-icon"><i class="fa-solid fa-mobile-screen-button"></i></span>
+            <span class="theme-choice-copy">
+              <strong>Sistema</strong>
+              <small>Do aparelho</small>
+            </span>
+          </button>
+          <button class="theme-choice" type="button" role="radio" data-theme-choice="light" aria-label="Usar modo claro" aria-checked="false">
+            <span class="theme-choice-icon"><i class="fa-solid fa-sun"></i></span>
+            <span class="theme-choice-copy">
+              <strong>Claro</strong>
+              <small>Modo dia</small>
+            </span>
+          </button>
+          <button class="theme-choice" type="button" role="radio" data-theme-choice="dark" aria-label="Usar modo noturno" aria-checked="false">
+            <span class="theme-choice-icon"><i class="fa-solid fa-moon"></i></span>
+            <span class="theme-choice-copy">
+              <strong>Noturno</strong>
+              <small>Modo noite</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="theme-current-card">
           <div>
             <div class="settings-item-title">Tema atual</div>
-            <div class="settings-item-desc" id="theme-current">Modo escuro ativado</div>
+            <div class="settings-item-desc" id="theme-current">Seguindo o dispositivo</div>
           </div>
-          <span class="badge" id="theme-preview">Noturno</span>
+          <span class="badge theme-badge" id="theme-preview">Sistema</span>
         </div>
       </div>
 
