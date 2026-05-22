@@ -29,11 +29,11 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
-    <link rel="stylesheet" href="../css/style.css?v=20260522-6" />
+    <link rel="stylesheet" href="../css/style.css?v=20260522-9" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../js/supabase.js?v=20260520-4"></script>
-    <script defer src="../js/admin.js?v=20260522-6"></script>
+    <script defer src="../js/admin.js?v=20260522-9"></script>
   </head>
   <body class="admin-shell-body">
     <div class="admin-app-shell" data-admin-app>
@@ -362,6 +362,22 @@
                     aria-label="Pesquisar produto"
                     placeholder="Pesquisar produto, categoria, estoque"
                   />
+                </label>
+                <label class="admin-filter-field" for="admin-product-category-filter">
+                  <span>Categoria</span>
+                  <select id="admin-product-category-filter">
+                    <option value="all">Todas</option>
+                    <option value="agua">Água</option>
+                    <option value="gas">Gás</option>
+                    <option value="limpeza">Limpeza</option>
+                    <option value="lavanderia">Lavanderia</option>
+                    <option value="higiene">Higiene</option>
+                    <option value="banheiro">Banheiro</option>
+                    <option value="cozinha">Cozinha</option>
+                    <option value="utensilios">Utensílios</option>
+                    <option value="organizacao">Organização</option>
+                    <option value="limpeza-pesada">Limpeza pesada</option>
+                  </select>
                 </label>
                 <div id="admin-product-detail-panel" class="admin-product-detail-panel hidden"></div>
                 <div id="lista-produtos-admin" class="admin-products-simple-list"></div>

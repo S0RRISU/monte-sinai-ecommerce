@@ -569,6 +569,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return haystack.includes(query);
   }
 
+  function adminCategorySlug(value = '') {
+    const normalized = normalize(value || 'produtos');
+    if (normalized.includes('limpeza pesada')) return 'limpeza-pesada';
+    if (normalized.includes('agua')) return 'agua';
+    if (normalized.includes('gas')) return 'gas';
+    if (normalized.includes('lavanderia')) return 'lavanderia';
+    if (normalized.includes('higiene')) return 'higiene';
+    if (normalized.includes('banheiro')) return 'banheiro';
+    if (normalized.includes('cozinha')) return 'cozinha';
+    if (normalized.includes('organiz')) return 'organizacao';
+    if (normalized.includes('utens')) return 'utensilios';
+    if (normalized.includes('limpeza')) return 'limpeza';
+    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function productMatchesCategory(product = {}, filter = 'all') {
+    return !filter || filter === 'all' || adminCategorySlug(product.categoria) === filter;
+  }
+
   function isMissingVariationTableError(error) {
     const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
     return (
@@ -1080,8 +1099,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = qs('#lista-produtos-admin');
     const count = qs('#admin-products-count');
     const query = adminSearchQuery('#admin-product-search');
-    const visibleProdutos = query ? produtos.filter((product) => productMatchesSearch(product, query)) : produtos;
-    if (count) count.textContent = query ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
+    const categoryFilter = qs('#admin-product-category-filter')?.value || 'all';
+    const visibleProdutos = produtos.filter(
+      (product) => productMatchesSearch(product, query) && productMatchesCategory(product, categoryFilter),
+    );
+    if (count)
+      count.textContent =
+        query || categoryFilter !== 'all' ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
     if (!list) return;
     if (state.selectedProductId && !produtos.some((product) => product.id === state.selectedProductId)) {
       state.selectedProductId = '';
@@ -1089,7 +1113,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!visibleProdutos.length) {
-      list.innerHTML = `<p class="admin-empty-state">${query ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum produto cadastrado ainda.'}</p>`;
+      list.innerHTML = `<p class="admin-empty-state">${
+        query || categoryFilter !== 'all'
+          ? 'Nenhum produto encontrado para esta busca e categoria.'
+          : 'Nenhum produto cadastrado ainda.'
+      }</p>`;
       return;
     }
 
@@ -1130,6 +1158,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="admin-product-badges">${statusBadges}</span>
             </div>
             <div class="admin-product-quick-actions">
+              <button class="btn btn-secondary" type="button" data-admin-product-details="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-eye"></i>
+                Ver detalhes
+              </button>
               <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-pen"></i>
                 Editar
@@ -1158,6 +1190,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function productDetailsPanelHTML(product = {}) {
     const offer = productOfferActive(product);
     const active = product.ativo !== false;
+    const variations = productVariations(product.id);
     const stock = product.estoque ?? '';
     const lowStock = productStockLow(product);
     const stockLabel =
@@ -1190,6 +1223,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><dt>ID</dt><dd>${escapeHTML(product.id || '')}</dd></div>
             <div class="is-wide"><dt>Imagem</dt><dd>${escapeHTML(product.imagem || 'Sem URL')}</dd></div>
             <div class="is-wide"><dt>Descricao</dt><dd>${escapeHTML(product.descricao || 'Sem descricao')}</dd></div>
+            <div class="is-wide"><dt>Variacoes</dt><dd>${
+              variations.length
+                ? variations
+                    .map(
+                      (variation) =>
+                        `${escapeHTML(variation.nome || 'Variacao')} - ${formatMoney(variation.preco || product.preco)} - ${
+                          variation.ativo === false ? 'Inativa' : 'Ativa'
+                        } - estoque ${escapeHTML(variation.estoque ?? 'livre')}`,
+                    )
+                    .join('<br>')
+                : 'Sem variacoes cadastradas'
+            }</dd></div>
           </dl>
         </div>
         <div class="admin-product-detail-actions">
@@ -1210,12 +1255,38 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function ensureProductDetailModal() {
+    let modal = qs('#admin-product-detail-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'admin-product-detail-modal';
+    modal.className = 'admin-product-detail-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Detalhes do produto');
+    modal.innerHTML = '<div class="admin-product-detail-modal-panel" data-admin-product-detail-modal-panel></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (event) => {
+      if (event.target !== modal) return;
+      state.selectedProductId = '';
+      renderProductDetailsPanel();
+      renderizarProdutosAdmin(state.produtos);
+    });
+    return modal;
+  }
+
   function renderProductDetailsPanel() {
     const panel = qs('#admin-product-detail-panel');
-    if (!panel) return;
+    const modal = ensureProductDetailModal();
+    const modalPanel = qs('[data-admin-product-detail-modal-panel]', modal);
     const product = state.produtos.find((item) => item.id === state.selectedProductId);
-    panel.classList.toggle('hidden', !product);
-    panel.innerHTML = product ? productDetailsPanelHTML(product) : '';
+    if (panel) {
+      panel.classList.add('hidden');
+      panel.innerHTML = '';
+    }
+    modal.classList.toggle('hidden', !product);
+    document.body.classList.toggle('admin-detail-modal-open', Boolean(product));
+    if (modalPanel) modalPanel.innerHTML = product ? productDetailsPanelHTML(product) : '';
   }
 
   function openProductDetails(productId) {
@@ -1224,7 +1295,6 @@ document.addEventListener('DOMContentLoaded', () => {
     state.selectedProductId = productId;
     renderProductDetailsPanel();
     renderizarProdutosAdmin(state.produtos);
-    qs('#admin-product-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function productVariations(productId) {
@@ -2353,6 +2423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
     qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
     qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));
+    qs('#admin-product-category-filter')?.addEventListener('change', () => renderizarProdutosAdmin(state.produtos));
     qs('#admin-team-search')?.addEventListener('input', (event) => {
       const query = normalize(event.target.value || '');
       qsa('#admin-team-list tr[data-team-row]').forEach((tr) => {
@@ -2411,6 +2482,12 @@ document.addEventListener('DOMContentLoaded', () => {
         state.selectedProductId = '';
         renderProductDetailsPanel();
         renderizarProdutosAdmin(state.produtos);
+        return;
+      }
+
+      const detailOpen = event.target.closest('[data-admin-product-details]');
+      if (detailOpen) {
+        openProductDetails(detailOpen.dataset.adminProductDetails);
         return;
       }
 

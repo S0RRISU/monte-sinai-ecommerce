@@ -68,6 +68,19 @@ document.addEventListener('DOMContentLoaded', () => {
     'cozinha',
     'utensilios',
     'organizacao',
+    'limpeza-pesada',
+  ];
+  const PUBLIC_CATEGORY_FILTERS = [
+    ['agua', 'Água'],
+    ['gas', 'Gás'],
+    ['limpeza', 'Limpeza'],
+    ['lavanderia', 'Lavanderia'],
+    ['higiene', 'Higiene'],
+    ['banheiro', 'Banheiro'],
+    ['cozinha', 'Cozinha'],
+    ['utensilios', 'Utensílios'],
+    ['organizacao', 'Organização'],
+    ['limpeza-pesada', 'Limpeza pesada'],
   ];
   const CATALOG_SECTION_META = {
     recommended: {
@@ -115,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'gas-de-cozinha-p13': ['Supergas', 'Ultragas'],
     'desinfetante-2l': ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive'],
   };
-  const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue'];
+  const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue', 'Cancelado'];
   const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
   // Emergency fallback mapping for admin emails. Do NOT rely on this in production.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
@@ -204,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let installPromptVisible = false;
   let adminOrderPollTimer = null;
   let adminRealtimeChannel = null;
+  let customerOrdersRealtimeChannel = null;
   let adminOrderAlertsStarted = false;
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
@@ -1001,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeOrderStatus(status = '') {
     const text = normalizeText(status);
+    if (text.includes('cancel')) return 'Cancelado';
     if (text.includes('prepar')) return 'Preparando';
     if (text.includes('saiu') || text.includes('entrega'))
       return text.includes('entregue') ? 'Entregue' : 'Saiu para entrega';
@@ -1022,6 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Preparando: 'is-status-preparing',
         'Saiu para entrega': 'is-status-delivery',
         Entregue: 'is-status-delivered',
+        Cancelado: 'is-status-canceled',
       }[normalizeOrderStatus(status)] || 'is-status-received'
     );
   }
@@ -1221,7 +1237,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function categorySlug(value) {
     const normalized = normalizeText(value || 'produtos');
+    if (normalized.includes('limpeza pesada')) return 'limpeza-pesada';
+    if (normalized.includes('agua')) return 'agua';
+    if (normalized.includes('gas')) return 'gas';
+    if (normalized.includes('lavanderia')) return 'lavanderia';
+    if (normalized.includes('higiene')) return 'higiene';
+    if (normalized.includes('banheiro')) return 'banheiro';
+    if (normalized.includes('cozinha')) return 'cozinha';
+    if (normalized.includes('organiz')) return 'organizacao';
     if (normalized.includes('utens')) return 'utensilios';
+    if (normalized.includes('limpeza')) return 'limpeza';
     return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
   }
 
@@ -3162,59 +3187,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dock = qs('.mobile-quick-dock');
     if (!brand && !trigger && !mobileToggle && !dock) return;
 
-    const compact = window.matchMedia?.('(max-width: 760px)').matches;
-    const veryCompact = window.matchMedia?.('(max-width: 360px)').matches;
-    const placeFixed = (element, styles = {}) => {
-      if (!element) return;
-      element.removeAttribute('style');
-      Object.entries(styles).forEach(([property, value]) => {
-        element.style.setProperty(property, value, 'important');
-      });
-    };
-
-    if (compact) {
-      placeFixed(brand, {
-        position: 'fixed',
-        left: '10px',
-        top: '28px',
-        width: veryCompact ? 'min(108px, 35vw)' : 'min(136px, 44vw)',
-        'z-index': '760',
-        transform: 'translateY(-50%)',
-      });
-      placeFixed(trigger, {
-        position: 'fixed',
-        right: '66px',
-        top: '28px',
-        display: 'inline-grid',
-        visibility: 'visible',
-        opacity: '1',
-        width: veryCompact ? '108px' : '124px',
-        height: '42px',
-        'min-width': veryCompact ? '108px' : '124px',
-        'min-height': '42px',
-        'z-index': '761',
-        transform: 'translateY(-50%)',
-      });
-      placeFixed(mobileToggle, {
-        position: 'fixed',
-        right: '10px',
-        top: '28px',
-        display: 'inline-grid',
-        visibility: 'visible',
-        opacity: '1',
-        width: '48px',
-        height: '48px',
-        'min-width': '48px',
-        'min-height': '48px',
-        'z-index': '761',
-        transform: 'translateY(-50%)',
-      });
-    } else {
-      [brand, trigger, mobileToggle].filter(Boolean).forEach((control) => {
-        control.removeAttribute('style');
-      });
-    }
-
+    [brand, trigger, mobileToggle].filter(Boolean).forEach((control) => {
+      control.removeAttribute('style');
+    });
     if (dock) dock.removeAttribute('style');
   }
 
@@ -4439,16 +4414,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDynamicFilters() {
     const filterBar = qs('.filter-chips');
-    if (!filterBar || !productIndex.length) return;
-
-    const categories = orderedCategoryEntries(storeProducts());
+    if (!filterBar) return;
 
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
-      '<button class="filter-chip" type="button" data-filter="recommended">Recomendados</button>',
-      '<button class="filter-chip" type="button" data-filter="ofertas">Ofertas</button>',
-      '<button class="filter-chip" type="button" data-filter="kits">Kits</button>',
-      ...categories.map(
+      ...PUBLIC_CATEGORY_FILTERS.map(
         ([slug, label]) =>
           `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
       ),
@@ -4926,16 +4896,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     products.forEach((card) => {
       const category = card.dataset.category || '';
-      const recommended = card.dataset.recommended === 'true' || card.classList.contains('is-recommended');
       const matchesProduct = searchProducts.some((product) => cardMatchesCatalogProduct(card, product));
       const matchesCardText = !searchProducts.length && cardMatchesCatalogQuery(card, rawTerm, true);
       const matchesTerm = !term || matchesProduct || matchesCardText;
-      const matchesFilter =
-        filter === 'all' ||
-        category === filter ||
-        (filter === 'recommended' && recommended) ||
-        (filter === 'ofertas' && card.classList.contains('is-offer-product')) ||
-        (filter === 'kits' && card.classList.contains('is-kit-product'));
+      const matchesFilter = filter === 'all' || category === filter;
       const show = matchesTerm && matchesFilter;
       card.classList.toggle('hidden', !show);
       card.classList.toggle('is-related-result', false);
@@ -4952,7 +4916,14 @@ document.addEventListener('DOMContentLoaded', () => {
       sectionHead?.classList.toggle('hidden', hideGroup);
     });
 
-    qs('#catalog-empty', catalogRoot)?.classList.toggle('hidden', visible > 0);
+    const empty = qs('#catalog-empty', catalogRoot);
+    if (empty) {
+      empty.textContent =
+        filter !== 'all' && !term
+          ? 'Nenhum produto encontrado nesta categoria'
+          : 'Nenhum produto encontrado com esse filtro.';
+      empty.classList.toggle('hidden', visible > 0);
+    }
     const result = qs('[data-catalog-results]');
     if (result) {
       const suffix = term ? ` para "${rawTerm.trim()}"` : '';
@@ -6841,6 +6812,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('click', handleAdminPanelClick);
     document.body.addEventListener('change', handleAdminPanelChange);
+    subscribeCustomerOrdersRealtime();
     updateOrdersPageMode({ force: true });
     document.body.dataset.ordersPageBound = 'true';
   }
@@ -9172,6 +9144,44 @@ document.addEventListener('DOMContentLoaded', () => {
     saveOrderLocally(order);
   }
 
+  async function refreshLocalOrdersFromSupabase() {
+    const localOrders = loadLocalOrders();
+    if (!localOrders.length || !ordersClient()?.rpc) return localOrders;
+
+    const refreshed = await Promise.all(
+      localOrders.map(async (order) => {
+        const code = order.id || order.codigo || '';
+        const phone = order.customer?.phone || '';
+        if (!code || onlyDigits(phone).length < 10) return order;
+        try {
+          return await trackOrderByCode(code, phone);
+        } catch (_error) {
+          return order;
+        }
+      }),
+    );
+
+    const merged = dedupeOrders([...refreshed, ...localOrders]);
+    saveJSON(STORAGE.orders, merged.slice(0, 20));
+    return merged;
+  }
+
+  function subscribeCustomerOrdersRealtime() {
+    const client = ordersClient();
+    if (!client?.channel || customerOrdersRealtimeChannel || currentPage() !== 'pedidos.html') return;
+    try {
+      customerOrdersRealtimeChannel = client
+        .channel('monte-sinai-customer-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+          remoteOrdersLoaded = false;
+          renderOrdersEverywhere({ force: true });
+        })
+        .subscribe();
+    } catch (error) {
+      console.warn('[Pedidos] Realtime indisponivel para o cliente. Mantendo atualizacao por polling.', error);
+    }
+  }
+
   function orderBelongsToCurrentUser(order) {
     if (!currentUser?.email && !currentUser?.phone) return false;
     const userEmail = normalizeText(currentUser.email || '');
@@ -9275,7 +9285,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function renderOrdersEverywhere(options = {}) {
-    const orders = dedupeOrders(await loadOrdersFromSupabase(options));
+    let orders = dedupeOrders(await loadOrdersFromSupabase(options));
+    if (!currentUser?.email && ['pedidos.html', 'perfil.html'].includes(currentPage())) {
+      orders = await refreshLocalOrdersFromSupabase();
+    }
     const customerOrders = currentUser?.email ? orders.filter(orderBelongsToCurrentUser) : loadLocalOrders();
 
     setText('#dash-orders-count', String(orders.length));
@@ -9370,6 +9383,17 @@ document.addEventListener('DOMContentLoaded', () => {
         : '<p class="empty-cart">Nenhum produto em alerta de estoque.</p>';
     }
     notifyLowStock(lowProducts);
+  }
+
+  function orderStatusTimelineHTML(status = '') {
+    const displayStatus = normalizeOrderStatus(status);
+    const canceled = displayStatus === 'Cancelado';
+    const steps = ORDER_STATUS_OPTIONS.map((label) => {
+      const isCanceledStep = label === 'Cancelado';
+      const active = canceled ? isCanceledStep : !isCanceledStep && ORDER_STATUS_OPTIONS.indexOf(label) <= ORDER_STATUS_OPTIONS.indexOf(displayStatus);
+      return `<span class="${active ? 'active' : ''} ${isCanceledStep ? 'is-canceled-step' : ''}">${escapeHTML(label)}</span>`;
+    });
+    return steps.join('');
   }
 
   function notifyLowStock(products = []) {
@@ -9490,10 +9514,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         `
           : '';
-      const statusIndex = Math.max(0, ORDER_STATUS_OPTIONS.indexOf(displayStatus));
-      const statusSteps = ORDER_STATUS_OPTIONS.map(
-        (status, index) => `<span class="${index <= statusIndex ? 'active' : ''}">${escapeHTML(status)}</span>`,
-      ).join('');
+      const statusSteps = orderStatusTimelineHTML(displayStatus);
 
       card.innerHTML = `
         <header>
