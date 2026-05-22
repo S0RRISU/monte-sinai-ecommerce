@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'estoque_minimo',
   ].join(', ');
   const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
+  const ADMIN_THEME_KEY = 'ms_admin_theme';
 
   function orderStatusClass(statusUi = 'pendente') {
     return (
@@ -83,6 +84,27 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+
+  applyAdminTheme();
+
+  function applyAdminTheme(theme = localStorage.getItem(ADMIN_THEME_KEY) || 'dark') {
+    const resolved = theme === 'light' ? 'light' : 'dark';
+    document.body.classList.toggle('light-mode', resolved === 'light');
+    document.body.dataset.adminTheme = resolved;
+    qs('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f4f8ff' : '#00061f');
+    qsa('[data-admin-theme-toggle]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(resolved === 'light'));
+      const label = resolved === 'light' ? 'Tema escuro' : 'Tema claro';
+      const icon = resolved === 'light' ? 'fa-moon' : 'fa-sun';
+      button.innerHTML = `<i class="fa-solid ${icon}"></i>${label}`;
+    });
+  }
+
+  function toggleAdminTheme() {
+    const next = document.body.dataset.adminTheme === 'light' ? 'dark' : 'light';
+    localStorage.setItem(ADMIN_THEME_KEY, next);
+    applyAdminTheme(next);
+  }
 
   function escapeHTML(value) {
     return text(value).replace(
@@ -2027,6 +2049,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     qs('[data-admin-refresh-equipe]')?.addEventListener('click', () => carregarEquipeAdmin());
     qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
+    qsa('[data-admin-theme-toggle]').forEach((button) => {
+      button.addEventListener('click', toggleAdminTheme);
+    });
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
     qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
     qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));

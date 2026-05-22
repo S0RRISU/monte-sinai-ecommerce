@@ -197,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let productSearchResults = [];
   let activeSearchSuggestionContext = null;
   let searchSuggestionFrame = 0;
+  let lockedPageScrollY = 0;
   let deferredInstallPrompt = null;
   let installPromptVisible = false;
   let adminOrderPollTimer = null;
@@ -2317,6 +2318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal) return;
     modal.dataset.searchTerm = query;
     renderProductSearchModal(resolved);
+    lockPageScroll();
     modal.classList.add('open');
     document.body.classList.add('product-search-open');
   }
@@ -2324,6 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeProductSearchModal() {
     qs('.product-search-modal')?.classList.remove('open');
     document.body.classList.remove('product-search-open');
+    unlockPageScroll();
     activeSearchProduct = null;
   }
 
@@ -3810,6 +3813,28 @@ document.addEventListener('DOMContentLoaded', () => {
     clearSearchSuggestionsPosition(suggestions);
   }
 
+  function lockPageScroll() {
+    if (document.body.dataset.scrollLocked === 'true') return;
+    lockedPageScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.dataset.scrollLocked = 'true';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedPageScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockPageScroll() {
+    if (document.body.dataset.scrollLocked !== 'true') return;
+    document.body.dataset.scrollLocked = 'false';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lockedPageScrollY);
+  }
+
   function closeOtherSearchSuggestions(activeSuggestions) {
     qsa('.search-suggestions').forEach((suggestions) => {
       if (suggestions !== activeSuggestions) hideSearchSuggestions(suggestions);
@@ -4551,6 +4576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     modal.classList.remove('hidden');
+    lockPageScroll();
     document.body.classList.add('catalog-detail-open');
     requestAnimationFrame(() => modal.classList.add('show'));
   }
@@ -4560,7 +4586,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal || modal.classList.contains('hidden')) return;
     modal.classList.remove('show');
     document.body.classList.remove('catalog-detail-open');
-    window.setTimeout(() => modal.classList.add('hidden'), 180);
+    window.setTimeout(() => {
+      modal.classList.add('hidden');
+      unlockPageScroll();
+    }, 180);
   }
 
   function bindFullCatalogPage() {
