@@ -23,11 +23,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260522-1">
+  <link rel="stylesheet" href="../css/style.css?v=20260522-4">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/admin.js?v=20260522-1"></script>
+  <script defer src="../js/admin.js?v=20260522-4"></script>
 </head>
 <body class="admin-shell-body">
   <div class="admin-app-shell" data-admin-app>
@@ -102,6 +102,10 @@
               <h1>Pedidos</h1>
             </div>
             <div class="orders-toolbar">
+              <label class="admin-search-field admin-order-search" for="admin-order-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="admin-order-search" type="search" autocomplete="off" aria-label="Buscar pedido" placeholder="Buscar pedido, cliente, telefone">
+              </label>
               <span class="admin-live-pill" id="admin-realtime-status">Conectando...</span>
               <button class="btn btn-secondary" type="button" data-admin-refresh-orders>
                 <i class="fa-solid fa-rotate"></i>
@@ -113,7 +117,30 @@
           <div class="admin-alert hidden" id="admin-new-order-alert" role="status"></div>
           <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
 
-          <section class="admin-kanban" aria-label="Pedidos por status">
+          <div class="admin-order-status-tabs" role="tablist" aria-label="Filtrar pedidos por status">
+            <button class="admin-order-status-tab active" type="button" data-admin-order-filter="pendente" aria-pressed="true">
+              <i class="fa-solid fa-hourglass-half"></i>
+              <span>Pendentes</span>
+              <strong data-admin-order-filter-count="pendente">0</strong>
+            </button>
+            <button class="admin-order-status-tab" type="button" data-admin-order-filter="preparo" aria-pressed="false">
+              <i class="fa-solid fa-fire-burner"></i>
+              <span>Em Preparo</span>
+              <strong data-admin-order-filter-count="preparo">0</strong>
+            </button>
+            <button class="admin-order-status-tab" type="button" data-admin-order-filter="entrega" aria-pressed="false">
+              <i class="fa-solid fa-truck-fast"></i>
+              <span>Saiu para Entrega</span>
+              <strong data-admin-order-filter-count="entrega">0</strong>
+            </button>
+            <button class="admin-order-status-tab" type="button" data-admin-order-filter="entregue" aria-pressed="false">
+              <i class="fa-solid fa-circle-check"></i>
+              <span>Entregues</span>
+              <strong data-admin-order-filter-count="entregue">0</strong>
+            </button>
+          </div>
+
+          <section class="admin-kanban admin-order-list-view" aria-label="Pedidos por status">
             <article class="admin-kanban-col" data-status-column="pendente">
               <h2><i class="fa-solid fa-hourglass-half"></i> Pendentes</h2>
               <div id="lista-pendentes" class="admin-order-list"></div>
@@ -209,6 +236,11 @@
                 <h2>Produtos cadastrados</h2>
                 <span id="admin-products-count">0</span>
               </div>
+              <label class="admin-search-field admin-product-search" for="admin-product-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="admin-product-search" type="search" autocomplete="off" aria-label="Pesquisar produto" placeholder="Pesquisar produto, categoria, estoque">
+              </label>
+              <div id="admin-product-detail-panel" class="admin-product-detail-panel hidden"></div>
               <div id="lista-produtos-admin" class="admin-products-simple-list"></div>
             </section>
           </section>

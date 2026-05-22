@@ -205,12 +205,24 @@ create table if not exists public.site_configuracoes (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.admin_audit_logs (
+  id uuid primary key default extensions.gen_random_uuid(),
+  actor_id uuid,
+  actor_email text not null default '',
+  action text not null,
+  entity_type text not null default '',
+  entity_id text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_produtos_ativo_nome on public.produtos (ativo, nome);
 create index if not exists idx_enderecos_user_id on public.enderecos (user_id);
 create index if not exists idx_pedidos_user_id_created_at on public.pedidos (user_id, created_at desc);
 create index if not exists idx_pedidos_created_at on public.pedidos (created_at desc);
 create index if not exists idx_pedidos_status_created_at on public.pedidos (status, created_at desc);
 create index if not exists idx_pedido_itens_pedido_id on public.pedido_itens (pedido_id);
+create index if not exists idx_admin_audit_logs_created_at on public.admin_audit_logs (created_at desc);
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -287,6 +299,113 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to anon;
 grant execute on function public.is_admin() to authenticated;
+
+create or replace function public.admin_can_write()
+returns boolean
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select coalesce(
+    public.is_admin()
+    or exists (
+      select 1
+      from auth.users u
+      where u.id = auth.uid()
+        and lower(u.email) in (
+          'marcelol527319@gmail.com',
+          'patriciapaula01234@gmail.com',
+          'marcelo52731@gmail.com'
+        )
+    ),
+    false
+  );
+$$;
+
+revoke all on function public.admin_can_write() from public;
+grant execute on function public.admin_can_write() to authenticated;
+
+create or replace function public.admin_log_action(
+  p_action text,
+  p_entity_type text default '',
+  p_entity_id text default '',
+  p_metadata jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+begin
+  if not public.admin_can_write() then
+    raise exception 'Acesso administrativo negado';
+  end if;
+
+  insert into public.admin_audit_logs (
+    actor_id,
+    actor_email,
+    action,
+    entity_type,
+    entity_id,
+    metadata
+  ) values (
+    auth.uid(),
+    coalesce((select u.email from auth.users u where u.id = auth.uid()), ''),
+    coalesce(nullif(btrim(p_action), ''), 'admin_action'),
+    coalesce(nullif(btrim(p_entity_type), ''), ''),
+    coalesce(nullif(btrim(p_entity_id), ''), ''),
+    coalesce(p_metadata, '{}'::jsonb)
+  );
+end;
+$$;
+
+revoke all on function public.admin_log_action(text, text, text, jsonb) from public;
+grant execute on function public.admin_log_action(text, text, text, jsonb) to authenticated;
+
+create or replace function public.admin_delete_order(p_id uuid)
+returns table (id uuid)
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  order_code text;
+  customer_name text;
+begin
+  if not public.admin_can_write() then
+    raise exception 'Acesso administrativo negado';
+  end if;
+
+  select p.codigo, p.cliente_nome
+  into order_code, customer_name
+  from public.pedidos p
+  where p.id = p_id;
+
+  return query
+  delete from public.pedidos p
+  where p.id = p_id
+  returning p.id;
+
+  insert into public.admin_audit_logs (
+    actor_id,
+    actor_email,
+    action,
+    entity_type,
+    entity_id,
+    metadata
+  ) values (
+    auth.uid(),
+    coalesce((select u.email from auth.users u where u.id = auth.uid()), ''),
+    'pedido_excluido',
+    'pedido',
+    p_id::text,
+    jsonb_build_object('codigo', coalesce(order_code, ''), 'cliente', coalesce(customer_name, ''))
+  );
+end;
+$$;
+
+revoke all on function public.admin_delete_order(uuid) from public;
+grant execute on function public.admin_delete_order(uuid) to authenticated;
 
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
@@ -695,6 +814,7 @@ alter table public.enderecos enable row level security;
 alter table public.pedidos enable row level security;
 alter table public.pedido_itens enable row level security;
 alter table public.site_configuracoes enable row level security;
+alter table public.admin_audit_logs enable row level security;
 
 drop policy if exists "profiles_select_own_or_admin" on public.profiles;
 create policy "profiles_select_own_or_admin"
@@ -728,8 +848,14 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+grant select on public.produtos to anon;
+grant select, insert, update, delete on public.produtos to authenticated;
+grant select, update, delete on public.pedidos to authenticated;
+grant select on public.pedido_itens to authenticated;
+grant select, insert, update on public.profiles to authenticated;
 grant select on public.site_configuracoes to anon, authenticated;
 grant insert, update, delete on public.site_configuracoes to authenticated;
+grant select, insert on public.admin_audit_logs to authenticated;
 
 drop policy if exists "site_configuracoes_public_read" on public.site_configuracoes;
 create policy "site_configuracoes_public_read"
@@ -792,6 +918,12 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "pedidos_delete_admin" on public.pedidos;
+create policy "pedidos_delete_admin"
+on public.pedidos for delete
+to authenticated
+using (public.is_admin());
+
 drop policy if exists "pedido_itens_select_by_order_access" on public.pedido_itens;
 create policy "pedido_itens_select_by_order_access"
 on public.pedido_itens for select
@@ -823,6 +955,18 @@ create policy "pedido_itens_admin_all"
 on public.pedido_itens for all
 to authenticated
 using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "admin_audit_logs_select_admin" on public.admin_audit_logs;
+create policy "admin_audit_logs_select_admin"
+on public.admin_audit_logs for select
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "admin_audit_logs_insert_admin" on public.admin_audit_logs;
+create policy "admin_audit_logs_insert_admin"
+on public.admin_audit_logs for insert
+to authenticated
 with check (public.is_admin());
 
 commit;

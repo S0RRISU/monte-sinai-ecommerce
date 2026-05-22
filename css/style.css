@@ -22102,6 +22102,44 @@ body.app-is-installed .auth-install-button {
   padding: 0 0 14px;
 }
 
+.admin-view-header .orders-toolbar {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.admin-search-field {
+  display: flex;
+  flex: 1 1 300px;
+  min-width: min(100%, 260px);
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: #00061f;
+  color: var(--text-soft);
+  padding: 0 12px;
+}
+
+.admin-search-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px !important;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  padding: 0;
+}
+
+.admin-search-field input::placeholder {
+  color: color-mix(in srgb, var(--text-soft) 72%, transparent);
+}
+
+.admin-product-search {
+  margin: 12px 0;
+}
+
 .admin-live-pill {
   display: inline-flex;
   min-height: 38px;
@@ -22128,10 +22166,75 @@ body.app-is-installed .auth-install-button {
   font-weight: 900;
 }
 
+.admin-order-status-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-order-status-tab {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 58px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 76%, #000000 8%);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 950;
+  text-align: left;
+}
+
+.admin-order-status-tab i {
+  color: var(--accent);
+}
+
+.admin-order-status-tab span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-order-status-tab strong {
+  min-width: 32px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  color: var(--accent);
+  text-align: center;
+}
+
+.admin-order-status-tab.active {
+  border-color: color-mix(in srgb, var(--primary) 72%, var(--line));
+  background: color-mix(in srgb, var(--primary) 24%, var(--surface-soft));
+}
+
+.admin-order-status-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .admin-kanban {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.admin-order-list-view {
+  grid-template-columns: 1fr;
+}
+
+.admin-order-list-view .admin-kanban-col {
+  display: none;
+}
+
+.admin-order-list-view .admin-kanban-col.is-active {
+  display: grid;
 }
 
 .admin-kanban-col {
@@ -22439,16 +22542,21 @@ textarea {
 
 @media (max-width: 1180px) {
   .admin-app-shell {
+    display: block;
     grid-template-columns: 1fr;
   }
 
   .admin-sidebar {
-    position: sticky;
+    position: relative;
     top: 0;
-    z-index: 20;
+    z-index: 1;
     height: auto;
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .admin-main {
+    margin-left: 0 !important;
   }
 
   .admin-sidebar-menu {
@@ -22469,6 +22577,10 @@ textarea {
   }
 
   .admin-kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-order-status-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -22480,7 +22592,20 @@ textarea {
   }
 
   .admin-sidebar-brand {
-    min-height: 56px;
+    min-height: 48px;
+  }
+
+  .admin-sidebar-brand img {
+    width: 42px;
+    height: 42px;
+  }
+
+  .admin-sidebar-brand strong {
+    font-size: 1rem;
+  }
+
+  .admin-sidebar-brand small {
+    display: none;
   }
 
   .admin-sidebar-menu {
@@ -22503,12 +22628,42 @@ textarea {
     padding: 14px;
   }
 
+  .admin-view-header {
+    position: static;
+    gap: 12px;
+  }
+
+  .admin-view-header h1 {
+    font-size: clamp(2rem, 10vw, 2.55rem);
+    line-height: 1;
+  }
+
   .admin-view-header,
   .admin-list-head,
   .admin-order-card header,
   .admin-order-meta {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .admin-view-header .orders-toolbar,
+  .orders-toolbar {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-search-field {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-order-status-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-order-status-tab {
+    min-height: 52px;
   }
 
   .admin-kanban,
@@ -22518,7 +22673,19 @@ textarea {
   }
 
   .admin-kanban-col {
-    min-height: 240px;
+    min-height: 180px;
+  }
+
+  .admin-order-control-grid,
+  .admin-product-detail-grid,
+  .admin-product-detail-grid dl {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-product-detail-card header,
+  .admin-product-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .admin-toast-stack {
@@ -22652,6 +22819,19 @@ textarea {
 /* Admin product management controls */
 .admin-product-manage-card {
   align-items: flex-start;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.admin-product-manage-card:hover,
+.admin-product-manage-card.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 68%, var(--line));
+  background: color-mix(in srgb, var(--primary) 12%, rgba(255, 255, 255, 0.04));
+}
+
+.admin-product-manage-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  outline-offset: 3px;
 }
 
 .admin-product-manage-body {
@@ -22706,6 +22886,95 @@ textarea {
 
 .admin-product-quick-actions .btn {
   min-height: 42px;
+}
+
+.admin-product-detail-panel {
+  margin: 12px 0;
+}
+
+.admin-product-detail-panel.hidden {
+  display: none;
+}
+
+.admin-product-detail-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 56%, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 82%, #000000 8%);
+  padding: 16px;
+}
+
+.admin-product-detail-card header,
+.admin-product-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-product-detail-card h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+}
+
+.admin-product-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-product-detail-media {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-product-detail-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-product-detail-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-product-detail-grid dl div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+}
+
+.admin-product-detail-grid dl .is-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-product-detail-grid dt {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.admin-product-detail-grid dd {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.admin-product-detail-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .admin-product-edit-panel {
@@ -22846,7 +23115,7 @@ textarea {
 
 .admin-order-control-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
   gap: 12px;
   align-items: end;
 }

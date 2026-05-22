@@ -54,9 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
     produtos: [],
     realtimeChannel: null,
     activeTab: 'pedidos',
+    activeOrderStatus: 'pendente',
+    selectedProductId: '',
     user: null,
     profile: null,
-    developerManifest: null
+    developerManifest: null,
+    auditLogs: []
   };
   let productsExtendedReady = true;
   let ordersExtendedReady = true;
@@ -224,6 +227,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  async function rpcExcluirPedido(pedidoId) {
+    const api = client();
+    if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
+    return api.rpc('admin_delete_order', { p_id: pedidoId });
+  }
+
   async function rpcAtualizarProduto(productId, payload = {}) {
     const api = client();
     if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
@@ -231,6 +240,18 @@ document.addEventListener('DOMContentLoaded', () => {
       p_id: productId,
       p_payload: payload
     });
+  }
+
+  async function logAdminAction(action, entityType, entityId, metadata = {}) {
+    const api = client();
+    if (!api?.rpc) return;
+    const { error } = await api.rpc('admin_log_action', {
+      p_action: action,
+      p_entity_type: entityType,
+      p_entity_id: text(entityId),
+      p_metadata: metadata || {}
+    });
+    if (error) console.warn('[Admin Audit] Log nao registrado.', error);
   }
 
   function friendlyDbError(error, fallback) {
@@ -410,6 +431,68 @@ document.addEventListener('DOMContentLoaded', () => {
     return list.filter(order => order.statusUi !== 'entregue');
   }
 
+  function adminSearchQuery(selector) {
+    return normalize(qs(selector)?.value || '');
+  }
+
+  function orderMatchesSearch(order = {}, query = '') {
+    if (!query) return true;
+    const items = (order.items || []).map(item => `${item.nome || ''} ${item.variacao || ''}`).join(' ');
+    const haystack = normalize([
+      order.codigo,
+      order.id,
+      order.cliente_nome,
+      order.cliente_email,
+      order.cliente_telefone,
+      onlyDigits(order.cliente_telefone),
+      order.endereco_entrega,
+      order.pagamento,
+      order.pagamento_status,
+      order.status,
+      order.total,
+      items
+    ].join(' '));
+    return haystack.includes(query);
+  }
+
+  function productMatchesSearch(product = {}, query = '') {
+    if (!query) return true;
+    const stock = product.estoque === null || product.estoque === undefined ? 'sem estoque cadastrado' : `${product.estoque} estoque`;
+    const offer = productOfferActive(product) ? 'oferta promocao destaque' : '';
+    const active = product.ativo === false ? 'desativado inativo' : 'ativo';
+    const haystack = normalize([
+      product.nome,
+      product.categoria,
+      product.descricao,
+      product.tipo,
+      stock,
+      offer,
+      active,
+      product.preco
+    ].join(' '));
+    return haystack.includes(query);
+  }
+
+  function updateOrderStatusTabs(pedidos = [], query = '') {
+    Object.keys(ORDER_STATUS).forEach(key => {
+      const count = pedidos.filter(order => order.statusUi === key).length;
+      const button = qs(`[data-admin-order-filter="${key}"]`);
+      const badge = qs(`[data-admin-order-filter-count="${key}"]`);
+      if (badge) badge.textContent = String(count);
+      if (button) {
+        const active = key === state.activeOrderStatus;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+        button.disabled = query && count === 0 && !active;
+      }
+    });
+  }
+
+  function setActiveOrderStatus(statusUi = 'pendente') {
+    state.activeOrderStatus = ORDER_STATUS[statusUi] ? statusUi : 'pendente';
+    renderizarPedidosAdmin(state.pedidos);
+  }
+
   async function carregarPedidosAdmin(options = {}) {
     const api = client();
     if (!api) return [];
@@ -546,30 +629,42 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fa-solid ${order.confirmado ? 'fa-circle-check' : 'fa-check-double'}"></i>
             ${!ordersExtendedReady ? 'Atualize o banco' : (order.confirmado ? 'Pedido confirmado' : 'Confirmar pedido')}
           </button>
+          <button class="btn btn-secondary admin-danger" type="button" data-admin-order-delete="${escapeHTML(order.id)}">
+            <i class="fa-solid fa-trash"></i>
+            Apagar
+          </button>
         </div>
       </article>
     `;
   }
 
   function renderizarPedidosAdmin(pedidos = state.pedidos, options = {}) {
+    const query = adminSearchQuery('#admin-order-search');
+    const visiblePedidos = query ? pedidos.filter(order => orderMatchesSearch(order, query)) : pedidos;
+    const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
+    const activeConfig = ORDER_STATUS[activeStatus];
+    const activePedidos = visiblePedidos.filter(order => order.statusUi === activeStatus);
+
     Object.values(ORDER_STATUS).forEach(config => {
       const column = qs(`#${config.column}`);
       if (column) column.innerHTML = '';
     });
 
-    pedidos.forEach(order => {
-      const status = ORDER_STATUS[order.statusUi] || ORDER_STATUS.pendente;
-      const column = qs(`#${status.column}`);
-      if (column) column.insertAdjacentHTML('beforeend', orderCardHTML(order, options.highlightId));
+    const activeColumn = qs(`#${activeConfig.column}`);
+    activePedidos.forEach(order => {
+      if (activeColumn) activeColumn.insertAdjacentHTML('beforeend', orderCardHTML(order, options.highlightId));
     });
 
     Object.entries(ORDER_STATUS).forEach(([key, config]) => {
       const column = qs(`#${config.column}`);
-      if (column && !column.children.length) column.innerHTML = emptyColumnHTML(config.label);
       const wrapper = qs(`[data-status-column="${key}"]`);
-      const count = pedidos.filter(order => order.statusUi === key).length;
+      const count = visiblePedidos.filter(order => order.statusUi === key).length;
       wrapper?.style.setProperty('--admin-column-count', `"${count}"`);
+      wrapper?.classList.toggle('is-active', key === activeStatus);
+      if (wrapper) wrapper.hidden = key !== activeStatus;
+      if (column && key === activeStatus && !column.children.length) column.innerHTML = emptyColumnHTML(config.label);
     });
+    updateOrderStatusTabs(visiblePedidos, query);
 
     const openCount = unreadAdminOrders(pedidos).length;
     const badge = qs('#badge-pedidos');
@@ -648,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { ...order, status, statusUi }
       : order);
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    await logAdminAction('pedido_status', 'pedido', pedidoId, { status });
     await carregarPedidosAdmin({ highlightId: pedidoId });
     showToast('Status do pedido atualizado.', 'success');
     return true;
@@ -696,6 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { ...order, pagamento_status: pagamentoStatus }
       : order);
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    await logAdminAction('pedido_pagamento', 'pedido', pedidoId, { pagamento_status: pagamentoStatus });
     showToast('Pagamento atualizado.', 'success');
     return true;
   }
@@ -736,7 +833,43 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { ...order, confirmado: true }
       : order);
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    await logAdminAction('pedido_confirmado', 'pedido', pedidoId, { confirmado: true });
     showToast('Pedido confirmado.', 'success');
+    return true;
+  }
+
+  async function excluirPedidoAdmin(pedidoId) {
+    const api = client();
+    if (!api || !pedidoId) return false;
+    const order = state.pedidos.find(item => item.id === pedidoId);
+    const label = order ? `#${orderShortId(order)} de ${order.cliente_nome || 'cliente'}` : 'este pedido';
+    if (!confirm(`Apagar ${label}? Esta acao remove o pedido e os itens dele.`)) return false;
+
+    let { error } = await api
+      .from('pedidos')
+      .delete()
+      .eq('id', pedidoId);
+
+    if (error) {
+      const rpc = await rpcExcluirPedido(pedidoId);
+      error = rpc.error;
+    }
+
+    if (error) {
+      showToast(friendlyDbError(error, 'Nao consegui apagar o pedido.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    state.pedidos = state.pedidos.filter(item => item.id !== pedidoId);
+    renderizarPedidosAdmin(state.pedidos);
+    renderFinanceiro();
+    renderEntregas();
+    await logAdminAction('pedido_excluido', 'pedido', pedidoId, {
+      codigo: order?.codigo || '',
+      cliente: order?.cliente_nome || ''
+    });
+    showToast('Pedido apagado.', 'success');
     return true;
   }
 
@@ -774,15 +907,21 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderizarProdutosAdmin(produtos = state.produtos) {
     const list = qs('#lista-produtos-admin');
     const count = qs('#admin-products-count');
-    if (count) count.textContent = String(produtos.length);
+    const query = adminSearchQuery('#admin-product-search');
+    const visibleProdutos = query ? produtos.filter(product => productMatchesSearch(product, query)) : produtos;
+    if (count) count.textContent = query ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
     if (!list) return;
+    if (state.selectedProductId && !produtos.some(product => product.id === state.selectedProductId)) {
+      state.selectedProductId = '';
+      renderProductDetailsPanel();
+    }
 
-    if (!produtos.length) {
-      list.innerHTML = '<p class="admin-empty-state">Nenhum produto cadastrado ainda.</p>';
+    if (!visibleProdutos.length) {
+      list.innerHTML = `<p class="admin-empty-state">${query ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum produto cadastrado ainda.'}</p>`;
       return;
     }
 
-    list.innerHTML = produtos.map(product => {
+    list.innerHTML = visibleProdutos.map(product => {
       const offer = productOfferActive(product);
       const stock = product.estoque ?? '';
       const active = product.ativo !== false;
@@ -793,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
         offer ? '<span class="admin-product-badge is-offer">Oferta</span>' : ''
       ].filter(Boolean).join('');
       return `
-        <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''}">
+        <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''} ${product.id === state.selectedProductId ? 'is-selected' : ''}" role="button" tabindex="0" data-admin-product-open="${escapeHTML(product.id)}">
           <span class="admin-product-thumb">
             ${productImageHTML(product)}
           </span>
@@ -826,6 +965,73 @@ document.addEventListener('DOMContentLoaded', () => {
         </article>
       `;
     }).join('');
+    renderProductDetailsPanel();
+  }
+
+  function productDetailsPanelHTML(product = {}) {
+    const offer = productOfferActive(product);
+    const active = product.ativo !== false;
+    const stock = product.estoque ?? '';
+    const stockLabel = stock === '' || stock === null ? 'Sem estoque cadastrado' : `${stock} em estoque`;
+    return `
+      <article class="admin-product-detail-card">
+        <header>
+          <div>
+            <span class="eyebrow">Detalhes do produto</span>
+            <h2>${escapeHTML(product.nome || 'Produto')}</h2>
+          </div>
+          <button class="icon-button" type="button" data-admin-product-detail-close aria-label="Fechar detalhes">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+        <div class="admin-product-detail-grid">
+          <span class="admin-product-detail-media">${productImageHTML(product)}</span>
+          <dl>
+            <div><dt>Categoria</dt><dd>${escapeHTML(product.categoria || 'Produtos')}</dd></div>
+            <div><dt>Preco</dt><dd>${formatMoney(product.preco)}</dd></div>
+            <div><dt>Status</dt><dd>${active ? 'Ativo' : 'Desativado'}</dd></div>
+            <div><dt>Estoque</dt><dd>${escapeHTML(stockLabel)}</dd></div>
+            <div><dt>Estoque minimo</dt><dd>${escapeHTML(product.estoque_minimo ?? 3)}</dd></div>
+            <div><dt>Oferta</dt><dd>${offer ? `${formatMoney(product.preco_promocional)} ate ${formatDateTime(product.oferta_fim) || 'sem fim'}` : 'Nao ativa'}</dd></div>
+            <div><dt>Destaque</dt><dd>${product.destaque ? 'Sim' : 'Nao'}</dd></div>
+            <div><dt>ID</dt><dd>${escapeHTML(product.id || '')}</dd></div>
+            <div class="is-wide"><dt>Imagem</dt><dd>${escapeHTML(product.imagem || 'Sem URL')}</dd></div>
+            <div class="is-wide"><dt>Descricao</dt><dd>${escapeHTML(product.descricao || 'Sem descricao')}</dd></div>
+          </dl>
+        </div>
+        <div class="admin-product-detail-actions">
+          <button class="btn btn-primary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-pen"></i>
+            Editar produto
+          </button>
+          <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-ban"></i>
+            Esgotar
+          </button>
+          <button class="btn btn-secondary" type="button" data-admin-product-offer-24="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-bolt"></i>
+            Oferta 24h
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderProductDetailsPanel() {
+    const panel = qs('#admin-product-detail-panel');
+    if (!panel) return;
+    const product = state.produtos.find(item => item.id === state.selectedProductId);
+    panel.classList.toggle('hidden', !product);
+    panel.innerHTML = product ? productDetailsPanelHTML(product) : '';
+  }
+
+  function openProductDetails(productId) {
+    const product = state.produtos.find(item => item.id === productId);
+    if (!product) return;
+    state.selectedProductId = productId;
+    renderProductDetailsPanel();
+    renderizarProdutosAdmin(state.produtos);
+    qs('#admin-product-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function productEditFormHTML(product = {}) {
@@ -984,7 +1190,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (file) {
         try {
           showToast('Enviando nova imagem...', 'info');
-          payload.imagem = await uploadImagemProduto(file, payload.nome || productId);
+          payload.imagem = await resolveProductImage(file, payload.nome || productId);
         } catch (error) {
           showToast(friendlyDbError(error, error.message || 'Nao consegui enviar a imagem.'), 'error');
           return false;
@@ -1043,6 +1249,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { ...product, ...payload }
       : product);
     renderizarProdutosAdmin(state.produtos);
+    await logAdminAction(override ? 'produto_atalho' : 'produto_atualizado', 'produto', productId, {
+      campos: Object.keys(payload)
+    });
     showToast('Produto atualizado.', 'success');
     carregarProdutosAdmin();
     return true;
@@ -1065,6 +1274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    await logAdminAction('produto_excluido', 'produto', productId, { nome: name });
     showToast('Produto excluido.', 'success');
     await carregarProdutosAdmin();
   }
@@ -1085,16 +1295,43 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'png';
   }
 
-  async function uploadImagemProduto(file, productNameOverride = '') {
-    const api = client();
-    if (!api?.storage) throw new Error('Storage do Supabase indisponível.');
-    if (!file) return '';
+  function validateProductImageFile(file) {
+    if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       throw new Error('Use uma imagem JPG, PNG ou WebP.');
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      throw new Error('Use uma imagem de até 5 MB.');
+      throw new Error('Use uma imagem de ate 5 MB.');
     }
+  }
+
+  function fileToDataUrl(file) {
+    validateProductImageFile(file);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(text(reader.result || ''));
+      reader.onerror = () => reject(new Error('Nao consegui ler a imagem selecionada.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function resolveProductImage(file, productNameOverride = '') {
+    if (!file) return '';
+    validateProductImageFile(file);
+    try {
+      return await uploadImagemProduto(file, productNameOverride);
+    } catch (error) {
+      console.warn('[Admin] Upload no Storage falhou, usando imagem embutida no cadastro.', error);
+      showToast('Storage nao aceitou a imagem; salvando direto no produto.', 'info');
+      return fileToDataUrl(file);
+    }
+  }
+
+  async function uploadImagemProduto(file, productNameOverride = '') {
+    const api = client();
+    if (!api?.storage) throw new Error('Storage do Supabase indisponível.');
+    if (!file) return '';
+    validateProductImageFile(file);
 
     const extension = imageExtension(file);
     const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
@@ -1132,11 +1369,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (feedback) feedback.textContent = file ? 'Enviando imagem...' : 'Salvando produto...';
-      const publicUrl = file ? await uploadImagemProduto(file) : '';
+      const productName = qs('#prod-nome')?.value.trim() || '';
+      const publicUrl = file ? await resolveProductImage(file, productName || file.name || 'produto') : '';
       const estoqueValue = qs('#prod-estoque')?.value;
       const offerActive = qs('#prod-oferta-ativa')?.value === 'true';
       const payload = {
-        nome: qs('#prod-nome')?.value.trim() || '',
+        nome: productName,
         preco: parsePrice(qs('#prod-preco')?.value || 0),
         categoria: qs('#prod-categoria')?.value || 'Produtos',
         descricao: qs('#prod-desc')?.value.trim() || '',
@@ -1159,7 +1397,11 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Informe o preco promocional para ativar a oferta.');
       }
 
-      let { error } = await api.from('produtos').insert(payload);
+      let { data: insertedProduct, error } = await api
+        .from('produtos')
+        .insert(payload)
+        .select('id')
+        .maybeSingle();
       if (error && normalize(error.message || error.details || '').match(/oferta|promocional|estoque_minimo|destaque|tipo|kit_itens/)) {
         const basePayload = {
           nome: payload.nome,
@@ -1170,7 +1412,12 @@ document.addEventListener('DOMContentLoaded', () => {
           ativo: payload.ativo
         };
         if (estoqueValue !== '') basePayload.estoque = payload.estoque;
-        const fallback = await api.from('produtos').insert(basePayload);
+        const fallback = await api
+          .from('produtos')
+          .insert(basePayload)
+          .select('id')
+          .maybeSingle();
+        insertedProduct = fallback.data;
         error = fallback.error;
       }
       if (error) throw error;
@@ -1178,6 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
       form.reset();
       if (feedback) feedback.textContent = 'Produto salvo.';
       await carregarProdutosAdmin();
+      await logAdminAction('produto_criado', 'produto', insertedProduct?.id || payload.nome, { nome: payload.nome });
       showToast('Produto salvo no catálogo.', 'success');
     } catch (error) {
       console.warn('[Admin] Erro ao salvar produto.', error);
@@ -1238,6 +1486,40 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  async function loadAdminAuditLogs() {
+    const api = client();
+    if (!api) return { ready: false, logs: [] };
+    const { data, error } = await api
+      .from('admin_audit_logs')
+      .select('created_at, actor_email, action, entity_type, entity_id, metadata')
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (error) {
+      console.warn('[Admin Audit] Nao consegui ler auditoria.', error);
+      return { ready: false, logs: [] };
+    }
+
+    state.auditLogs = data || [];
+    return { ready: true, logs: state.auditLogs };
+  }
+
+  function auditRows(audit = { ready: false, logs: [] }) {
+    if (!audit.ready) {
+      return [
+        { label: 'Status', value: 'Execute supabase/reparar-painel-admin.sql' },
+        { label: 'Tabela', value: 'admin_audit_logs' }
+      ];
+    }
+    if (!audit.logs.length) {
+      return [{ label: 'Status', value: 'Nenhuma alteracao registrada ainda' }];
+    }
+    return audit.logs.map(log => ({
+      label: `${formatDateTime(log.created_at)} - ${log.actor_email || 'admin'}`,
+      value: `${log.action} ${log.entity_type || ''} ${text(log.entity_id).slice(0, 8)}`
+    }));
+  }
+
   async function readAssetManifestSummary() {
     if (state.developerManifest) return state.developerManifest;
     const summary = {
@@ -1273,6 +1555,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cacheKeys = 'caches' in window
       ? await caches.keys().catch(() => [])
       : [];
+    const audit = await loadAdminAuditLogs();
     const realtimeText = qs('#admin-realtime-status')?.textContent || 'Não iniciado';
     const profile = state.profile || {};
 
@@ -1293,7 +1576,20 @@ document.addEventListener('DOMContentLoaded', () => {
         { label: 'Assets mapeados', value: manifest.total },
         { label: 'Gerado em', value: manifest.generated },
         { label: 'Caches do navegador', value: cacheKeys.length ? cacheKeys.join(', ') : 'Nenhum cache listado' }
-      ])
+      ]),
+      developerCardHTML('Esqueleto do site', 'sitemap', [
+        { label: 'Paginas publicas', value: 'inicio, produtos, catalogo, pedido, perfil, pagamento' },
+        { label: 'Painel admin', value: 'pedidos, produtos, entregas, financeiro, configuracoes' },
+        { label: 'Arquivos principais', value: 'pages/*.html, css/style.css, js/script.js, js/admin.js' },
+        { label: 'SQL operacional', value: 'supabase/reparar-painel-admin.sql' }
+      ]),
+      developerCardHTML('Funcoes alteraveis', 'sliders', [
+        { label: 'Produtos', value: 'nome, preco, categoria, estoque, status, oferta, imagem' },
+        { label: 'Pedidos', value: 'status, pagamento, confirmacao, remocao' },
+        { label: 'Loja', value: 'WhatsApp, Pix e caches locais' },
+        { label: 'Auditoria', value: audit.ready ? 'Ativa' : 'Aguardando SQL de reparo' }
+      ]),
+      developerCardHTML('Auditoria admin', 'clipboard-list', auditRows(audit))
     ].join('');
   }
 
@@ -1316,6 +1612,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
+    qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
+    qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));
+    qsa('[data-admin-order-filter]').forEach(button => {
+      button.addEventListener('click', () => setActiveOrderStatus(button.dataset.adminOrderFilter));
+    });
     qsa('[data-admin-product-view]').forEach(button => {
       button.addEventListener('click', () => setAdminProductView(button.dataset.adminProductView || 'list'));
     });
@@ -1344,6 +1645,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const editorClose = event.target.closest('[data-admin-product-editor-close]');
       if (editorClose) {
         closeProductEditor();
+        return;
+      }
+
+      const detailClose = event.target.closest('[data-admin-product-detail-close]');
+      if (detailClose) {
+        state.selectedProductId = '';
+        renderProductDetailsPanel();
+        renderizarProdutosAdmin(state.produtos);
         return;
       }
 
@@ -1400,7 +1709,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const confirmOrder = event.target.closest('[data-admin-order-confirm]');
       if (confirmOrder) {
         confirmarPedidoAdmin(confirmOrder.dataset.adminOrderConfirm);
+        return;
       }
+
+      const deleteOrder = event.target.closest('[data-admin-order-delete]');
+      if (deleteOrder) {
+        excluirPedidoAdmin(deleteOrder.dataset.adminOrderDelete);
+        return;
+      }
+
+      const productOpen = event.target.closest('[data-admin-product-open]');
+      if (productOpen && !event.target.closest('button, a, input, select, textarea, label')) {
+        openProductDetails(productOpen.dataset.adminProductOpen);
+      }
+    });
+
+    document.body.addEventListener('keydown', event => {
+      const productOpen = event.target.closest?.('[data-admin-product-open]');
+      if (!productOpen || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      openProductDetails(productOpen.dataset.adminProductOpen);
     });
   }
 
