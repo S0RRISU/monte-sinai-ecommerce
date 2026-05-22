@@ -2495,7 +2495,10 @@ document.addEventListener('DOMContentLoaded', () => {
       productSearchResults.length > 1
         ? `
         <div class="product-search-more">
-          <span>Outras sugestões</span>
+          <span>
+            <strong>Outras sugestões</strong>
+            <small>Produtos relacionados à sua busca</small>
+          </span>
           <div>
             ${productSearchResults
               .map((result, index) => {
@@ -2524,8 +2527,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ${productMediaHTML(activeSearchProduct, image)}
       </div>
       <div class="product-search-info">
-        <span class="eyebrow">Produto encontrado</span>
+        <span class="eyebrow">Resultado principal</span>
         <h2>${escapeHTML(activeSearchProduct.name)}</h2>
+        <span class="product-search-category">${escapeHTML(activeSearchProduct.category || 'Produto encontrado')}</span>
         <p>${escapeHTML(description)}</p>
         <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
         <small class="product-stock-line">${escapeHTML(activeSearchProduct.hasVariations ? optionStockText(firstOption, activeSearchProduct) : productStockText(activeSearchProduct))}</small>
@@ -3541,19 +3545,26 @@ document.addEventListener('DOMContentLoaded', () => {
   async function updateAdminPanelLinks({ force = false } = {}) {
     setAdminPanelLinksVisible(false);
     setAdminOrderLinksVisible(false);
+    updateClientOrdersLinksForRole(false);
     if (!currentUser?.email) return false;
 
     try {
       await authReady.catch(() => null);
       const admin = await isCurrentUserAdmin({ force });
+      ordersPageAdminMode = Boolean(admin);
+      document.body.classList.toggle('orders-admin-mode', ordersPageAdminMode);
       setAdminPanelLinksVisible(admin);
       setAdminOrderLinksVisible(admin);
+      updateClientOrdersLinksForRole(admin);
       if (admin) refreshAdminOrderAlerts({ force: true });
       return admin;
     } catch (error) {
       console.warn('[Admin] Nao foi possivel validar o link do painel.', error);
       setAdminPanelLinksVisible(false);
       setAdminOrderLinksVisible(false);
+      ordersPageAdminMode = false;
+      document.body.classList.remove('orders-admin-mode');
+      updateClientOrdersLinksForRole(false);
       return false;
     }
   }
@@ -3994,12 +4005,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (!isMobileSearchViewport()) {
-      clearSearchSuggestionsPosition(suggestions);
+    const rect = form.getBoundingClientRect();
+    if (!rect.width || rect.bottom < 0 || rect.top > window.innerHeight) {
+      hideSearchSuggestions(suggestions);
       return;
     }
 
-    clearSearchSuggestionsPosition(suggestions);
+    const margin = 12;
+    const preferredWidth = Math.max(300, Math.min(440, rect.width < 260 ? 360 : rect.width));
+    const width = Math.min(preferredWidth, window.innerWidth - margin * 2);
+    const left = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin);
+    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const maxHeight = Math.max(180, window.innerHeight - top - margin);
+
+    suggestions.classList.add('is-positioned');
+    suggestions.style.setProperty('--suggestions-top', `${Math.max(margin, top)}px`);
+    suggestions.style.setProperty('--suggestions-left', `${left}px`);
+    suggestions.style.setProperty('--suggestions-width', `${width}px`);
+    suggestions.style.setProperty('--suggestions-max-height', `${maxHeight}px`);
   }
 
   function bindSearchSuggestionViewportTracking() {
@@ -5243,6 +5266,25 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const cartSuggestion = event.target.closest('[data-cart-suggestion-product]');
+      if (cartSuggestion) {
+        const productId = cartSuggestion.dataset.cartSuggestionProduct || '';
+        const product = productIndex.find((item) => String(normalizeProduct(item).id) === String(productId));
+        const normalized = product ? normalizeProduct(product) : null;
+        if (!normalized) return;
+        const option = (normalized.options || []).find((item) => !optionOutOfStock(item));
+        addToCart({
+          productId: normalized.id,
+          variationId: option?.id || '',
+          name: normalized.name,
+          variant: option?.name || '',
+          price: Number(option?.price || normalized.price || 0),
+          image: option?.image || productAssetPath(normalized),
+          stock: option ? option.stock : normalized.stock,
+        });
+        return;
+      }
+
       if (!action) return;
 
       const id = action.dataset.cartId;
@@ -5487,6 +5529,63 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       container.appendChild(row);
     });
+
+    const suggestions = cartSuggestionProducts();
+    if (suggestions.length) {
+      const block = document.createElement('section');
+      block.className = 'cart-suggestions';
+      block.innerHTML = `
+        <div class="cart-suggestions-head">
+          <strong>Complete seu pedido</strong>
+          <span>Sugestões rápidas para adicionar ao carrinho</span>
+        </div>
+        <div class="cart-suggestions-grid">
+          ${suggestions
+            .map((product) => {
+              const imageSrc = assetHref(productAssetPath(product));
+              return `
+                <button class="cart-suggestion-card" type="button" data-cart-suggestion-product="${escapeHTML(product.id)}">
+                  <span class="cart-suggestion-media">
+                    ${
+                      imageSrc
+                        ? `<img src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+                        : productPlaceholderHTML(product, 'product-placeholder-compact')
+                    }
+                  </span>
+                  <span class="cart-suggestion-copy">
+                    <strong>${escapeHTML(product.name)}</strong>
+                    <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>
+                  </span>
+                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                </button>
+              `;
+            })
+            .join('')}
+        </div>
+      `;
+      container.appendChild(block);
+    }
+  }
+
+  function cartSuggestionProducts() {
+    if (!cart.length || !productIndex.length) return [];
+    const inCartProductIds = new Set(cart.map((item) => String(item.productId || '')).filter(Boolean));
+    const inCartNames = new Set(cart.map((item) => normalizeText(item.baseName || item.name || '')));
+    const active = productIndex
+      .map(normalizeProduct)
+      .filter((product) => product.active !== false)
+      .filter((product) => !inCartProductIds.has(String(product.id || '')))
+      .filter((product) => !inCartNames.has(normalizeText(product.name)))
+      .filter((product) => {
+        if (product.hasVariations) return (product.options || []).some((option) => !optionOutOfStock(option));
+        return product.stockState !== 'out';
+      });
+    return [
+      ...active.filter((product) => product.recommended || product.highlight || product.offerActive),
+      ...active,
+    ]
+      .filter((product, index, list) => list.findIndex((item) => String(item.id) === String(product.id)) === index)
+      .slice(0, 3);
   }
 
   function bindAccountPage() {
