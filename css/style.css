@@ -21978,6 +21978,181 @@ body.app-is-installed .auth-install-button {
   white-space: nowrap !important;
 }
 
+/* Mobile UX fixes for Etapa 5: navbar, hero, chips, admin sidebar, bottom dock */
+@media (max-width: 760px) {
+  :root {
+    --bottom-nav-height: 68px;
+  }
+
+  /* ensure bottom dock won't cover content */
+  body {
+    padding-bottom: var(--bottom-nav-height);
+  }
+
+  /* hide top action icons on compact mobile when bottom dock exists */
+  .navbar .nav-actions,
+  .navbar .nav-whatsapp-link,
+  .navbar .nav-account-link,
+  .navbar .nav-cart-link,
+  .nav-actions {
+    display: none !important;
+  }
+
+  /* keep header elements aligned: logo left, compact trigger centered, hamburger right */
+  .nav-inner {
+    justify-content: space-between;
+  }
+
+  .brand {
+    position: fixed !important;
+    left: 12px !important;
+    top: 12px !important;
+    width: min(140px, 44vw) !important;
+    z-index: 760 !important;
+    transform: none !important;
+  }
+
+  .mobile-menu-toggle {
+    position: fixed !important;
+    right: 10px !important;
+    top: 12px !important;
+    z-index: 761 !important;
+  }
+
+  /* compact search / trigger centered in header */
+  .nav-search-trigger,
+  .nav-search-inline {
+    position: fixed !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: 12px !important;
+    display: inline-grid !important;
+    width: min(220px, 56%) !important;
+    z-index: 761 !important;
+  }
+
+  /* hero adjustments so title doesn't overflow and leaves space for bottom dock */
+  .hero-home {
+    padding-bottom: calc(var(--bottom-nav-height) + 28px) !important;
+  }
+
+  .hero-home h1 {
+    font-size: 1.28rem !important;
+    line-height: 1.12 !important;
+    max-width: calc(100% - 40px) !important;
+    overflow-wrap: break-word !important;
+    hyphens: auto !important;
+  }
+
+  /* category chips: horizontal scroll, compact chips */
+  .filter-chips {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding: 6px 6px !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+  }
+
+  .filter-chip {
+    flex: 0 0 auto !important;
+    padding: 6px 10px !important;
+    font-size: 0.95rem !important;
+    min-height: 36px !important;
+  }
+
+  /* admin sidebar becomes a compact responsive grid on mobile */
+  .admin-app-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-sidebar {
+    position: static !important;
+    height: auto !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    padding: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    align-items: center !important;
+  }
+
+  .admin-sidebar-brand {
+    display: none !important;
+  }
+
+  .admin-sidebar-menu {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .admin-menu-btn {
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 8px !important;
+    font-size: 0.92rem !important;
+    white-space: normal !important;
+    line-height: 1.05 !important;
+  }
+
+  /* bottom dock styling and spacing */
+  .mobile-quick-dock {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: var(--bottom-nav-height) !important;
+    display: flex !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    z-index: 1200 !important;
+    padding: 6px 6px !important;
+    background: var(--surface) !important;
+    border-top: 1px solid var(--line) !important;
+  }
+
+  .mobile-quick-dock a,
+  .mobile-quick-dock button {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    font-size: 0.82rem !important;
+    color: var(--text) !important;
+  }
+
+  .mobile-quick-dock .dock-cart {
+    min-width: 48px !important;
+  }
+
+  /* prevent horizontal overflow from fixed elements */
+  html,
+  body {
+    overflow-x: hidden !important;
+  }
+
+  /* reduce product card min-height on small screens */
+  .product-card {
+    min-height: auto !important;
+  }
+}
+
+@media (max-width: 440px) {
+  .brand {
+    left: 8px !important;
+    top: 10px !important;
+    width: 120px !important;
+  }
+
+  .hero-home h1 {
+    font-size: 1.1rem !important;
+  }
+}
+
 .dashboard-shortcuts {
   display: none !important;
 }
@@ -23821,7 +23996,11 @@ textarea {
   border-radius: inherit;
   background:
     radial-gradient(circle at 42% 24%, rgba(255, 212, 31, 0.18), transparent 48%),
-    linear-gradient(145deg, color-mix(in srgb, var(--surface-soft) 86%, transparent), color-mix(in srgb, var(--surface) 88%, #000 6%));
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface-soft) 86%, transparent),
+      color-mix(in srgb, var(--surface) 88%, #000 6%)
+    );
   color: var(--primary);
   text-align: center;
 }
@@ -26134,7 +26313,10 @@ body.light-mode .products-page .catalog-tools .search-suggestion-item small {
 }
 
 .admin-variation-create {
-  grid-template-columns: minmax(180px, 1.4fr) minmax(96px, 0.65fr) minmax(92px, 0.6fr) minmax(180px, 1.3fr) minmax(132px, 0.85fr) minmax(128px, 0.8fr) !important;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(96px, 0.65fr) minmax(92px, 0.6fr) minmax(180px, 1.3fr) minmax(
+      132px,
+      0.85fr
+    ) minmax(128px, 0.8fr) !important;
   align-items: end !important;
   min-width: 0 !important;
   padding: 12px !important;
@@ -26214,7 +26396,7 @@ body.light-mode .products-page .catalog-tools .search-suggestion-item small {
     grid-column: auto;
   }
 
-.admin-variation-actions .btn {
+  .admin-variation-actions .btn {
     flex: 1 1 120px;
   }
 }
