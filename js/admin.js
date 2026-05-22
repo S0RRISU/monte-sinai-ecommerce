@@ -15,8 +15,38 @@ document.addEventListener('DOMContentLoaded', () => {
     entrega: { label: 'Saiu para Entrega', db: 'Saiu para entrega', column: 'lista-entrega' },
     entregue: { label: 'Entregue', db: 'Entregue', column: 'lista-entregues' }
   };
+  const PAYMENT_STATUS = ['Pendente', 'Pago', 'Cancelado'];
+  const PRODUCT_BASIC_SELECT = 'id, nome, preco, categoria, descricao, imagem, ativo, estoque, created_at';
+  const PRODUCT_EXTENDED_SELECT = [
+    PRODUCT_BASIC_SELECT,
+    'tipo',
+    'destaque',
+    'oferta_ativa',
+    'preco_promocional',
+    'oferta_inicio',
+    'oferta_fim',
+    'kit_itens',
+    'estoque_minimo'
+  ].join(', ');
   const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS)
     .reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
+
+  function orderStatusClass(statusUi = 'pendente') {
+    return {
+      pendente: 'is-status-received',
+      preparo: 'is-status-preparing',
+      entrega: 'is-status-delivery',
+      entregue: 'is-status-delivered'
+    }[statusUi] || 'is-status-received';
+  }
+
+  function orderPaymentClass(status = 'Pendente') {
+    return {
+      Pendente: 'is-payment-pending',
+      Pago: 'is-payment-paid',
+      Cancelado: 'is-payment-canceled'
+    }[PAYMENT_STATUS.includes(status) ? status : 'Pendente'] || 'is-payment-pending';
+  }
 
   const state = {
     client: null,
@@ -28,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     profile: null,
     developerManifest: null
   };
+  let productsExtendedReady = true;
+  let ordersExtendedReady = true;
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -84,6 +116,78 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function formatDateTimeLocal(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  function isoFromLocal(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  function productOfferActive(product = {}) {
+    if (!product.oferta_ativa) return false;
+    if (!product.preco_promocional || Number(product.preco_promocional) <= 0) return false;
+    if (!product.oferta_fim) return true;
+    return new Date(product.oferta_fim).getTime() > Date.now();
+  }
+
+  function productCardField(id, field) {
+    return qs(`[data-admin-product-field="${field}"][data-product-id="${escapeSelector(id)}"]`);
+  }
+
+  function productImageFallback(product = {}) {
+    const name = normalize(product.nome || '');
+    if (name.includes('agua')) return '../assets/produtos/v2/agua-mineral-20l.png';
+    if (name.includes('gas')) return '../assets/produtos/v2/gas-p13.png';
+    if (name.includes('desinfetante')) return '../assets/produtos/v2/desinfetante-2l.png';
+    if (name.includes('detergente')) return '../assets/produtos/v2/detergente-2l.png';
+    if (name.includes('alcool')) return '../assets/produtos/v2/alcool-perfumado.png';
+    if (name.includes('amaciante')) return '../assets/produtos/v2/amaciante-2l.png';
+    if (name.includes('candida') && name.includes('color')) return '../assets/produtos/v2/candida-colorida.png';
+    if (name.includes('candida')) return '../assets/produtos/v2/candida-2l.png';
+    if (name.includes('cloro') && name.includes('1l')) return '../assets/produtos/v2/cloro-1l.png';
+    if (name.includes('cloro')) return '../assets/produtos/v2/cloro-2l.png';
+    if (name.includes('bombril')) return '../assets/produtos/v2/bombril.png';
+    if (name.includes('esponja') && name.includes('aco')) return '../assets/produtos/v2/esponja-aco.png';
+    if (name.includes('esponja') && name.includes('louca')) return '../assets/produtos/v2/esponja-louca.png';
+    if (name.includes('esponja')) return '../assets/produtos/v2/esponjao.png';
+    if (name.includes('escova') && name.includes('vaso')) return '../assets/produtos/v2/escova-vaso.png';
+    if (name.includes('escova')) return '../assets/produtos/v2/escova-roupa.png';
+    if (name.includes('limpa') && name.includes('aluminio')) return '../assets/produtos/v2/limpa-aluminio.png';
+    if (name.includes('limpa') && name.includes('pedra') && name.includes('500')) return '../assets/produtos/v2/limpa-pedra-500ml.png';
+    if (name.includes('limpa') && name.includes('pedra')) return '../assets/produtos/v2/limpa-pedra-2l.png';
+    if (name.includes('sabao') && name.includes('coco')) return '../assets/produtos/v2/sabao-coco.png';
+    if (name.includes('sabao')) return '../assets/produtos/v2/sabao-omo.png';
+    if (name.includes('sabonete')) return '../assets/produtos/v2/sabonete-liquido.png';
+    if (name.includes('saco')) return '../assets/produtos/v2/saco-lixo.png';
+    if (name.includes('rodo') && name.includes('pequeno')) return '../assets/produtos/v2/rodo-pequeno.png';
+    if (name.includes('rodo')) return '../assets/produtos/v2/rodo-grande.png';
+    if (name.includes('rodinho')) return '../assets/produtos/v2/rodinho-pia.png';
+    if (name.includes('prendedor') && name.includes('madeira')) return '../assets/produtos/v2/prendedor-madeira.png';
+    if (name.includes('prendedor')) return '../assets/produtos/v2/prendedor-plastico.png';
+    if (name.includes('pedra')) return '../assets/produtos/v2/pedra-vaso.png';
+    if (name.includes('pasta')) return '../assets/produtos/v2/pasta-brilho.png';
+    if (name === 'pa' || name.includes(' pa')) return '../assets/produtos/v2/pa.png';
+    if (name.includes('vassoura')) return '../assets/produtos/v2/vassoura.png';
+    return '';
+  }
+
+  function productImageHTML(product = {}) {
+    const src = text(product.imagem || '').trim();
+    const fallback = productImageFallback(product);
+    if (!src && !fallback) return '<i class="fa-solid fa-box"></i>';
+    const onerror = fallback && src !== fallback
+      ? ` onerror="this.onerror=null;this.src='${escapeHTML(fallback)}';"`
+      : ' onerror="this.onerror=null;this.closest(\'.admin-product-thumb\').innerHTML=\'<i class=&quot;fa-solid fa-box&quot;></i>\';"';
+    return `<img src="${escapeHTML(src || fallback)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async"${onerror}>`;
+  }
+
   function showToast(message, type = 'info') {
     let stack = qs('.admin-toast-stack');
     if (!stack) {
@@ -109,8 +213,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return state.client;
   }
 
+  async function rpcAtualizarPedido(pedidoId, payload = {}) {
+    const api = client();
+    if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
+    return api.rpc('admin_update_order', {
+      p_id: pedidoId,
+      p_status: payload.status ?? null,
+      p_pagamento_status: payload.pagamento_status ?? null,
+      p_confirmado: payload.confirmado ?? null
+    });
+  }
+
+  async function rpcAtualizarProduto(productId, payload = {}) {
+    const api = client();
+    if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
+    return api.rpc('admin_update_product', {
+      p_id: productId,
+      p_payload: payload
+    });
+  }
+
   function friendlyDbError(error, fallback) {
     const message = normalize(error?.message || error?.details || '');
+    if (message.includes('does not exist') || message.includes('column')) {
+      return 'Banco do Supabase incompleto. Execute supabase/reparar-painel-admin.sql no SQL Editor.';
+    }
     if (message.includes('row-level security') || message.includes('permission')) {
       return 'A conta precisa estar marcada como administradora no Supabase.';
     }
@@ -118,6 +245,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Confira o bucket público produtos e as policies de Storage.';
     }
     return fallback;
+  }
+
+  function isMissingSchemaError(error, patterns = []) {
+    const message = normalize(`${error?.message || ''} ${error?.details || ''}`);
+    return message.includes('does not exist') || message.includes('column')
+      || patterns.some(pattern => message.includes(normalize(pattern)));
+  }
+
+  function setDatabaseAlert(message = '') {
+    const alert = qs('#admin-db-alert');
+    if (!alert) return;
+    alert.classList.toggle('hidden', !message);
+    alert.innerHTML = message
+      ? `<strong>Ação necessária no Supabase</strong><span>${escapeHTML(message)}</span>`
+      : '';
   }
 
   function setAccessState(title, message, options = {}) {
@@ -261,6 +403,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function unreadAdminOrders(pedidos = state.pedidos) {
+    const list = pedidos || [];
+    const unconfirmed = list.filter(order => order.confirmado === false);
+    if (unconfirmed.length) return unconfirmed;
+    return list.filter(order => order.statusUi !== 'entregue');
+  }
+
   async function carregarPedidosAdmin(options = {}) {
     const api = client();
     if (!api) return [];
@@ -279,6 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
       'status',
       'pagamento_status',
       'confirmado',
+      'confirmado_em',
+      'pagamento_confirmado_em',
       'subtotal',
       'entrega',
       'total',
@@ -292,17 +443,21 @@ document.addEventListener('DOMContentLoaded', () => {
       .select(extendedSelect)
       .order('created_at', { ascending: false });
 
-    if (error) {
+    if (error && isMissingSchemaError(error, ['pagamento_status', 'confirmado'])) {
       console.warn('[Admin] Busca completa de pedidos falhou, tentando campos basicos.', error);
+      ordersExtendedReady = false;
+      setDatabaseAlert('A tabela pedidos ainda não tem as colunas de pagamento/confirmacao. Execute supabase/reparar-painel-admin.sql para liberar status completo, pagamento e confirmação.');
       const fallback = await api
         .from('pedidos')
         .select(baseSelect)
         .order('created_at', { ascending: false });
       data = fallback.data;
       error = fallback.error;
+    } else if (!error) {
+      ordersExtendedReady = true;
     }
 
-    if (error) {
+    if (error || !data) {
       showToast(friendlyDbError(error, 'Não consegui carregar os pedidos.'), 'error');
       return [];
     }
@@ -339,10 +494,35 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function orderPaymentSelect(order) {
+      const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
+    if (!ordersExtendedReady) {
+      return `
+        <label class="admin-order-status-select">
+          <span>Pagamento</span>
+          <select disabled>
+            <option>Atualize o banco</option>
+          </select>
+        </label>
+      `;
+    }
+    return `
+      <label class="admin-order-status-select">
+        <span>Pagamento</span>
+        <select data-admin-order-payment="${escapeHTML(order.id)}">
+          ${PAYMENT_STATUS.map(status => `
+            <option value="${escapeHTML(status)}" ${status === payment ? 'selected' : ''}>${escapeHTML(status)}</option>
+          `).join('')}
+        </select>
+      </label>
+    `;
+  }
+
   function orderCardHTML(order, highlightId = '') {
     const highlighted = highlightId && order.id === highlightId;
+    const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
     return `
-      <article class="admin-order-card ${highlighted ? 'is-new' : ''}" data-admin-order-card="${escapeHTML(order.id)}">
+      <article class="admin-order-card ${orderStatusClass(order.statusUi)} ${orderPaymentClass(payment)} ${order.confirmado ? 'is-confirmed' : 'is-unconfirmed'} ${highlighted ? 'is-new' : ''}" data-admin-order-card="${escapeHTML(order.id)}">
         <header>
           <strong>#${escapeHTML(orderShortId(order))}</strong>
           <span>${escapeHTML(formatDateTime(order.created_at))}</span>
@@ -359,7 +539,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>${escapeHTML(order.pagamento || 'Pagamento a combinar')}</span>
           <strong>${formatMoney(order.totalNumber)}</strong>
         </div>
-        ${orderStatusSelect(order)}
+        <div class="admin-order-control-grid">
+          ${orderStatusSelect(order)}
+          ${orderPaymentSelect(order)}
+          <button class="btn btn-secondary ${order.confirmado ? 'is-confirmed' : ''}" type="button" data-admin-order-confirm="${escapeHTML(order.id)}" ${order.confirmado || !ordersExtendedReady ? 'disabled' : ''}>
+            <i class="fa-solid ${order.confirmado ? 'fa-circle-check' : 'fa-check-double'}"></i>
+            ${!ordersExtendedReady ? 'Atualize o banco' : (order.confirmado ? 'Pedido confirmado' : 'Confirmar pedido')}
+          </button>
+        </div>
       </article>
     `;
   }
@@ -384,9 +571,13 @@ document.addEventListener('DOMContentLoaded', () => {
       wrapper?.style.setProperty('--admin-column-count', `"${count}"`);
     });
 
-    const openCount = pedidos.filter(order => order.statusUi !== 'entregue').length;
+    const openCount = unreadAdminOrders(pedidos).length;
     const badge = qs('#badge-pedidos');
     if (badge) badge.textContent = String(openCount);
+    if (badge) {
+      badge.classList.toggle('is-empty', openCount === 0);
+      badge.setAttribute('aria-label', `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`);
+    }
 
     if (options.announce) {
       const alert = qs('#admin-new-order-alert');
@@ -432,10 +623,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const select = qs(`[data-admin-order-status="${escapeSelector(pedidoId)}"]`);
     if (select) select.disabled = true;
 
-    const { error } = await api
+    let { data, error } = await api
       .from('pedidos')
       .update({ status })
-      .eq('id', pedidoId);
+      .eq('id', pedidoId)
+      .select('id, status')
+      .maybeSingle();
+
+    if (error || !data) {
+      const fallback = await rpcAtualizarPedido(pedidoId, { status });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
 
     if (select) select.disabled = false;
 
@@ -449,17 +648,118 @@ document.addEventListener('DOMContentLoaded', () => {
       ? { ...order, status, statusUi }
       : order);
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    await carregarPedidosAdmin({ highlightId: pedidoId });
     showToast('Status do pedido atualizado.', 'success');
+    return true;
+  }
+
+  async function atualizarPagamentoPedido(pedidoId, pagamentoStatus) {
+    const api = client();
+    if (!api || !pedidoId || !PAYMENT_STATUS.includes(pagamentoStatus)) {
+      showToast('Status de pagamento invalido.', 'error');
+      return false;
+    }
+    if (!ordersExtendedReady) {
+      showToast('Execute o SQL de reparo no Supabase para controlar pagamento.', 'error');
+      setDatabaseAlert('A coluna pedidos.pagamento_status não existe no banco. Execute supabase/reparar-painel-admin.sql.');
+      return false;
+    }
+
+    const select = qs(`[data-admin-order-payment="${escapeSelector(pedidoId)}"]`);
+    if (select) select.disabled = true;
+
+    let { data, error } = await api
+      .from('pedidos')
+      .update({
+        pagamento_status: pagamentoStatus,
+        pagamento_confirmado_em: pagamentoStatus === 'Pago' ? new Date().toISOString() : null
+      })
+      .eq('id', pedidoId)
+      .select('id, pagamento_status')
+      .maybeSingle();
+
+    if (error || !data) {
+      const fallback = await rpcAtualizarPedido(pedidoId, { pagamento_status: pagamentoStatus });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
+
+    if (select) select.disabled = false;
+
+    if (error || !data || data.pagamento_status !== pagamentoStatus) {
+      showToast(friendlyDbError(error, 'Nao consegui atualizar o pagamento.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    state.pedidos = state.pedidos.map(order => order.id === pedidoId
+      ? { ...order, pagamento_status: pagamentoStatus }
+      : order);
+    renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    showToast('Pagamento atualizado.', 'success');
+    return true;
+  }
+
+  async function confirmarPedidoAdmin(pedidoId) {
+    const api = client();
+    if (!api || !pedidoId) return false;
+    if (!ordersExtendedReady) {
+      showToast('Execute o SQL de reparo no Supabase para confirmar pedidos.', 'error');
+      setDatabaseAlert('A coluna pedidos.confirmado não existe no banco. Execute supabase/reparar-painel-admin.sql.');
+      return false;
+    }
+
+    const button = qs(`[data-admin-order-confirm="${escapeSelector(pedidoId)}"]`);
+    if (button) button.disabled = true;
+
+    let { data, error } = await api
+      .from('pedidos')
+      .update({ confirmado: true, confirmado_em: new Date().toISOString() })
+      .eq('id', pedidoId)
+      .select('id, confirmado')
+      .maybeSingle();
+
+    if (error || !data) {
+      const fallback = await rpcAtualizarPedido(pedidoId, { confirmado: true });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
+
+    if (error || !data || data.confirmado !== true) {
+      if (button) button.disabled = false;
+      showToast(friendlyDbError(error, 'Nao consegui confirmar o pedido.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    state.pedidos = state.pedidos.map(order => order.id === pedidoId
+      ? { ...order, confirmado: true }
+      : order);
+    renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
+    showToast('Pedido confirmado.', 'success');
     return true;
   }
 
   async function carregarProdutosAdmin() {
     const api = client();
     if (!api) return [];
-    const { data, error } = await api
+    let { data, error } = await api
       .from('produtos')
-      .select('id, nome, preco, categoria, descricao, imagem, ativo, estoque, created_at')
+      .select(PRODUCT_EXTENDED_SELECT)
       .order('created_at', { ascending: false });
+
+    if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque', 'tipo', 'kit_itens'])) {
+      productsExtendedReady = false;
+      setDatabaseAlert('A tabela produtos ainda não tem todas as colunas de oferta/estoque. Execute supabase/reparar-painel-admin.sql para liberar todos os controles.');
+      const fallback = await api
+        .from('produtos')
+        .select(PRODUCT_BASIC_SELECT)
+        .order('created_at', { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    } else if (!error) {
+      productsExtendedReady = true;
+    }
 
     if (error) {
       showToast(friendlyDbError(error, 'Não consegui carregar os produtos.'), 'error');
@@ -482,20 +782,291 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    list.innerHTML = produtos.map(product => `
-      <article class="admin-product-simple-card">
-        <span class="admin-product-thumb">
-          ${product.imagem
-            ? `<img src="${escapeHTML(product.imagem)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async">`
-            : '<i class="fa-solid fa-box"></i>'}
-        </span>
-        <span>
+    list.innerHTML = produtos.map(product => {
+      const offer = productOfferActive(product);
+      const stock = product.estoque ?? '';
+      const active = product.ativo !== false;
+      const stockLabel = stock === '' || stock === null ? 'Sem estoque cadastrado' : (Number(stock) <= 0 ? 'Esgotado' : `${stock} em estoque`);
+      const statusBadges = [
+        `<span class="admin-product-badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>`,
+        stock !== '' && stock !== null && Number(stock) <= 0 ? '<span class="admin-product-badge is-out">Esgotado</span>' : '',
+        offer ? '<span class="admin-product-badge is-offer">Oferta</span>' : ''
+      ].filter(Boolean).join('');
+      return `
+        <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''}">
+          <span class="admin-product-thumb">
+            ${productImageHTML(product)}
+          </span>
+          <div class="admin-product-manage-body">
+            <div class="admin-product-manage-title">
+              <strong>${escapeHTML(product.nome || 'Produto')}</strong>
+              <small>${escapeHTML(product.categoria || 'Produtos')} - ${formatMoney(product.preco)}</small>
+              <small>${active ? stockLabel : 'Desativado'}${offer ? ' - Em oferta' : ''}</small>
+              <span class="admin-product-badges">${statusBadges}</span>
+            </div>
+            <div class="admin-product-quick-actions">
+              <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-pen"></i>
+                Editar
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-ban"></i>
+                Esgotar
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-product-offer-24="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-bolt"></i>
+                Oferta 24h
+              </button>
+              <button class="btn btn-secondary admin-danger" type="button" data-admin-product-delete="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-trash"></i>
+                Excluir
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function productEditFormHTML(product = {}) {
+    const stock = product.estoque ?? '';
+    const active = product.ativo !== false;
+    return `
+      <div class="admin-product-editor-media">
+        <span class="admin-product-thumb">${productImageHTML(product)}</span>
+        <div>
           <strong>${escapeHTML(product.nome || 'Produto')}</strong>
-          <small>${escapeHTML(product.categoria || 'Produtos')} - ${formatMoney(product.preco)}</small>
-          <small>${product.ativo === false ? 'Desativado' : (Number(product.estoque) === 0 ? 'Esgotado' : 'Ativo')}</small>
-        </span>
-      </article>
-    `).join('');
+          <small>${escapeHTML(product.categoria || 'Produtos')}</small>
+        </div>
+      </div>
+      <div class="admin-product-edit-grid">
+        <label>Nome
+          <input type="text" value="${escapeHTML(product.nome || '')}" data-admin-product-field="nome" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Preco
+          <input type="number" min="0" step="0.01" value="${Number(product.preco || 0).toFixed(2)}" data-admin-product-field="preco" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Categoria
+          <input type="text" value="${escapeHTML(product.categoria || 'Produtos')}" data-admin-product-field="categoria" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label class="admin-product-edit-wide">Imagem do produto
+          <input type="url" value="${escapeHTML(product.imagem || '')}" data-admin-product-field="imagem" data-product-id="${escapeHTML(product.id)}" placeholder="https://...">
+        </label>
+        <label class="admin-product-edit-wide">Enviar nova imagem
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-product-image-file="${escapeHTML(product.id)}">
+        </label>
+        <label>Estoque
+          <input type="number" min="0" step="1" value="${escapeHTML(stock)}" data-admin-product-field="estoque" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Estoque minimo
+          <input type="number" min="0" step="1" value="${escapeHTML(product.estoque_minimo ?? 3)}" data-admin-product-field="estoque_minimo" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Status
+          <select data-admin-product-field="ativo" data-product-id="${escapeHTML(product.id)}">
+            <option value="true" ${active ? 'selected' : ''}>Ativo</option>
+            <option value="false" ${!active ? 'selected' : ''}>Desativado</option>
+          </select>
+        </label>
+        <label>Destaque
+          <select data-admin-product-field="destaque" data-product-id="${escapeHTML(product.id)}">
+            <option value="false" ${!product.destaque ? 'selected' : ''}>Nao</option>
+            <option value="true" ${product.destaque ? 'selected' : ''}>Sim</option>
+          </select>
+        </label>
+        <label>Oferta
+          <select data-admin-product-field="oferta_ativa" data-product-id="${escapeHTML(product.id)}">
+            <option value="false" ${!product.oferta_ativa ? 'selected' : ''}>Nao</option>
+            <option value="true" ${product.oferta_ativa ? 'selected' : ''}>Sim</option>
+          </select>
+        </label>
+        <label>Preco de oferta
+          <input type="number" min="0" step="0.01" value="${product.preco_promocional ? Number(product.preco_promocional).toFixed(2) : ''}" data-admin-product-field="preco_promocional" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Oferta comeca
+          <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(product.oferta_inicio))}" data-admin-product-field="oferta_inicio" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label>Oferta termina
+          <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(product.oferta_fim))}" data-admin-product-field="oferta_fim" data-product-id="${escapeHTML(product.id)}">
+        </label>
+        <label class="admin-product-edit-wide">Descricao
+          <textarea rows="3" data-admin-product-field="descricao" data-product-id="${escapeHTML(product.id)}">${escapeHTML(product.descricao || '')}</textarea>
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-primary" type="button" data-admin-product-save="${escapeHTML(product.id)}">
+          <i class="fa-solid fa-floppy-disk"></i>
+          Salvar alteracoes
+        </button>
+        <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
+          <i class="fa-solid fa-ban"></i>
+          Esgotar
+        </button>
+        <button class="btn btn-secondary" type="button" data-admin-product-offer-24="${escapeHTML(product.id)}">
+          <i class="fa-solid fa-bolt"></i>
+          Oferta 24h
+        </button>
+        <button class="btn btn-secondary" type="button" data-admin-product-offer-end="${escapeHTML(product.id)}">
+          <i class="fa-solid fa-hourglass-end"></i>
+          Encerrar oferta
+        </button>
+      </div>
+    `;
+  }
+
+  function ensureProductEditorModal() {
+    let modal = qs('#admin-product-editor-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'admin-product-editor-modal';
+    modal.className = 'admin-product-editor-modal hidden';
+    modal.innerHTML = `
+      <button class="admin-product-editor-backdrop" type="button" data-admin-product-editor-close aria-label="Fechar editor"></button>
+      <section class="admin-product-editor-panel" role="dialog" aria-modal="true" aria-labelledby="admin-product-editor-title">
+        <header class="admin-product-editor-head">
+          <div>
+            <span class="eyebrow">Editar produto</span>
+            <h2 id="admin-product-editor-title">Produto da loja</h2>
+          </div>
+          <button class="icon-button" type="button" data-admin-product-editor-close aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+        <div class="admin-product-editor-content"></div>
+      </section>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openProductEditor(productId) {
+    const product = state.produtos.find(item => item.id === productId);
+    if (!product) return;
+    const modal = ensureProductEditorModal();
+    const content = qs('.admin-product-editor-content', modal);
+    const title = qs('#admin-product-editor-title', modal);
+    if (title) title.textContent = product.nome || 'Produto da loja';
+    if (content) content.innerHTML = productEditFormHTML(product);
+    modal.classList.remove('hidden');
+    document.body.classList.add('admin-product-editor-open');
+  }
+
+  function closeProductEditor() {
+    qs('#admin-product-editor-modal')?.classList.add('hidden');
+    document.body.classList.remove('admin-product-editor-open');
+  }
+
+  function adminProductPayloadFromCard(productId) {
+    const field = name => productCardField(productId, name);
+    const offerActive = field('oferta_ativa')?.value === 'true';
+    return {
+      nome: field('nome')?.value.trim() || '',
+      preco: parsePrice(field('preco')?.value || 0),
+      categoria: field('categoria')?.value.trim() || 'Produtos',
+      imagem: field('imagem')?.value.trim() || '',
+      descricao: field('descricao')?.value.trim() || '',
+      estoque: field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
+      estoque_minimo: Math.max(0, Math.round(parsePrice(field('estoque_minimo')?.value || 0))),
+      ativo: field('ativo')?.value !== 'false',
+      destaque: field('destaque')?.value === 'true' || offerActive,
+      oferta_ativa: offerActive,
+      preco_promocional: offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null,
+      oferta_inicio: offerActive ? (isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString()) : null,
+      oferta_fim: offerActive ? isoFromLocal(field('oferta_fim')?.value) : null
+    };
+  }
+
+  async function salvarEdicaoProduto(productId, override = null) {
+    const api = client();
+    if (!api || !productId) return false;
+    const payload = override || adminProductPayloadFromCard(productId);
+    if (!override) {
+      const file = qs(`[data-admin-product-image-file="${escapeSelector(productId)}"]`)?.files?.[0] || null;
+      if (file) {
+        try {
+          showToast('Enviando nova imagem...', 'info');
+          payload.imagem = await uploadImagemProduto(file, payload.nome || productId);
+        } catch (error) {
+          showToast(friendlyDbError(error, error.message || 'Nao consegui enviar a imagem.'), 'error');
+          return false;
+        }
+      }
+    }
+    if (!override && !payload.nome) {
+      showToast('Informe o nome do produto.', 'error');
+      return false;
+    }
+    if (payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
+      showToast('Informe o preco promocional para ativar a oferta.', 'error');
+      return false;
+    }
+
+    let { data, error } = await api
+      .from('produtos')
+      .update(payload)
+      .eq('id', productId)
+      .select('id')
+      .maybeSingle();
+
+    if (error || !data) {
+      const rpc = await rpcAtualizarProduto(productId, payload);
+      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+      error = rpc.error;
+    }
+
+    if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
+      productsExtendedReady = false;
+      setDatabaseAlert('Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.');
+      const basePayload = {
+        nome: payload.nome,
+        preco: payload.preco,
+        categoria: payload.categoria,
+        descricao: payload.descricao,
+        ativo: payload.ativo
+      };
+      if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
+      const fallback = await api
+        .from('produtos')
+        .update(basePayload)
+        .eq('id', productId)
+        .select('id')
+        .maybeSingle();
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error || !data) {
+      showToast(friendlyDbError(error, 'Nao consegui alterar o produto.'), 'error');
+      return false;
+    }
+
+    state.produtos = state.produtos.map(product => product.id === productId
+      ? { ...product, ...payload }
+      : product);
+    renderizarProdutosAdmin(state.produtos);
+    showToast('Produto atualizado.', 'success');
+    carregarProdutosAdmin();
+    return true;
+  }
+
+  async function excluirProdutoAdmin(productId) {
+    const api = client();
+    if (!api || !productId) return;
+    const product = state.produtos.find(item => item.id === productId);
+    const name = product?.nome || 'este produto';
+    if (!confirm(`Excluir ${name} da loja?`)) return;
+
+    const { error } = await api
+      .from('produtos')
+      .delete()
+      .eq('id', productId);
+
+    if (error) {
+      showToast(friendlyDbError(error, 'Nao consegui excluir o produto.'), 'error');
+      return;
+    }
+
+    showToast('Produto excluido.', 'success');
+    await carregarProdutosAdmin();
   }
 
   function safeFileName(value = 'produto') {
@@ -514,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'png';
   }
 
-  async function uploadImagemProduto(file) {
+  async function uploadImagemProduto(file, productNameOverride = '') {
     const api = client();
     if (!api?.storage) throw new Error('Storage do Supabase indisponível.');
     if (!file) return '';
@@ -526,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const extension = imageExtension(file);
-    const productName = qs('#prod-nome')?.value || file.name;
+    const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
     const path = `${safeFileName(productName)}/${Date.now()}-${safeFileName(file.name)}.${extension}`;
     const { error } = await api.storage
       .from(PRODUCT_IMAGE_BUCKET)
@@ -563,13 +1134,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (feedback) feedback.textContent = file ? 'Enviando imagem...' : 'Salvando produto...';
       const publicUrl = file ? await uploadImagemProduto(file) : '';
       const estoqueValue = qs('#prod-estoque')?.value;
+      const offerActive = qs('#prod-oferta-ativa')?.value === 'true';
       const payload = {
         nome: qs('#prod-nome')?.value.trim() || '',
         preco: parsePrice(qs('#prod-preco')?.value || 0),
         categoria: qs('#prod-categoria')?.value || 'Produtos',
         descricao: qs('#prod-desc')?.value.trim() || '',
         imagem: publicUrl,
-        ativo: true
+        ativo: true,
+        destaque: qs('#prod-destaque')?.value === 'true' || offerActive,
+        oferta_ativa: offerActive,
+        preco_promocional: offerActive ? parsePrice(qs('#prod-preco-promocional')?.value || 0) : null,
+        oferta_inicio: offerActive ? (isoFromLocal(qs('#prod-oferta-inicio')?.value) || new Date().toISOString()) : null,
+        oferta_fim: offerActive ? isoFromLocal(qs('#prod-oferta-fim')?.value) : null,
+        estoque_minimo: Math.max(0, Math.round(parsePrice(qs('#prod-estoque-minimo')?.value || 3)))
       };
       if (estoqueValue !== '') payload.estoque = Math.max(0, Math.round(parsePrice(estoqueValue || 0)));
 
@@ -577,7 +1155,24 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Preencha nome, preço e categoria.');
       }
 
-      const { error } = await api.from('produtos').insert(payload);
+      if (offerActive && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
+        throw new Error('Informe o preco promocional para ativar a oferta.');
+      }
+
+      let { error } = await api.from('produtos').insert(payload);
+      if (error && normalize(error.message || error.details || '').match(/oferta|promocional|estoque_minimo|destaque|tipo|kit_itens/)) {
+        const basePayload = {
+          nome: payload.nome,
+          preco: payload.preco,
+          categoria: payload.categoria,
+          descricao: payload.descricao,
+          imagem: payload.imagem,
+          ativo: payload.ativo
+        };
+        if (estoqueValue !== '') basePayload.estoque = payload.estoque;
+        const fallback = await api.from('produtos').insert(basePayload);
+        error = fallback.error;
+      }
       if (error) throw error;
 
       form.reset();
@@ -721,6 +1316,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
+    qsa('[data-admin-product-view]').forEach(button => {
+      button.addEventListener('click', () => setAdminProductView(button.dataset.adminProductView || 'list'));
+    });
     qs('#admin-store-config-form')?.addEventListener('submit', event => {
       event.preventDefault();
       localStorage.setItem('ms_admin_store_config', JSON.stringify({
@@ -733,9 +1331,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.body.addEventListener('change', event => {
       const select = event.target.closest('[data-admin-order-status]');
-      if (!select) return;
-      atualizarStatusPedido(select.dataset.adminOrderStatus, select.value);
+      if (select) {
+        atualizarStatusPedido(select.dataset.adminOrderStatus, select.value);
+        return;
+      }
+
+      const payment = event.target.closest('[data-admin-order-payment]');
+      if (payment) atualizarPagamentoPedido(payment.dataset.adminOrderPayment, payment.value);
     });
+
+    document.body.addEventListener('click', event => {
+      const editorClose = event.target.closest('[data-admin-product-editor-close]');
+      if (editorClose) {
+        closeProductEditor();
+        return;
+      }
+
+      const edit = event.target.closest('[data-admin-product-edit]');
+      if (edit) {
+        openProductEditor(edit.dataset.adminProductEdit);
+        return;
+      }
+
+    const save = event.target.closest('[data-admin-product-save]');
+    if (save) {
+      salvarEdicaoProduto(save.dataset.adminProductSave).then(saved => {
+        if (saved) closeProductEditor();
+      });
+      return;
+    }
+
+      const stockZero = event.target.closest('[data-admin-product-stock-zero]');
+      if (stockZero) {
+        salvarEdicaoProduto(stockZero.dataset.adminProductStockZero, { estoque: 0 });
+        return;
+      }
+
+      const offer24 = event.target.closest('[data-admin-product-offer-24]');
+      if (offer24) {
+        const product = state.produtos.find(item => item.id === offer24.dataset.adminProductOffer24);
+        const price = Number(product?.preco || 0);
+        salvarEdicaoProduto(offer24.dataset.adminProductOffer24, {
+          destaque: true,
+          oferta_ativa: true,
+          preco_promocional: Math.max(0, Number((price * 0.9).toFixed(2))),
+          oferta_inicio: new Date().toISOString(),
+          oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+        return;
+      }
+
+      const offerEnd = event.target.closest('[data-admin-product-offer-end]');
+      if (offerEnd) {
+        salvarEdicaoProduto(offerEnd.dataset.adminProductOfferEnd, {
+          oferta_ativa: false,
+          preco_promocional: null,
+          oferta_fim: new Date().toISOString()
+        });
+        return;
+      }
+
+      const remove = event.target.closest('[data-admin-product-delete]');
+      if (remove) {
+        excluirProdutoAdmin(remove.dataset.adminProductDelete);
+        return;
+      }
+
+      const confirmOrder = event.target.closest('[data-admin-order-confirm]');
+      if (confirmOrder) {
+        confirmarPedidoAdmin(confirmOrder.dataset.adminOrderConfirm);
+      }
+    });
+  }
+
+  function setAdminProductView(view = 'list') {
+    const mode = view === 'new' ? 'new' : 'list';
+    const layout = qs('[data-admin-products-layout]');
+    layout?.classList.toggle('is-new-mode', mode === 'new');
+    layout?.classList.toggle('is-list-mode', mode === 'list');
+    qsa('[data-admin-product-view]').forEach(button => {
+      const active = button.dataset.adminProductView === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    if (mode === 'new') qs('#prod-nome')?.focus();
   }
 
   async function initAdminPanel() {

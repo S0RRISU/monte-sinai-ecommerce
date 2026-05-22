@@ -1,6 +1,6 @@
 {
   "version": "v2",
-  "generated_at": "2026-05-21T00:00:00-03:00",
+  "generated_at": "2026-05-22T03:27:11.633955+00:00",
   "assets": [
     {
       "slug": "monte-sinai-logo",
@@ -97,9 +97,9 @@
       "old_path": "assets/produtos/agua-mineral-20l.png",
       "new_path": "assets/produtos/v2/agua-mineral-20l.png",
       "site_path": "assets/produtos/site/v2/agua-mineral-20l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "20 liter mineral water gallon, realistic 3D product packshot, clean catalog style, full product visible",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 20 liter mineral water gallon, transparent blue plastic bottle, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:23:03.764410+00:00"
     },
     {
       "slug": "gas-p13",
@@ -119,9 +119,9 @@
       "old_path": "assets/produtos/alcool-perfumado.png",
       "new_path": "assets/produtos/v2/alcool-perfumado.png",
       "site_path": "assets/produtos/site/v2/alcool-perfumado.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Perfumed alcohol cleaning bottle 500ml, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded small perfumed alcohol cleaning bottle, translucent plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:05.554050+00:00"
     },
     {
       "slug": "amaciante-2l",
@@ -130,9 +130,9 @@
       "old_path": "assets/produtos/amaciante-2l.png",
       "new_path": "assets/produtos/v2/amaciante-2l.png",
       "site_path": "assets/produtos/site/v2/amaciante-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter fabric softener bottle, realistic 3D product packshot, pastel plastic bottle, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter fabric softener bottle, pastel blue plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:07.628824+00:00"
     },
     {
       "slug": "bombril",
@@ -141,9 +141,9 @@
       "old_path": "assets/produtos/bombril.png",
       "new_path": "assets/produtos/v2/bombril.png",
       "site_path": "assets/produtos/site/v2/bombril.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Steel wool cleaning sponge package, realistic 3D branded-aware product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded steel wool cleaning sponge package, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:09.589102+00:00"
     },
     {
       "slug": "candida-2l",
@@ -152,9 +152,9 @@
       "old_path": "assets/produtos/candida-2l.png",
       "new_path": "assets/produtos/v2/candida-2l.png",
       "site_path": "assets/produtos/site/v2/candida-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter bleach bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter bleach bottle, white plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:12.239887+00:00"
     },
     {
       "slug": "candida-colorida",
@@ -163,9 +163,9 @@
       "old_path": "assets/produtos/candida-colorida.png",
       "new_path": "assets/produtos/v2/candida-colorida.png",
       "site_path": "assets/produtos/site/v2/candida-colorida.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter color-safe bleach bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter color-safe bleach bottle, white and violet plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:14.411175+00:00"
     },
     {
       "slug": "cloro-1l",
@@ -174,9 +174,9 @@
       "old_path": "assets/produtos/cloro-1l.png",
       "new_path": "assets/produtos/v2/cloro-1l.png",
       "site_path": "assets/produtos/site/v2/cloro-1l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "1 liter chlorine cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 1 liter chlorine cleaner bottle, white plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:18.213298+00:00"
     },
     {
       "slug": "cloro-2l",
@@ -185,9 +185,9 @@
       "old_path": "assets/produtos/cloro-2l.png",
       "new_path": "assets/produtos/v2/cloro-2l.png",
       "site_path": "assets/produtos/site/v2/cloro-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter chlorine cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter chlorine cleaner bottle, white plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:20.573743+00:00"
     },
     {
       "slug": "desinfetante-2l",
@@ -196,9 +196,9 @@
       "old_path": "assets/produtos/desinfetante-2l.png",
       "new_path": "assets/produtos/v2/desinfetante-2l.png",
       "site_path": "assets/produtos/site/v2/desinfetante-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter disinfectant cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter disinfectant cleaner bottle, green plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:22.601080+00:00"
     },
     {
       "slug": "detergente-2l",
@@ -207,9 +207,9 @@
       "old_path": "assets/produtos/detergente-2l.png",
       "new_path": "assets/produtos/v2/detergente-2l.png",
       "site_path": "assets/produtos/site/v2/detergente-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter liquid detergent bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter liquid detergent bottle, yellow plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:24.564481+00:00"
     },
     {
       "slug": "escova-roupa",
@@ -218,9 +218,9 @@
       "old_path": "assets/produtos/escova-roupa.png",
       "new_path": "assets/produtos/v2/escova-roupa.png",
       "site_path": "assets/produtos/site/v2/escova-roupa.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Laundry brush with bristles, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded laundry brush with short handle and bristles, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:26.326877+00:00"
     },
     {
       "slug": "escova-vaso",
@@ -229,9 +229,9 @@
       "old_path": "assets/produtos/escova-vaso.png",
       "new_path": "assets/produtos/v2/escova-vaso.png",
       "site_path": "assets/produtos/site/v2/escova-vaso.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Toilet brush with holder, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded toilet brush with holder, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:28.074243+00:00"
     },
     {
       "slug": "esponja-aco",
@@ -240,9 +240,9 @@
       "old_path": "assets/produtos/esponja-aco.png",
       "new_path": "assets/produtos/v2/esponja-aco.png",
       "site_path": "assets/produtos/site/v2/esponja-aco.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Steel scrub sponge bundle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded steel scrub sponge bundle, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:30.127433+00:00"
     },
     {
       "slug": "esponja-louca",
@@ -251,9 +251,9 @@
       "old_path": "assets/produtos/esponja-louca.png",
       "new_path": "assets/produtos/v2/esponja-louca.png",
       "site_path": "assets/produtos/site/v2/esponja-louca.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Yellow and green dishwashing sponge, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded yellow and green dishwashing sponge, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:24:32.480330+00:00"
     },
     {
       "slug": "esponjao",
@@ -273,9 +273,9 @@
       "old_path": "assets/produtos/limpa-aluminio.png",
       "new_path": "assets/produtos/v2/limpa-aluminio.png",
       "site_path": "assets/produtos/site/v2/limpa-aluminio.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Small aluminum cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded small aluminum cleaner bottle, metallic silver label but no text, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:34.693654+00:00"
     },
     {
       "slug": "limpa-pedra-2l",
@@ -284,9 +284,9 @@
       "old_path": "assets/produtos/limpa-pedra-2l.png",
       "new_path": "assets/produtos/v2/limpa-pedra-2l.png",
       "site_path": "assets/produtos/site/v2/limpa-pedra-2l.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter stone floor cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter stone floor cleaner bottle, sturdy plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:37.015436+00:00"
     },
     {
       "slug": "limpa-pedra-500ml",
@@ -295,9 +295,9 @@
       "old_path": "assets/produtos/limpa-pedra-500ml.png",
       "new_path": "assets/produtos/v2/limpa-pedra-500ml.png",
       "site_path": "assets/produtos/site/v2/limpa-pedra-500ml.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "500 ml stone cleaner bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 500 ml stone cleaner bottle with trigger cap, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:38.931089+00:00"
     },
     {
       "slug": "pa",
@@ -306,9 +306,9 @@
       "old_path": "assets/produtos/pa.png",
       "new_path": "assets/produtos/v2/pa.png",
       "site_path": "assets/produtos/site/v2/pa.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Dustpan cleaning tool, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded dustpan cleaning tool, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:42.671285+00:00"
     },
     {
       "slug": "pasta-brilho",
@@ -317,9 +317,9 @@
       "old_path": "assets/produtos/pasta-brilho.png",
       "new_path": "assets/produtos/v2/pasta-brilho.png",
       "site_path": "assets/produtos/site/v2/pasta-brilho.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Round polishing paste container, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded round polishing paste container, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:44.461168+00:00"
     },
     {
       "slug": "pedra-vaso",
@@ -328,9 +328,9 @@
       "old_path": "assets/produtos/pedra-vaso.png",
       "new_path": "assets/produtos/v2/pedra-vaso.png",
       "site_path": "assets/produtos/site/v2/pedra-vaso.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Toilet deodorizer block with holder, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded toilet deodorizer block in simple holder, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:47.429128+00:00"
     },
     {
       "slug": "prendedor-madeira",
@@ -339,9 +339,9 @@
       "old_path": "assets/produtos/prendedor-madeira.png",
       "new_path": "assets/produtos/v2/prendedor-madeira.png",
       "site_path": "assets/produtos/site/v2/prendedor-madeira.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Wooden clothespins grouped together, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded wooden clothespins grouped together, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:49.096294+00:00"
     },
     {
       "slug": "prendedor-plastico",
@@ -350,9 +350,9 @@
       "old_path": "assets/produtos/prendedor-plastico.png",
       "new_path": "assets/produtos/v2/prendedor-plastico.png",
       "site_path": "assets/produtos/site/v2/prendedor-plastico.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Colorful plastic clothespins grouped together, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded colorful plastic clothespins grouped together, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:52.073938+00:00"
     },
     {
       "slug": "rodinho-pia",
@@ -361,9 +361,9 @@
       "old_path": "assets/produtos/rodinho-pia.png",
       "new_path": "assets/produtos/v2/rodinho-pia.png",
       "site_path": "assets/produtos/site/v2/rodinho-pia.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Small sink squeegee, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded small sink squeegee, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:55.036190+00:00"
     },
     {
       "slug": "rodo-grande",
@@ -372,9 +372,9 @@
       "old_path": "assets/produtos/rodo-grande.png",
       "new_path": "assets/produtos/v2/rodo-grande.png",
       "site_path": "assets/produtos/site/v2/rodo-grande.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Large floor squeegee with long handle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded large floor squeegee with long handle, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:25:58.136325+00:00"
     },
     {
       "slug": "rodo-pequeno",
@@ -383,9 +383,9 @@
       "old_path": "assets/produtos/rodo-pequeno.png",
       "new_path": "assets/produtos/v2/rodo-pequeno.png",
       "site_path": "assets/produtos/site/v2/rodo-pequeno.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Small floor squeegee with handle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded small floor squeegee with handle, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:26:00.329393+00:00"
     },
     {
       "slug": "sabao-coco",
@@ -394,9 +394,9 @@
       "old_path": "assets/produtos/sabao-coco.png",
       "new_path": "assets/produtos/v2/sabao-coco.png",
       "site_path": "assets/produtos/site/v2/sabao-coco.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter coconut liquid soap bottle, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter coconut liquid soap bottle, white plastic, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:26:02.545967+00:00"
     },
     {
       "slug": "sabao-omo",
@@ -405,9 +405,9 @@
       "old_path": "assets/produtos/sabao-omo.png",
       "new_path": "assets/produtos/v2/sabao-omo.png",
       "site_path": "assets/produtos/site/v2/sabao-omo.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "2 liter Omo-style laundry soap bottle, realistic 3D branded-aware product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded 2 liter laundry soap bottle, blue plastic, generic unbranded, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:26:04.537583+00:00"
     },
     {
       "slug": "sabonete-liquido",
@@ -427,9 +427,9 @@
       "old_path": "assets/produtos/saco-lixo.png",
       "new_path": "assets/produtos/v2/saco-lixo.png",
       "site_path": "assets/produtos/site/v2/saco-lixo.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Roll of black trash bags, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded roll of black trash bags, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:27:07.691494+00:00"
     },
     {
       "slug": "vassoura",
@@ -438,9 +438,9 @@
       "old_path": "assets/produtos/vassoura.png",
       "new_path": "assets/produtos/v2/vassoura.png",
       "site_path": "assets/produtos/site/v2/vassoura.png",
-      "status": "copied-v2-placeholder",
-      "prompt": "Broom with long handle and bristles, realistic 3D product packshot, clean catalog style",
-      "generated_at": "2026-05-21T00:00:00-03:00"
+      "status": "generated",
+      "prompt": "generic unbranded broom with long handle and bristles, realistic 3D product render, clean catalog product image, isolated on a pure white studio background, soft professional lighting, subtle ground shadow, centered, full product visible, high detail, no brand, no logo, no readable text, no watermark",
+      "generated_at": "2026-05-22T03:27:11.630955+00:00"
     }
   ]
 }

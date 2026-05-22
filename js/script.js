@@ -188,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let adminOrderAlertsStarted = false;
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
+  let ordersPageAdminMode = false;
 
   applySavedTheme();
   applySiteConfig();
@@ -712,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountEmail = user.email || email;
     const nextUser = { ...user, passwordSaved: Boolean(savedAuthSessionForEmail(accountEmail)) };
 
-    if (shouldSave === true) {
+    if (shouldSave !== false) {
       const sessionSaved = saveAuthSessionForEmail(accountEmail, session);
       const browserSaved = await rememberBrowserPassword({
         email: user.email || email,
@@ -837,6 +838,9 @@ document.addEventListener('DOMContentLoaded', () => {
     saveUser(session?.user ? userFromAuthUser(session.user) : null);
     applyCheckoutProfile();
     if (currentPage() === 'perfil.html') initProfilePage();
+    if (currentPage() === 'pedidos.html') {
+      window.setTimeout(() => updateOrdersPageMode({ force: true }), 0);
+    }
     updateAdminPanelLinks({ force: true });
   }
 
@@ -956,6 +960,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (text.includes('pago') || text.includes('paid')) return 'Pago';
     if (text.includes('cancel')) return 'Cancelado';
     return 'Pendente';
+  }
+
+  function orderStatusClass(status = '') {
+    return {
+      Recebido: 'is-status-received',
+      Preparando: 'is-status-preparing',
+      'Saiu para entrega': 'is-status-delivery',
+      Entregue: 'is-status-delivered'
+    }[normalizeOrderStatus(status)] || 'is-status-received';
+  }
+
+  function orderPaymentClass(status = '') {
+    return {
+      Pendente: 'is-payment-pending',
+      Pago: 'is-payment-paid',
+      Cancelado: 'is-payment-canceled'
+    }[normalizePaymentStatus(status)] || 'is-payment-pending';
   }
 
   function normalizeEmail(value = '') {
@@ -1392,6 +1413,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function ordersClient() {
     return supabaseProductClient();
+  }
+
+  async function rpcAdminUpdateOrder(orderId, payload = {}) {
+    const client = ordersClient();
+    if (!client?.rpc) return { data: null, error: new Error('RPC indisponivel') };
+    return client.rpc('admin_update_order', {
+      p_id: orderId,
+      p_status: payload.status ?? null,
+      p_pagamento_status: payload.pagamento_status ?? null,
+      p_confirmado: payload.confirmado ?? null
+    });
+  }
+
+  async function rpcAdminUpdateProduct(productId, payload = {}) {
+    const client = ordersClient();
+    if (!client?.rpc) return { data: null, error: new Error('RPC indisponivel') };
+    return client.rpc('admin_update_product', {
+      p_id: productId,
+      p_payload: payload
+    });
   }
 
   async function currentAuthUser() {
@@ -2650,12 +2691,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ensureClientOrdersLink(container) {
-    if (!container || qsa('a', container).some(link => navLinkPage(link) === 'pedidos.html')) return;
+    if (!container) return;
+    const orderLinks = qsa('a', container).filter(link => link.hasAttribute('data-client-orders-link') || navLinkPage(link) === 'pedidos.html');
+    orderLinks.slice(1).forEach(link => link.remove());
+    if (orderLinks.length) return;
 
     const markup = `<a href="${ordersHref()}" data-client-orders-link>Pedidos</a>`;
     const productsLink = qsa('a', container).find(link => navLinkPage(link) === 'produtos.html');
     if (productsLink) productsLink.insertAdjacentHTML('afterend', markup);
     else container.insertAdjacentHTML('beforeend', markup);
+  }
+
+  function cleanupDuplicateOrderLinks() {
+    qsa('.nav-menu, .mobile-menu, .footer-links').forEach(container => {
+      const links = qsa('a', container).filter(link => link.hasAttribute('data-client-orders-link') || navLinkPage(link) === 'pedidos.html');
+      links.slice(1).forEach(link => link.remove());
+    });
   }
 
   function enhanceNavigation() {
@@ -2699,8 +2750,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const trigger = document.createElement('button');
       trigger.className = 'nav-search-trigger';
       trigger.type = 'button';
-      trigger.dataset.openSearch = '';
+      trigger.dataset.navSearchToggle = '';
       trigger.setAttribute('aria-label', 'Abrir pesquisa');
+      trigger.setAttribute('aria-expanded', 'false');
       trigger.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><span>Buscar produto</span>';
       navInner.insertBefore(trigger, mobileToggle);
     }
@@ -2715,6 +2767,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const actions = document.createElement('div');
       actions.className = 'nav-actions';
       actions.innerHTML = `
+        <a class="nav-icon nav-whatsapp-link" href="https://wa.me/${ownerWhatsApp()}" target="_blank" rel="noreferrer" aria-label="Chamar no WhatsApp">
+          <i class="fa-brands fa-whatsapp"></i>
+          <span>WhatsApp</span>
+        </a>
         <a class="nav-pill nav-account-link" href="${profileHref()}" aria-label="Abrir perfil do cliente">
           <span class="nav-account-avatar" data-account-avatar><i class="fa-solid fa-user" aria-hidden="true"></i></span>
           <span class="nav-account-label" data-account-label>Entrar ou cadastrar</span>
@@ -2727,12 +2783,23 @@ document.addEventListener('DOMContentLoaded', () => {
       navInner.insertBefore(actions, mobileToggle || null);
     }
 
+    const navActions = qs('.nav-actions', navInner);
+    if (navActions && !qs('.nav-whatsapp-link', navActions)) {
+      navActions.insertAdjacentHTML('afterbegin', `
+        <a class="nav-icon nav-whatsapp-link" href="https://wa.me/${ownerWhatsApp()}" target="_blank" rel="noreferrer" aria-label="Chamar no WhatsApp">
+          <i class="fa-brands fa-whatsapp"></i>
+          <span>WhatsApp</span>
+        </a>
+      `);
+    }
+
     qsa('.mobile-top-actions').forEach(actions => actions.remove());
     document.body.classList.remove('has-mobile-top-actions');
 
     const mobileMenu = qs('.mobile-menu');
     ensureClientOrdersLink(mobileMenu);
     qsa('.footer-links').forEach(ensureClientOrdersLink);
+    cleanupDuplicateOrderLinks();
     if (mobileMenu && !qs('[data-mobile-extra]', mobileMenu)) {
       mobileMenu.insertAdjacentHTML('beforeend', `
         <div class="mobile-menu-divider" data-mobile-extra></div>
@@ -2744,11 +2811,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <i class="fa-solid fa-gauge-high"></i>
           Painel Admin
         </a>
-        <a class="mobile-only-link hidden mobile-admin-orders-link" href="${adminPanelHref()}#orders" data-admin-orders-link="mobile" data-mobile-extra>
-          <i class="fa-solid fa-clipboard-list"></i>
-          Pedidos do painel
-          <strong class="admin-order-badge" data-admin-order-count>0</strong>
-        </a>
         <button class="mobile-only-link mobile-menu-button" type="button" data-open-cart data-mobile-extra>
           <i class="fa-solid fa-bag-shopping"></i>
           Carrinho
@@ -2757,6 +2819,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `);
     }
     updateAdminPanelLinks();
+    updateClientOrdersLinksForRole();
 
     if (!document.body.classList.contains('auth-body') && !qs('.mobile-quick-dock')) {
       const dock = document.createElement('nav');
@@ -2815,36 +2878,36 @@ document.addEventListener('DOMContentLoaded', () => {
       placeFixed(brand, {
         position: 'fixed',
         left: '10px',
-        top: '38px',
-        width: veryCompact ? 'min(112px, 35vw)' : 'min(142px, 44vw)',
+        top: '28px',
+        width: veryCompact ? 'min(108px, 35vw)' : 'min(136px, 44vw)',
         'z-index': '760',
         transform: 'translateY(-50%)'
       });
       placeFixed(trigger, {
         position: 'fixed',
-        right: '72px',
-        top: '38px',
+        right: '66px',
+        top: '28px',
         display: 'inline-grid',
         visibility: 'visible',
         opacity: '1',
-        width: veryCompact ? '118px' : '132px',
-        height: '46px',
-        'min-width': veryCompact ? '118px' : '132px',
-        'min-height': '46px',
+        width: veryCompact ? '108px' : '124px',
+        height: '42px',
+        'min-width': veryCompact ? '108px' : '124px',
+        'min-height': '42px',
         'z-index': '761',
         transform: 'translateY(-50%)'
       });
       placeFixed(mobileToggle, {
         position: 'fixed',
         right: '10px',
-        top: '38px',
+        top: '28px',
         display: 'inline-grid',
         visibility: 'visible',
         opacity: '1',
-        width: '54px',
-        height: '54px',
-        'min-width': '54px',
-        'min-height': '54px',
+        width: '48px',
+        height: '48px',
+        'min-width': '48px',
+        'min-height': '48px',
         'z-index': '761',
         transform: 'translateY(-50%)'
       });
@@ -2889,14 +2952,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('.nav-account-link, [data-account-cta]').forEach(link => {
       if (!(link instanceof HTMLAnchorElement)) return;
-      link.href = signed ? profileHref() : loginHref({ redirect: currentLocationForRedirect() });
+      link.href = profileHref();
       link.classList.toggle('active', ['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(currentPage()));
-      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Entrar ou cadastrar');
+      link.setAttribute('aria-label', signed ? `Conta de ${firstName()}` : 'Abrir perfil de visitante');
 
       if (link.hasAttribute('data-account-cta')) {
         link.innerHTML = signed
           ? '<i class="fa-solid fa-user-gear"></i> Minha conta'
-          : '<i class="fa-solid fa-user-check"></i> Entrar ou cadastrar';
+          : '<i class="fa-solid fa-user"></i> Perfil visitante';
       }
     });
 
@@ -3099,13 +3162,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function bindProfilePhotoPreview() {
     if (document.body.dataset.profilePhotoPreviewBound === 'true') return;
     document.body.addEventListener('click', event => {
-      const desktopAccount = event.target.closest('.navbar .nav-account-link');
-      if (desktopAccount && currentUser?.photo && window.matchMedia?.('(min-width: 1021px)').matches) {
-        event.preventDefault();
-        openProfilePhotoPreview(currentUser.photo);
-        return;
-      }
-
       const profileAvatar = event.target.closest('#profile-avatar');
       if (profileAvatar && currentUser?.photo) {
         event.preventDefault();
@@ -3145,9 +3201,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function setAdminOrderLinksVisible(visible) {
     qsa('[data-admin-orders-link]').forEach(link => {
       setForcedElementVisible(link, visible);
-      if (link instanceof HTMLAnchorElement) link.href = `${adminPanelHref()}#orders`;
+      if (link instanceof HTMLAnchorElement) link.href = ordersHref();
     });
     qs('.mobile-menu-toggle')?.classList.toggle('has-admin-order-alert', false);
+  }
+
+  function updateClientOrdersLinksForRole(admin = ordersPageAdminMode) {
+    const count = admin ? adminUnreadOrders(remoteOrdersCache).length : 0;
+    qsa('[data-client-orders-link]').forEach(link => {
+      if (!(link instanceof HTMLAnchorElement)) return;
+      link.href = ordersHref();
+      link.innerHTML = admin
+        ? `Controlar pedidos <span class="admin-order-badge ${count ? '' : 'is-empty'}" data-client-order-count>${count}</span>`
+        : 'Pedidos';
+      link.classList.toggle('nav-orders-link', admin);
+      link.classList.toggle('has-pending-orders', admin && count > 0);
+      link.setAttribute('aria-label', admin ? 'Controlar pedidos dos clientes' : 'Ver meus pedidos');
+    });
   }
 
   function adminPendingOrders(orders = remoteOrdersCache) {
@@ -3160,19 +3230,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function adminUnreadOrders(orders = remoteOrdersCache) {
+    const list = orders || [];
+    const withConfirmation = list.filter(order => order.confirmed === false);
+    if (withConfirmation.length) return withConfirmation;
+    return list.filter(order => normalizeOrderStatus(order.status) !== 'Entregue');
+  }
+
   function updateAdminOrderAlertUI(orders = remoteOrdersCache, visible = null) {
-    const pending = adminPendingOrders(orders);
-    const count = pending.length;
+    const count = adminUnreadOrders(orders).length;
     const anyVisible = qsa('[data-admin-orders-link]').some(link => !link.classList.contains('hidden'));
     const shouldShow = visible ?? anyVisible;
     setAdminOrderLinksVisible(Boolean(shouldShow));
-    qsa('[data-admin-order-count]').forEach(badge => {
+    qsa('[data-admin-order-count], [data-client-order-count]').forEach(badge => {
       badge.textContent = String(count);
       badge.classList.toggle('is-empty', count === 0);
-      badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} pendente${count === 1 ? '' : 's'}`);
+      badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
     });
     qsa('[data-admin-orders-link]').forEach(link => {
       link.classList.toggle('has-pending-orders', count > 0);
+    });
+    qsa('[data-client-orders-link]').forEach(link => {
+      link.classList.toggle('has-pending-orders', count > 0 && ordersPageAdminMode);
     });
     const toggle = qs('.mobile-menu-toggle');
     if (toggle) {
@@ -3221,6 +3300,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const orders = await loadOrdersFromSupabase({ force });
     updateAdminOrderAlertUI(orders, true);
     return orders;
+  }
+
+  async function updateOrdersPageMode({ force = false } = {}) {
+    if (currentPage() !== 'pedidos.html') return false;
+
+    let admin = false;
+    if (currentUser?.email) {
+      admin = await isCurrentUserAdmin({ force }).catch(() => false);
+    }
+
+    ordersPageAdminMode = Boolean(admin);
+    document.body.classList.toggle('orders-admin-mode', ordersPageAdminMode);
+    updateClientOrdersLinksForRole(ordersPageAdminMode);
+
+    const loginLink = qs('[data-orders-login]');
+    if (loginLink) {
+      const showLogin = !currentUser?.email;
+      loginLink.classList.toggle('hidden', !showLogin);
+      loginLink.hidden = !showLogin;
+      if (loginLink instanceof HTMLAnchorElement) loginLink.href = loginHref({ redirect: 'pedidos.html' });
+    }
+
+    qs('.track-order-panel')?.classList.add('hidden');
+
+    const eyebrow = qs('#customer-orders-page .hero .eyebrow');
+    const title = qs('#customer-orders-page .hero h1');
+    const text = qs('#customer-orders-page .hero p');
+    const panelEyebrow = qs('.customer-orders-panel .admin-section-head .eyebrow');
+    const panelTitle = qs('.customer-orders-panel .admin-section-head h2');
+    const panelText = qs('.customer-orders-panel .admin-section-head p');
+
+    if (ordersPageAdminMode) {
+      if (eyebrow) eyebrow.textContent = 'Controle';
+      if (title) title.textContent = 'Pedidos dos clientes';
+      if (text) text.textContent = 'Atualize status, confirme pagamento e acompanhe os pedidos fora do painel administrativo.';
+      if (panelEyebrow) panelEyebrow.textContent = 'Admin';
+      if (panelTitle) panelTitle.innerHTML = '<i class="fa-solid fa-clipboard-list"></i> Controle de pedidos';
+      if (panelText) panelText.textContent = 'Administradores veem todos os pedidos e podem confirmar status, pagamento e entrega.';
+    } else {
+      if (eyebrow) eyebrow.textContent = 'Acompanhamento';
+      if (title) title.textContent = 'Meus pedidos';
+      if (text) text.textContent = 'Veja o status que a loja atualiza: recebido, preparando, saiu para entrega e entregue.';
+      if (panelEyebrow) panelEyebrow.textContent = 'Histórico';
+      if (panelTitle) panelTitle.innerHTML = '<i class="fa-solid fa-clipboard-list"></i> Pedidos vinculados ao cliente';
+      if (panelText) panelText.textContent = currentUser?.email
+        ? 'Veja os pedidos vinculados ao seu cadastro.'
+        : 'Visitantes veem o histórico deste aparelho sem precisar entrar.';
+    }
+
+    await renderOrdersEverywhere({ force: true });
+    return ordersPageAdminMode;
   }
 
   function startAdminOrderPolling() {
@@ -3342,6 +3472,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function bindSiteSearch() {
     bindSearchSuggestionViewportTracking();
+    bindNavSearchToggle();
 
     qsa('[data-site-search-form]').forEach(form => {
       const input = qs('[data-site-search-input]', form);
@@ -3371,6 +3502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const term = input?.value.trim() || '';
         hideSearchSuggestions(suggestions);
+        closeNavSearch();
         openSearchProductFromQuery(term);
       });
     });
@@ -3391,6 +3523,44 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollCatalogToTop();
       });
     });
+  }
+
+  function bindNavSearchToggle() {
+    if (document.body.dataset.navSearchToggleBound === 'true') return;
+    document.body.dataset.navSearchToggleBound = 'true';
+
+    document.addEventListener('click', event => {
+      const trigger = event.target.closest('[data-nav-search-toggle]');
+      if (trigger) {
+        event.preventDefault();
+        const willOpen = !document.body.classList.contains('header-search-open');
+        document.body.classList.toggle('header-search-open', willOpen);
+        trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+
+        if (willOpen) {
+          const input = qs('.navbar .nav-search [data-site-search-input]');
+          setTimeout(() => input?.focus(), 40);
+        } else {
+          qsa('.navbar .search-suggestions').forEach(hideSearchSuggestions);
+        }
+        return;
+      }
+
+      if (!document.body.classList.contains('header-search-open')) return;
+      if (event.target.closest('.navbar .nav-search') || event.target.closest('.navbar .nav-search-trigger')) return;
+      closeNavSearch();
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeNavSearch();
+    });
+  }
+
+  function closeNavSearch() {
+    if (!document.body.classList.contains('header-search-open')) return;
+    document.body.classList.remove('header-search-open');
+    qs('[data-nav-search-toggle]')?.setAttribute('aria-expanded', 'false');
+    qsa('.navbar .search-suggestions').forEach(hideSearchSuggestions);
   }
 
   function ensureSearchSuggestions(form) {
@@ -4167,12 +4337,15 @@ document.addEventListener('DOMContentLoaded', () => {
       applyCatalogFilters();
     });
 
-    filterBar?.addEventListener('click', event => {
-      const chip = event.target.closest('[data-filter]');
+    const handleFilterClick = event => {
+      const chip = event.target.closest('.products-page .filter-chips [data-filter]');
       if (!chip) return;
-      qsa('[data-filter]').forEach(item => item.classList.toggle('active', item === chip));
+      const scopedFilterBar = chip.closest('.filter-chips') || filterBar;
+      qsa('[data-filter]', scopedFilterBar || document).forEach(item => item.classList.toggle('active', item === chip));
       applyCatalogFilters();
-    });
+    };
+
+    document.body.addEventListener('click', handleFilterClick);
 
     window.addEventListener('hashchange', () => {
       if (!applyCatalogHashFilter(true)) return;
@@ -4186,12 +4359,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyCatalogFilters() {
-    const products = qsa('.catalog-product');
+    const catalogRoot = qs('.products-page #todos-produtos') || qs('#todos-produtos') || document;
+    const products = qsa('.catalog-product', catalogRoot);
 
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
     const searchProducts = term ? catalogSearchProducts(rawTerm, 8) : [];
-    const activeChip = qs('[data-filter].active');
+    const activeChip = qs('.filter-chips [data-filter].active', catalogRoot);
     const filter = activeChip?.dataset.filter || 'all';
     let visible = 0;
 
@@ -4212,7 +4386,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (show) visible += 1;
     });
 
-    qsa('.grid-produtos').forEach(grid => {
+    qsa('.grid-produtos', catalogRoot).forEach(grid => {
       const hasVisibleProducts = qsa('.catalog-product:not(.hidden)', grid).length > 0;
       const sectionHead = grid.previousElementSibling?.classList.contains('section-head') ? grid.previousElementSibling : null;
       const hideGroup = Boolean(term || filter !== 'all') && !hasVisibleProducts;
@@ -4220,7 +4394,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sectionHead?.classList.toggle('hidden', hideGroup);
     });
 
-    qs('#catalog-empty')?.classList.toggle('hidden', visible > 0);
+    qs('#catalog-empty', catalogRoot)?.classList.toggle('hidden', visible > 0);
     const result = qs('[data-catalog-results]');
     if (result) {
       const suffix = term ? ` para "${rawTerm.trim()}"` : '';
@@ -4234,7 +4408,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const select = event.target.closest('.product-option');
       if (!select) return;
 
-      const option = select.selectedOptions[0];
+      const option = select?.selectedOptions[0];
       const card = select.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
       const price = Number(option?.dataset.price || card?.querySelector('.btn-add-cart')?.dataset.price || 0);
       const priceEl = card?.querySelector('[data-product-price-display]') || card?.querySelector('strong');
@@ -4935,7 +5109,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    form.addEventListener('submit', async event => {
+    form?.addEventListener('submit', async event => {
       event.preventDefault();
       const mode = form.dataset.authMode || 'login';
       const email = emailInput.value.trim().toLowerCase();
@@ -5349,11 +5523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    dispararWhatsApp({
-      nome_cliente: order.customer.name,
-      forma_pagamento: order.payment,
-      total: order.total
-    }, order.uuid || order.id);
+    openWhatsAppOrder(order);
     cart = [];
     saveCart();
     renderCart();
@@ -5766,22 +5936,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}`, '_blank');
   }
 
-  function dispararWhatsApp(dadosPedido, idDoBanco) {
-    const shortId = String(idDoBanco || '')
-      .replace(/[^a-z0-9]/gi, '')
-      .substring(0, 5)
-      .toUpperCase() || 'NOVO';
-    const mensagem = `Olá! Fiz um pedido no site da Monte Sinai.
-*Código do Pedido:* #${shortId}
-*Nome:* ${dadosPedido.nome_cliente}
-*Forma de Pagamento:* ${dadosPedido.forma_pagamento}
-*Total:* R$ ${Number(dadosPedido.total || 0).toFixed(2).replace('.', ',')}
-
-Obrigado! Aguardo a confirmação pelo painel.`;
-
-    window.open(`https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(mensagem)}`, '_blank');
-  }
-
   function buildOrderUpdateMessage(order) {
     const status = normalizeOrderStatus(order.status);
     const payment = normalizePaymentStatus(order.paymentStatus);
@@ -6003,7 +6157,7 @@ Obrigado! Aguardo a confirmação pelo painel.`;
 
     const refresh = () => renderOrdersEverywhere({ force: true });
     qs('[data-refresh-customer-orders]')?.addEventListener('click', () => {
-      refresh();
+      updateOrdersPageMode({ force: true });
       showToast('Pedidos atualizados.');
     });
 
@@ -6042,7 +6196,9 @@ Obrigado! Aguardo a confirmação pelo painel.`;
       if (!document.hidden) refresh();
     });
 
-    refresh();
+    document.body.addEventListener('click', handleAdminPanelClick);
+    document.body.addEventListener('change', handleAdminPanelChange);
+    updateOrdersPageMode({ force: true });
     document.body.dataset.ordersPageBound = 'true';
   }
 
@@ -6087,7 +6243,7 @@ Obrigado! Aguardo a confirmação pelo painel.`;
       window.location.href = profileHref();
     });
 
-    form.addEventListener('submit', async event => {
+    form?.addEventListener('submit', async event => {
       event.preventDefault();
       const updated = {
         ...currentUser,
@@ -6939,13 +7095,31 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     const client = ordersClient();
     if (!client) return;
 
-    const { error } = await client
+    const previousOrders = remoteOrdersCache;
+    remoteOrdersCache = remoteOrdersCache.map(order => order.uuid === orderId || order.id === orderId
+      ? { ...order, status }
+      : order);
+    remoteOrdersLoaded = true;
+    await renderOrdersEverywhere({ force: false });
+
+    let { data, error } = await client
       .from('pedidos')
       .update({ status })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .select('id, status')
+      .maybeSingle();
 
-    if (error) {
-      showToast('Nao consegui atualizar o status.');
+    if (error || !data) {
+      const fallback = await rpcAdminUpdateOrder(orderId, { status });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
+
+    if (error || !data || normalizeOrderStatus(data.status) !== status) {
+      remoteOrdersCache = previousOrders;
+      remoteOrdersLoaded = false;
+      await renderOrdersEverywhere({ force: true });
+      showToast('Nao consegui atualizar o status. Confira as permissoes do Supabase.', { type: 'error', title: 'Pedido nao salvo' });
       console.warn('[Supabase] Erro ao atualizar status do pedido.', error);
       return;
     }
@@ -6961,18 +7135,36 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     const client = ordersClient();
     if (!client) return;
 
+    const previousOrders = remoteOrdersCache;
+    remoteOrdersCache = remoteOrdersCache.map(order => order.uuid === orderId || order.id === orderId
+      ? { ...order, paymentStatus: normalized }
+      : order);
+    remoteOrdersLoaded = true;
+    await renderOrdersEverywhere({ force: false });
+
     const payload = {
       pagamento_status: normalized,
       pagamento_confirmado_em: normalized === 'Pago' ? new Date().toISOString() : null
     };
 
-    const { error } = await client
+    let { data, error } = await client
       .from('pedidos')
       .update(payload)
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .select('id, pagamento_status')
+      .maybeSingle();
 
-    if (error) {
-      showToast('Nao consegui atualizar o pagamento. Execute o SQL novo no Supabase.');
+    if (error || !data) {
+      const fallback = await rpcAdminUpdateOrder(orderId, { pagamento_status: normalized });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
+
+    if (error || !data || normalizePaymentStatus(data.pagamento_status) !== normalized) {
+      remoteOrdersCache = previousOrders;
+      remoteOrdersLoaded = false;
+      await renderOrdersEverywhere({ force: true });
+      showToast('Nao consegui atualizar o pagamento. Execute o SQL novo no Supabase.', { type: 'error', title: 'Pagamento nao salvo' });
       console.warn('[Supabase] Erro ao atualizar pagamento.', error);
       return;
     }
@@ -6987,13 +7179,31 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     const client = ordersClient();
     if (!client) return;
 
-    const { error } = await client
+    const previousOrders = remoteOrdersCache;
+    remoteOrdersCache = remoteOrdersCache.map(order => order.uuid === orderId || order.id === orderId
+      ? { ...order, confirmed: true }
+      : order);
+    remoteOrdersLoaded = true;
+    await renderOrdersEverywhere({ force: false });
+
+    let { data, error } = await client
       .from('pedidos')
       .update({ confirmado: true, confirmado_em: new Date().toISOString() })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .select('id, confirmado')
+      .maybeSingle();
 
-    if (error) {
-      showToast('Nao consegui confirmar o pedido. Execute o SQL novo no Supabase.');
+    if (error || !data) {
+      const fallback = await rpcAdminUpdateOrder(orderId, { confirmado: true });
+      data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
+      error = fallback.error;
+    }
+
+    if (error || !data || data.confirmado !== true) {
+      remoteOrdersCache = previousOrders;
+      remoteOrdersLoaded = false;
+      await renderOrdersEverywhere({ force: true });
+      showToast('Nao consegui confirmar o pedido. Execute o SQL novo no Supabase.', { type: 'error', title: 'Pedido nao confirmado' });
       console.warn('[Supabase] Erro ao confirmar pedido.', error);
       return;
     }
@@ -7560,10 +7770,15 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     }
 
     const request = id
-      ? client.from('produtos').update(payload).eq('id', id)
-      : client.from('produtos').insert(payload);
+      ? client.from('produtos').update(payload).eq('id', id).select('id').maybeSingle()
+      : client.from('produtos').insert(payload).select('id').maybeSingle();
 
-    let { error } = await request;
+    let { data, error } = await request;
+    if (id && (error || !data)) {
+      const rpc = await rpcAdminUpdateProduct(id, payload);
+      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+      error = rpc.error;
+    }
     if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
       productExtendedColumnsReady = false;
       const basePayload = {
@@ -7575,14 +7790,15 @@ Obrigado! Aguardo a confirmação pelo painel.`;
         ativo: payload.ativo
       };
       const fallback = id
-        ? await client.from('produtos').update(basePayload).eq('id', id)
-        : await client.from('produtos').insert(basePayload);
+        ? await client.from('produtos').update(basePayload).eq('id', id).select('id').maybeSingle()
+        : await client.from('produtos').insert(basePayload).select('id').maybeSingle();
+      data = fallback.data;
       error = fallback.error;
       showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
     }
 
-    if (error) {
-      showToast('Nao consegui salvar o produto.');
+    if (error || !data) {
+      showToast('Nao consegui salvar o produto. Execute o SQL de reparo no Supabase.');
       console.warn('[Supabase] Erro ao salvar produto.', error);
       return;
     }
@@ -8221,7 +8437,7 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     const orders = dedupeOrders(await loadOrdersFromSupabase(options));
     const customerOrders = currentUser?.email
       ? orders.filter(orderBelongsToCurrentUser)
-      : [];
+      : loadLocalOrders();
 
     setText('#dash-orders-count', String(orders.length));
     setText('#dash-orders-total', formatMoney(orders.reduce((sum, order) => sum + Number(order.total || 0), 0)));
@@ -8325,7 +8541,7 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     if (!container) return;
     const isProfileHistory = container.id === 'profile-orders';
     const isCustomerOrdersPage = container.id === 'customer-orders-list';
-    const isAdminOrders = false;
+    const isAdminOrders = isCustomerOrdersPage && ordersPageAdminMode;
     container.innerHTML = '';
 
     if (isProfileHistory) {
@@ -8349,7 +8565,7 @@ Obrigado! Aguardo a confirmação pelo painel.`;
     }
 
     let visibleOrders = orders;
-    if (isProfileHistory || isCustomerOrdersPage) {
+    if ((isProfileHistory || isCustomerOrdersPage) && !isAdminOrders) {
       if (!currentUser?.email) {
         if (isProfileHistory) container.insertAdjacentHTML('beforeend', `
           <div class="profile-guest-note">
@@ -8364,29 +8580,32 @@ Obrigado! Aguardo a confirmação pelo painel.`;
         if (isCustomerOrdersPage) container.insertAdjacentHTML('beforeend', `
           <div class="profile-guest-note">
             <strong>Pedidos deste aparelho</strong>
-            <p>Entre com sua conta para ver pedidos salvos no Supabase, ou use o codigo e WhatsApp abaixo para consultar um pedido especifico.</p>
+            <p>Voce pode acompanhar os pedidos feitos neste celular sem entrar. Para buscar outro pedido, use o codigo e WhatsApp abaixo.</p>
           </div>
         `);
-        visibleOrders = orders;
+        visibleOrders = loadLocalOrders();
       } else {
         visibleOrders = orders.filter(orderBelongsToCurrentUser);
       }
     }
 
     if (!visibleOrders.length) {
-      container.insertAdjacentHTML('beforeend', '<p class="empty-cart">Nenhum pedido registrado neste navegador ainda.</p>');
+      const emptyMessage = isAdminOrders
+        ? 'Nenhum pedido encontrado no Supabase.'
+        : 'Nenhum pedido registrado neste navegador ainda.';
+      container.insertAdjacentHTML('beforeend', `<p class="empty-cart">${emptyMessage}</p>`);
       return;
     }
 
     visibleOrders.forEach(order => {
       const card = document.createElement('article');
-      card.className = 'order-card';
       const displayStatus = normalizeOrderStatus(order.status);
+      const paymentStatus = normalizePaymentStatus(order.paymentStatus);
+      card.className = `order-card ${orderStatusClass(displayStatus)} ${orderPaymentClass(paymentStatus)} ${order.confirmed ? 'is-confirmed' : 'is-unconfirmed'}`;
       const items = (order.items || []).map(item => `<li>${escapeHTML(item.quantity)} x ${escapeHTML(item.name)}</li>`).join('');
       const statusOptions = ORDER_STATUS_OPTIONS
         .map(status => `<option value="${escapeHTML(status)}" ${status === displayStatus ? 'selected' : ''}>${escapeHTML(status)}</option>`)
         .join('');
-      const paymentStatus = normalizePaymentStatus(order.paymentStatus);
       const paymentOptions = PAYMENT_STATUS_OPTIONS
         .map(status => `<option value="${escapeHTML(status)}" ${status === paymentStatus ? 'selected' : ''}>${escapeHTML(status)}</option>`)
         .join('');

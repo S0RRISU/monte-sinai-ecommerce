@@ -23,11 +23,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260521-37">
+  <link rel="stylesheet" href="../css/style.css?v=20260522-1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/admin.js?v=20260521-3"></script>
+  <script defer src="../js/admin.js?v=20260522-1"></script>
 </head>
 <body class="admin-shell-body">
   <div class="admin-app-shell" data-admin-app>
@@ -111,6 +111,7 @@
           </header>
 
           <div class="admin-alert hidden" id="admin-new-order-alert" role="status"></div>
+          <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
 
           <section class="admin-kanban" aria-label="Pedidos por status">
             <article class="admin-kanban-col" data-status-column="pendente">
@@ -138,13 +139,23 @@
               <span class="eyebrow">Catálogo</span>
               <h1>Produtos</h1>
             </div>
-            <button class="btn btn-secondary" type="button" data-admin-refresh-products>
-              <i class="fa-solid fa-rotate"></i>
-              Atualizar
-            </button>
+            <div class="admin-product-view-actions" role="group" aria-label="Ações de produtos">
+              <button class="btn btn-accent" type="button" data-admin-product-view="new">
+                <i class="fa-solid fa-plus"></i>
+                Novo produto
+              </button>
+              <button class="btn btn-secondary active" type="button" data-admin-product-view="list">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                Produtos da loja
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-refresh-products>
+                <i class="fa-solid fa-rotate"></i>
+                Atualizar
+              </button>
+            </div>
           </header>
 
-          <section class="admin-products-layout">
+          <section class="admin-products-layout is-list-mode" data-admin-products-layout>
             <form class="admin-product-simple-form" id="admin-product-form-basic">
               <h2>Cadastrar produto</h2>
               <label for="prod-nome">Nome</label>
@@ -163,6 +174,24 @@
               <textarea id="prod-desc" rows="3" placeholder="Descrição curta do produto"></textarea>
               <label for="prod-estoque">Estoque</label>
               <input id="prod-estoque" type="number" min="0" step="1" inputmode="numeric" placeholder="Opcional">
+              <label for="prod-estoque-minimo">Estoque minimo</label>
+              <input id="prod-estoque-minimo" type="number" min="0" step="1" inputmode="numeric" value="3">
+              <label for="prod-destaque">Destaque</label>
+              <select id="prod-destaque">
+                <option value="false">Nao</option>
+                <option value="true">Sim</option>
+              </select>
+              <label for="prod-oferta-ativa">Oferta</label>
+              <select id="prod-oferta-ativa">
+                <option value="false">Nao</option>
+                <option value="true">Sim</option>
+              </select>
+              <label for="prod-preco-promocional">Preco de oferta</label>
+              <input id="prod-preco-promocional" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Opcional">
+              <label for="prod-oferta-inicio">Oferta comeca</label>
+              <input id="prod-oferta-inicio" type="datetime-local">
+              <label for="prod-oferta-fim">Oferta termina</label>
+              <input id="prod-oferta-fim" type="datetime-local">
               <label class="admin-upload-label" for="prod-foto">
                 <i class="fa-solid fa-image"></i>
                 Escolher imagem
@@ -175,7 +204,7 @@
               </button>
             </form>
 
-            <section class="admin-product-list-panel">
+            <section class="admin-product-list-panel" data-admin-product-list-panel>
               <div class="admin-list-head">
                 <h2>Produtos cadastrados</h2>
                 <span id="admin-products-count">0</span>
