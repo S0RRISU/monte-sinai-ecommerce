@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260522-7';
+const CACHE_VERSION = 'monte-sinai-20260522-8';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_MANIFEST_URL = '/assets/generated/v2/manifest.json';
@@ -12,7 +12,7 @@ const STATIC_ASSETS = [
   '/sobre',
   '/contato',
   '/css/style.css?v=20260522-6',
-  '/js/script.js?v=20260522-5',
+  '/js/script.js?v=20260522-6',
   '/js/supabase.js?v=20260520-4',
   '/site.webmanifest',
   ASSET_MANIFEST_URL,
@@ -46,6 +46,7 @@ const PRIVATE_PATHS = [
   '/pages/painel.html',
 ];
 
+const FRESH_STATIC_FILE_RE = /\.(?:css|js)$/i;
 const STATIC_FILE_RE = /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|webmanifest)$/i;
 
 self.addEventListener('install', (event) => {
@@ -80,6 +81,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (FRESH_STATIC_FILE_RE.test(url.pathname)) {
+    event.respondWith(networkFirstStatic(request));
+    return;
+  }
+
   if (STATIC_FILE_RE.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(request));
   }
@@ -105,6 +111,17 @@ async function staleWhileRevalidate(request) {
     })
     .catch(() => cached);
   return cached || fresh;
+}
+
+async function networkFirstStatic(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const response = await fetch(new Request(request, { cache: 'no-store' }));
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (_error) {
+    return (await cache.match(request)) || Response.error();
+  }
 }
 
 async function cacheStaticAssets() {

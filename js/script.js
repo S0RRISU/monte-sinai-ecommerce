@@ -129,8 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
-  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at';
-  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, estoque, estoque_minimo, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
+  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
   const ADMIN_ORDER_POLL_MS = 25000;
   const ORDER_NOTIFICATION_SELECT =
     'id, pedido_id, user_id, cliente_email, cliente_telefone, titulo, mensagem, tipo, lida, created_at';
@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const authReady = initSupabaseAuth();
   initSiteConfig();
   upgradeProductImages();
-  syncProductsFromRenderedCards();
+  clearPublicProductShell();
   enhanceNavigation();
   bindProfilePhotoPreview();
   applySiteConfig();
@@ -1465,6 +1465,14 @@ document.addEventListener('DOMContentLoaded', () => {
     productIndex = uniqueProductList(products);
   }
 
+  function clearPublicProductShell() {
+    if (!['index.html', 'produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) return;
+    productIndex = [];
+    qsa('#todos-produtos .section-head, #todos-produtos .grid-produtos, [data-product-rail] .product-card, [data-promotions-grid] .product-card').forEach((node) =>
+      node.remove(),
+    );
+  }
+
   function pruneCartUnavailableProducts(products = []) {
     const activeIds = new Set(
       products
@@ -1480,27 +1488,6 @@ document.addEventListener('DOMContentLoaded', () => {
       saveCart();
       renderCart();
     }
-  }
-
-  function syncProductsFromRenderedCards() {
-    const products = qsa('.catalog-product, .rail-product')
-      .filter((card) => card.querySelector('.btn-add-cart'))
-      .map((card) => {
-        const button = card.querySelector('.btn-add-cart');
-        const name = button?.dataset.name || card.dataset.name || card.querySelector('h3')?.textContent || '';
-        const image = card.querySelector('.product-image')?.getAttribute('src') || button?.dataset.image || '';
-
-        return {
-          name,
-          category: card.dataset.category || card.querySelector('.eyebrow')?.textContent || 'Produtos',
-          price: button?.dataset.price || card.querySelector('strong')?.textContent || 0,
-          description: card.querySelector('p')?.textContent || '',
-          image,
-          recommended: card.dataset.recommended === 'true' || card.classList.contains('is-recommended'),
-        };
-      });
-
-    if (products.length) setProductIndex(products);
   }
 
   function supabaseProductClient() {
@@ -4100,7 +4087,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function productStockText(product = {}) {
     const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Indisponivel';
+    if (normalized.stockState === 'out') return 'Esgotado';
     if (normalized.stock === null) return 'Quantidade livre';
     return `${normalized.stock} em estoque`;
   }
@@ -4309,11 +4296,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fullCatalogStockText(product) {
-    const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Indisponivel';
-    if (normalized.stockState === 'low') return `${normalized.stock} em estoque`;
-    if (normalized.stock === null) return 'Quantidade livre';
-    return `${normalized.stock} em estoque`;
+    return productStockText(product);
   }
 
   function fullCatalogStatusText(product) {
@@ -6074,8 +6057,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (sessionStorage.getItem('ms_sw_reloaded_v1') === 'true') return;
-      sessionStorage.setItem('ms_sw_reloaded_v1', 'true');
+      if (sessionStorage.getItem('ms_sw_reloaded_v2') === 'true') return;
+      sessionStorage.setItem('ms_sw_reloaded_v2', 'true');
       window.location.reload();
     });
   }
