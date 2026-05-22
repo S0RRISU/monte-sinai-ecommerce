@@ -7,21 +7,56 @@ create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
 alter table public.profiles
+  add column if not exists nome text,
+  add column if not exists apelido text,
+  add column if not exists telefone text,
+  add column if not exists endereco text,
+  add column if not exists foto text,
+  add column if not exists updated_at timestamptz not null default now(),
   add column if not exists is_admin boolean not null default false,
-  add column if not exists admin_role text not null default 'customer';
+  add column if not exists admin_role text not null default 'customer',
+  add column if not exists role text;
+
+alter table public.profiles
+  alter column admin_role set default 'customer',
+  alter column is_admin set default false,
+  alter column updated_at set default now();
+
+update public.profiles
+set admin_role = case
+    when lower(btrim(coalesce(admin_role, role, ''))) in ('developer', 'owner', 'staff', 'customer', 'client')
+      then lower(btrim(coalesce(admin_role, role, '')))
+    when lower(btrim(coalesce(admin_role, role, ''))) in ('admin', 'manager')
+      then 'staff'
+    when coalesce(is_admin, false)
+      then 'owner'
+    else 'customer'
+  end,
+  is_admin = case
+    when lower(btrim(coalesce(admin_role, role, ''))) in ('developer', 'owner', 'staff', 'admin', 'manager')
+      then true
+    else coalesce(is_admin, false)
+  end,
+  updated_at = coalesce(updated_at, now())
+where admin_role is null
+  or admin_role <> lower(btrim(admin_role))
+  or admin_role not in ('developer', 'owner', 'staff', 'customer', 'client')
+  or updated_at is null
+  or is_admin is null;
+
+alter table public.profiles
+  alter column admin_role set not null,
+  alter column is_admin set not null,
+  alter column updated_at set not null;
 
 do $$
 begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'profiles_admin_role_check'
-      and conrelid = 'public.profiles'::regclass
-  ) then
-    alter table public.profiles
-      add constraint profiles_admin_role_check
-      check (admin_role in ('developer', 'owner', 'staff', 'customer'));
-  end if;
+  alter table public.profiles
+    drop constraint if exists profiles_admin_role_check;
+
+  alter table public.profiles
+    add constraint profiles_admin_role_check
+    check (admin_role in ('developer', 'owner', 'staff', 'customer', 'client'));
 end $$;
 
 create table if not exists public.perfis_usuarios (
@@ -135,7 +170,7 @@ begin
     raise exception 'Apenas developer ou owner podem gerenciar equipe';
   end if;
 
-  if target_role not in ('developer', 'owner', 'staff', 'customer') then
+  if target_role not in ('developer', 'owner', 'staff', 'customer', 'client') then
     raise exception 'Role invalida';
   end if;
 
@@ -157,18 +192,20 @@ begin
     raise exception 'Somente developer pode atribuir o papel developer';
   end if;
 
-  insert into public.profiles (id, email, nome, is_admin, admin_role)
+  insert into public.profiles (id, email, nome, is_admin, admin_role, role)
   values (
     p_user_id,
     target_email,
     coalesce(nullif(split_part(target_email, '@', 1), ''), 'Usuario'),
     target_role in ('developer', 'owner', 'staff'),
+    target_role,
     target_role
   )
   on conflict (id) do update
   set email = coalesce(public.profiles.email, excluded.email),
       is_admin = excluded.is_admin,
       admin_role = excluded.admin_role,
+      role = excluded.admin_role,
       updated_at = now();
 
   update public.perfis_usuarios
@@ -271,7 +308,7 @@ grant update (id, email, nome, apelido, telefone, endereco, foto, updated_at) on
 grant select on public.perfis_usuarios to authenticated;
 grant select, insert on public.admin_audit_logs to authenticated;
 
-insert into public.profiles (id, email, nome, is_admin, admin_role)
+insert into public.profiles (id, email, nome, is_admin, admin_role, role)
 select
   u.id,
   u.email,
@@ -281,6 +318,10 @@ select
     split_part(u.email, '@', 1)
   ),
   true,
+  case
+    when lower(u.email) = 'marcelol527319@gmail.com' then 'developer'
+    else 'owner'
+  end,
   case
     when lower(u.email) = 'marcelol527319@gmail.com' then 'developer'
     else 'owner'
@@ -295,6 +336,7 @@ on conflict (id) do update
 set email = excluded.email,
     is_admin = true,
     admin_role = excluded.admin_role,
+    role = excluded.admin_role,
     updated_at = now();
 
 update public.perfis_usuarios pu
