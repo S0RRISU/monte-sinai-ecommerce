@@ -1,307 +1,487 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Painel administrativo Monte Sinai para gerenciar pedidos, produtos, entregas, financeiro e configurações.">
-  <meta name="theme-color" content="#00061f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="color-scheme" content="dark light">
-  <meta name="robots" content="noindex, nofollow">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Painel Administrativo | Monte Sinai">
-  <meta property="og:description" content="Gerencie pedidos, status e produtos da Monte Sinai.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <title>Painel Administrativo | Monte Sinai</title>
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260522-4">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/admin.js?v=20260522-4"></script>
-</head>
-<body class="admin-shell-body">
-  <div class="admin-app-shell" data-admin-app>
-    <aside class="admin-sidebar" aria-label="Menu administrativo">
-      <a class="admin-sidebar-brand" href="../index.html" aria-label="Monte Sinai">
-        <img src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async">
-        <span>
-          <strong>Monte Sinai</strong>
-          <small>Painel Admin</small>
-        </span>
-      </a>
-
-      <nav class="admin-sidebar-menu" aria-label="Abas do painel">
-        <button class="admin-menu-btn active" type="button" data-admin-tab="pedidos">
-          <i class="fa-solid fa-clipboard-list"></i>
-          <span>Pedidos</span>
-          <strong class="admin-menu-badge" id="badge-pedidos">0</strong>
-        </button>
-        <button class="admin-menu-btn" type="button" data-admin-tab="produtos">
-          <i class="fa-solid fa-boxes-stacked"></i>
-          <span>Produtos</span>
-        </button>
-        <button class="admin-menu-btn" type="button" data-admin-tab="entregas">
-          <i class="fa-solid fa-truck-fast"></i>
-          <span>Entregas</span>
-        </button>
-        <button class="admin-menu-btn" type="button" data-admin-tab="financeiro">
-          <i class="fa-solid fa-chart-line"></i>
-          <span>Financeiro</span>
-        </button>
-        <button class="admin-menu-btn" type="button" data-admin-tab="config">
-          <i class="fa-solid fa-sliders"></i>
-          <span>Configurações da Loja</span>
-        </button>
-        <button class="admin-menu-btn admin-developer-menu" type="button" data-admin-tab="developer" data-developer-only hidden>
-          <i class="fa-solid fa-code"></i>
-          <span>Desenvolvedor</span>
-        </button>
-      </nav>
-
-      <div class="admin-sidebar-footer">
-        <a class="btn btn-secondary" href="produtos.html#todos-produtos">
-          <i class="fa-solid fa-store"></i>
-          Ver loja
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta
+      name="description"
+      content="Painel administrativo Monte Sinai para gerenciar pedidos, produtos, entregas, financeiro e configurações."
+    />
+    <meta name="theme-color" content="#00061f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Monte Sinai" />
+    <meta property="og:title" content="Painel Administrativo | Monte Sinai" />
+    <meta property="og:description" content="Gerencie pedidos, status e produtos da Monte Sinai." />
+    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <title>Painel Administrativo | Monte Sinai</title>
+    <link rel="manifest" href="../site.webmanifest" />
+    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
+    <link rel="stylesheet" href="../css/style.css?v=20260522-4" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase.js?v=20260520-4"></script>
+    <script defer src="../js/admin.js?v=20260522-4"></script>
+  </head>
+  <body class="admin-shell-body">
+    <div class="admin-app-shell" data-admin-app>
+      <aside class="admin-sidebar" aria-label="Menu administrativo">
+        <a class="admin-sidebar-brand" href="../index.html" aria-label="Monte Sinai">
+          <img src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" />
+          <span>
+            <strong>Monte Sinai</strong>
+            <small>Painel Admin</small>
+          </span>
         </a>
-        <button class="btn btn-secondary" type="button" data-admin-logout>
-          <i class="fa-solid fa-right-from-bracket"></i>
-          Sair
-        </button>
-      </div>
-    </aside>
 
-    <main class="admin-main">
-      <section class="admin-access-card" id="admin-access-state">
-        <i class="fa-solid fa-lock"></i>
-        <h1>Verificando acesso</h1>
-        <p>Conferindo sua conta administrativa no Supabase.</p>
-        <div class="settings-actions">
-          <a class="btn btn-primary hidden" href="login.html?redirect=painel.html" data-admin-login>
-            <i class="fa-solid fa-right-to-bracket"></i>
-            Entrar como administrador
+        <nav class="admin-sidebar-menu" aria-label="Abas do painel">
+          <button class="admin-menu-btn active" type="button" data-admin-tab="pedidos">
+            <i class="fa-solid fa-clipboard-list"></i>
+            <span>Pedidos</span>
+            <strong class="admin-menu-badge" id="badge-pedidos">0</strong>
+          </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="produtos">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span>Produtos</span>
+          </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="entregas">
+            <i class="fa-solid fa-truck-fast"></i>
+            <span>Entregas</span>
+          </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="financeiro">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Financeiro</span>
+          </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="config">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Configurações da Loja</span>
+          </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="equipe">
+            <i class="fa-solid fa-users"></i>
+            <span>Gerenciar Equipe</span>
+          </button>
+          <button
+            class="admin-menu-btn admin-developer-menu"
+            type="button"
+            data-admin-tab="dev-console"
+            data-developer-only
+            hidden
+          >
+            <i class="fa-solid fa-terminal"></i>
+            <span>Console do Desenvolvedor</span>
+          </button>
+          <button
+            class="admin-menu-btn admin-developer-menu"
+            type="button"
+            data-admin-tab="developer"
+            data-developer-only
+            hidden
+          >
+            <i class="fa-solid fa-code"></i>
+            <span>Desenvolvedor</span>
+          </button>
+        </nav>
+
+        <div class="admin-sidebar-footer">
+          <a class="btn btn-secondary" href="produtos.html#todos-produtos">
+            <i class="fa-solid fa-store"></i>
+            Ver loja
           </a>
-          <a class="btn btn-secondary" href="../index.html">Voltar ao site</a>
+          <button class="btn btn-secondary" type="button" data-admin-logout>
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Sair
+          </button>
         </div>
-      </section>
+      </aside>
 
-      <div class="admin-workspace hidden" data-admin-workspace>
-        <section class="admin-view active" id="tab-pedidos" data-admin-panel="pedidos">
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Tempo real</span>
-              <h1>Pedidos</h1>
-            </div>
-            <div class="orders-toolbar">
-              <label class="admin-search-field admin-order-search" for="admin-order-search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="admin-order-search" type="search" autocomplete="off" aria-label="Buscar pedido" placeholder="Buscar pedido, cliente, telefone">
-              </label>
-              <span class="admin-live-pill" id="admin-realtime-status">Conectando...</span>
-              <button class="btn btn-secondary" type="button" data-admin-refresh-orders>
-                <i class="fa-solid fa-rotate"></i>
-                Atualizar
-              </button>
-            </div>
-          </header>
-
-          <div class="admin-alert hidden" id="admin-new-order-alert" role="status"></div>
-          <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
-
-          <div class="admin-order-status-tabs" role="tablist" aria-label="Filtrar pedidos por status">
-            <button class="admin-order-status-tab active" type="button" data-admin-order-filter="pendente" aria-pressed="true">
-              <i class="fa-solid fa-hourglass-half"></i>
-              <span>Pendentes</span>
-              <strong data-admin-order-filter-count="pendente">0</strong>
-            </button>
-            <button class="admin-order-status-tab" type="button" data-admin-order-filter="preparo" aria-pressed="false">
-              <i class="fa-solid fa-fire-burner"></i>
-              <span>Em Preparo</span>
-              <strong data-admin-order-filter-count="preparo">0</strong>
-            </button>
-            <button class="admin-order-status-tab" type="button" data-admin-order-filter="entrega" aria-pressed="false">
-              <i class="fa-solid fa-truck-fast"></i>
-              <span>Saiu para Entrega</span>
-              <strong data-admin-order-filter-count="entrega">0</strong>
-            </button>
-            <button class="admin-order-status-tab" type="button" data-admin-order-filter="entregue" aria-pressed="false">
-              <i class="fa-solid fa-circle-check"></i>
-              <span>Entregues</span>
-              <strong data-admin-order-filter-count="entregue">0</strong>
-            </button>
+      <main class="admin-main">
+        <section class="admin-access-card" id="admin-access-state">
+          <i class="fa-solid fa-lock"></i>
+          <h1>Verificando acesso</h1>
+          <p>Conferindo sua conta administrativa no Supabase.</p>
+          <div class="settings-actions">
+            <a class="btn btn-primary hidden" href="login.html?redirect=painel.html" data-admin-login>
+              <i class="fa-solid fa-right-to-bracket"></i>
+              Entrar como administrador
+            </a>
+            <a class="btn btn-secondary" href="../index.html">Voltar ao site</a>
           </div>
-
-          <section class="admin-kanban admin-order-list-view" aria-label="Pedidos por status">
-            <article class="admin-kanban-col" data-status-column="pendente">
-              <h2><i class="fa-solid fa-hourglass-half"></i> Pendentes</h2>
-              <div id="lista-pendentes" class="admin-order-list"></div>
-            </article>
-            <article class="admin-kanban-col" data-status-column="preparo">
-              <h2><i class="fa-solid fa-fire-burner"></i> Em Preparo</h2>
-              <div id="lista-preparo" class="admin-order-list"></div>
-            </article>
-            <article class="admin-kanban-col" data-status-column="entrega">
-              <h2><i class="fa-solid fa-truck-fast"></i> Saiu para Entrega</h2>
-              <div id="lista-entrega" class="admin-order-list"></div>
-            </article>
-            <article class="admin-kanban-col" data-status-column="entregue">
-              <h2><i class="fa-solid fa-circle-check"></i> Entregues</h2>
-              <div id="lista-entregues" class="admin-order-list"></div>
-            </article>
-          </section>
         </section>
 
-        <section class="admin-view" id="tab-produtos" data-admin-panel="produtos">
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Catálogo</span>
-              <h1>Produtos</h1>
-            </div>
-            <div class="admin-product-view-actions" role="group" aria-label="Ações de produtos">
-              <button class="btn btn-accent" type="button" data-admin-product-view="new">
-                <i class="fa-solid fa-plus"></i>
-                Novo produto
-              </button>
-              <button class="btn btn-secondary active" type="button" data-admin-product-view="list">
-                <i class="fa-solid fa-boxes-stacked"></i>
-                Produtos da loja
-              </button>
-              <button class="btn btn-secondary" type="button" data-admin-refresh-products>
-                <i class="fa-solid fa-rotate"></i>
-                Atualizar
-              </button>
-            </div>
-          </header>
-
-          <section class="admin-products-layout is-list-mode" data-admin-products-layout>
-            <form class="admin-product-simple-form" id="admin-product-form-basic">
-              <h2>Cadastrar produto</h2>
-              <label for="prod-nome">Nome</label>
-              <input id="prod-nome" type="text" autocomplete="off" placeholder="Água mineral 20L" required>
-              <label for="prod-preco">Preço</label>
-              <input id="prod-preco" type="number" min="0" step="0.01" inputmode="decimal" placeholder="15,00" required>
-              <label for="prod-categoria">Categoria</label>
-              <select id="prod-categoria" required>
-                <option value="Água">Água</option>
-                <option value="Gás">Gás</option>
-                <option value="Limpeza">Produtos de Limpeza</option>
-                <option value="Utensílios">Utensílios</option>
-                <option value="Higiene">Higiene</option>
-              </select>
-              <label for="prod-desc">Descrição</label>
-              <textarea id="prod-desc" rows="3" placeholder="Descrição curta do produto"></textarea>
-              <label for="prod-estoque">Estoque</label>
-              <input id="prod-estoque" type="number" min="0" step="1" inputmode="numeric" placeholder="Opcional">
-              <label for="prod-estoque-minimo">Estoque minimo</label>
-              <input id="prod-estoque-minimo" type="number" min="0" step="1" inputmode="numeric" value="3">
-              <label for="prod-destaque">Destaque</label>
-              <select id="prod-destaque">
-                <option value="false">Nao</option>
-                <option value="true">Sim</option>
-              </select>
-              <label for="prod-oferta-ativa">Oferta</label>
-              <select id="prod-oferta-ativa">
-                <option value="false">Nao</option>
-                <option value="true">Sim</option>
-              </select>
-              <label for="prod-preco-promocional">Preco de oferta</label>
-              <input id="prod-preco-promocional" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Opcional">
-              <label for="prod-oferta-inicio">Oferta comeca</label>
-              <input id="prod-oferta-inicio" type="datetime-local">
-              <label for="prod-oferta-fim">Oferta termina</label>
-              <input id="prod-oferta-fim" type="datetime-local">
-              <label class="admin-upload-label" for="prod-foto">
-                <i class="fa-solid fa-image"></i>
-                Escolher imagem
-                <input id="prod-foto" type="file" accept="image/png,image/jpeg,image/webp" required>
-              </label>
-              <small id="admin-product-upload-feedback"></small>
-              <button class="btn btn-primary" type="submit">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                Salvar no catálogo
-              </button>
-            </form>
-
-            <section class="admin-product-list-panel" data-admin-product-list-panel>
-              <div class="admin-list-head">
-                <h2>Produtos cadastrados</h2>
-                <span id="admin-products-count">0</span>
+        <div class="admin-workspace hidden" data-admin-workspace>
+          <section class="admin-view active" id="tab-pedidos" data-admin-panel="pedidos">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Tempo real</span>
+                <h1>Pedidos</h1>
               </div>
-              <label class="admin-search-field admin-product-search" for="admin-product-search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="admin-product-search" type="search" autocomplete="off" aria-label="Pesquisar produto" placeholder="Pesquisar produto, categoria, estoque">
-              </label>
-              <div id="admin-product-detail-panel" class="admin-product-detail-panel hidden"></div>
-              <div id="lista-produtos-admin" class="admin-products-simple-list"></div>
+              <div class="orders-toolbar">
+                <label class="admin-search-field admin-order-search" for="admin-order-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    id="admin-order-search"
+                    type="search"
+                    autocomplete="off"
+                    aria-label="Buscar pedido"
+                    placeholder="Buscar pedido, cliente, telefone"
+                  />
+                </label>
+                <span class="admin-live-pill" id="admin-realtime-status">Conectando...</span>
+                <button class="btn btn-secondary" type="button" data-admin-refresh-orders>
+                  <i class="fa-solid fa-rotate"></i>
+                  Atualizar
+                </button>
+              </div>
+            </header>
+
+            <div class="admin-alert hidden" id="admin-new-order-alert" role="status"></div>
+            <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
+
+            <div class="admin-order-status-tabs" role="tablist" aria-label="Filtrar pedidos por status">
+              <button
+                class="admin-order-status-tab active"
+                type="button"
+                data-admin-order-filter="pendente"
+                aria-pressed="true"
+              >
+                <i class="fa-solid fa-hourglass-half"></i>
+                <span>Pendentes</span>
+                <strong data-admin-order-filter-count="pendente">0</strong>
+              </button>
+              <button
+                class="admin-order-status-tab"
+                type="button"
+                data-admin-order-filter="preparo"
+                aria-pressed="false"
+              >
+                <i class="fa-solid fa-fire-burner"></i>
+                <span>Em Preparo</span>
+                <strong data-admin-order-filter-count="preparo">0</strong>
+              </button>
+              <button
+                class="admin-order-status-tab"
+                type="button"
+                data-admin-order-filter="entrega"
+                aria-pressed="false"
+              >
+                <i class="fa-solid fa-truck-fast"></i>
+                <span>Saiu para Entrega</span>
+                <strong data-admin-order-filter-count="entrega">0</strong>
+              </button>
+              <button
+                class="admin-order-status-tab"
+                type="button"
+                data-admin-order-filter="entregue"
+                aria-pressed="false"
+              >
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Entregues</span>
+                <strong data-admin-order-filter-count="entregue">0</strong>
+              </button>
+            </div>
+
+            <section class="admin-kanban admin-order-list-view" aria-label="Pedidos por status">
+              <article class="admin-kanban-col" data-status-column="pendente">
+                <h2><i class="fa-solid fa-hourglass-half"></i> Pendentes</h2>
+                <div id="lista-pendentes" class="admin-order-list"></div>
+              </article>
+              <article class="admin-kanban-col" data-status-column="preparo">
+                <h2><i class="fa-solid fa-fire-burner"></i> Em Preparo</h2>
+                <div id="lista-preparo" class="admin-order-list"></div>
+              </article>
+              <article class="admin-kanban-col" data-status-column="entrega">
+                <h2><i class="fa-solid fa-truck-fast"></i> Saiu para Entrega</h2>
+                <div id="lista-entrega" class="admin-order-list"></div>
+              </article>
+              <article class="admin-kanban-col" data-status-column="entregue">
+                <h2><i class="fa-solid fa-circle-check"></i> Entregues</h2>
+                <div id="lista-entregues" class="admin-order-list"></div>
+              </article>
             </section>
           </section>
-        </section>
+          <section
+            class="admin-view admin-developer-view"
+            id="tab-dev-console"
+            data-admin-panel="dev-console"
+            data-developer-only
+            hidden
+          >
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Ferramentas</span>
+                <h1>Console do Desenvolvedor</h1>
+                <p>Terminal SQL embutido e Feed de logs em tempo real.</p>
+              </div>
+              <div class="settings-actions">
+                <button class="btn btn-secondary" type="button" data-admin-refresh-console>
+                  <i class="fa-solid fa-rotate"></i>
+                  Atualizar logs
+                </button>
+              </div>
+            </header>
 
-        <section class="admin-view" id="tab-entregas" data-admin-panel="entregas">
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Operação</span>
-              <h1>Entregas</h1>
+            <div class="admin-console-grid">
+              <div class="admin-console-card">
+                <label for="admin-sql-console" class="eyebrow">Terminal SQL</label>
+                <textarea
+                  id="admin-sql-console"
+                  class="sql-console"
+                  placeholder="Digite script SQL para execução (ex.: ALTER TABLE ...);"
+                ></textarea>
+                <div style="display: flex; gap: 12px; margin-top: 10px; align-items: center">
+                  <button class="btn btn-primary" id="admin-sql-execute">
+                    <i class="fa-solid fa-play"></i> Executar Script SQL
+                  </button>
+                  <button class="btn btn-secondary" id="admin-sql-clear">
+                    <i class="fa-solid fa-trash"></i> Limpar
+                  </button>
+                  <small class="form-help-text"
+                    >A execução de SQL é poderosa. Verifique permissões e políticas RLS.</small
+                  >
+                </div>
+              </div>
+
+              <div class="admin-console-card">
+                <label class="eyebrow">Feed de Logs</label>
+                <div id="admin-console-logs" class="admin-console-logs">
+                  <p class="admin-empty-state">Carregando logs...</p>
+                </div>
+              </div>
             </div>
-          </header>
-          <div class="admin-placeholder-grid" id="admin-delivery-metrics"></div>
-        </section>
+          </section>
 
-        <section class="admin-view" id="tab-financeiro" data-admin-panel="financeiro">
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Resumo</span>
-              <h1>Financeiro</h1>
+          <section class="admin-view" id="tab-produtos" data-admin-panel="produtos">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Catálogo</span>
+                <h1>Produtos</h1>
+              </div>
+              <div class="admin-product-view-actions" role="group" aria-label="Ações de produtos">
+                <button class="btn btn-accent" type="button" data-admin-product-view="new">
+                  <i class="fa-solid fa-plus"></i>
+                  Novo produto
+                </button>
+                <button class="btn btn-secondary active" type="button" data-admin-product-view="list">
+                  <i class="fa-solid fa-boxes-stacked"></i>
+                  Produtos da loja
+                </button>
+                <button class="btn btn-secondary" type="button" data-admin-refresh-products>
+                  <i class="fa-solid fa-rotate"></i>
+                  Atualizar
+                </button>
+              </div>
+            </header>
+
+            <section class="admin-products-layout is-list-mode" data-admin-products-layout>
+              <form class="admin-product-simple-form" id="admin-product-form-basic">
+                <h2>Cadastrar produto</h2>
+                <label for="prod-nome">Nome</label>
+                <input id="prod-nome" type="text" autocomplete="off" placeholder="Água mineral 20L" required />
+                <label for="prod-preco">Preço</label>
+                <input
+                  id="prod-preco"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  placeholder="15,00"
+                  required
+                />
+                <label for="prod-categoria">Categoria</label>
+                <select id="prod-categoria" required>
+                  <option value="Água">Água</option>
+                  <option value="Gás">Gás</option>
+                  <option value="Limpeza">Produtos de Limpeza</option>
+                  <option value="Utensílios">Utensílios</option>
+                  <option value="Higiene">Higiene</option>
+                </select>
+                <label for="prod-desc">Descrição</label>
+                <textarea id="prod-desc" rows="3" placeholder="Descrição curta do produto"></textarea>
+                <label for="prod-estoque">Estoque</label>
+                <input id="prod-estoque" type="number" min="0" step="1" inputmode="numeric" placeholder="Opcional" />
+                <label for="prod-estoque-minimo">Estoque minimo</label>
+                <input id="prod-estoque-minimo" type="number" min="0" step="1" inputmode="numeric" value="3" />
+                <label for="prod-destaque">Destaque</label>
+                <select id="prod-destaque">
+                  <option value="false">Nao</option>
+                  <option value="true">Sim</option>
+                </select>
+                <label for="prod-oferta-ativa">Oferta</label>
+                <select id="prod-oferta-ativa">
+                  <option value="false">Nao</option>
+                  <option value="true">Sim</option>
+                </select>
+                <label for="prod-preco-promocional">Preco de oferta</label>
+                <input
+                  id="prod-preco-promocional"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  placeholder="Opcional"
+                />
+                <label for="prod-oferta-inicio">Oferta comeca</label>
+                <input id="prod-oferta-inicio" type="datetime-local" />
+                <label for="prod-oferta-fim">Oferta termina</label>
+                <input id="prod-oferta-fim" type="datetime-local" />
+                <label class="admin-upload-label" for="prod-foto">
+                  <i class="fa-solid fa-image"></i>
+                  Escolher imagem
+                  <input id="prod-foto" type="file" accept="image/png,image/jpeg,image/webp" required />
+                </label>
+                <small id="admin-product-upload-feedback"></small>
+                <button class="btn btn-primary" type="submit">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  Salvar no catálogo
+                </button>
+              </form>
+
+              <section class="admin-product-list-panel" data-admin-product-list-panel>
+                <div class="admin-list-head">
+                  <h2>Produtos cadastrados</h2>
+                  <span id="admin-products-count">0</span>
+                </div>
+                <label class="admin-search-field admin-product-search" for="admin-product-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    id="admin-product-search"
+                    type="search"
+                    autocomplete="off"
+                    aria-label="Pesquisar produto"
+                    placeholder="Pesquisar produto, categoria, estoque"
+                  />
+                </label>
+                <div id="admin-product-detail-panel" class="admin-product-detail-panel hidden"></div>
+                <div id="lista-produtos-admin" class="admin-products-simple-list"></div>
+              </section>
+            </section>
+          </section>
+
+          <section class="admin-view" id="tab-entregas" data-admin-panel="entregas">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Operação</span>
+                <h1>Entregas</h1>
+              </div>
+            </header>
+            <div class="admin-placeholder-grid" id="admin-delivery-metrics"></div>
+          </section>
+
+          <section class="admin-view" id="tab-financeiro" data-admin-panel="financeiro">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Resumo</span>
+                <h1>Financeiro</h1>
+              </div>
+            </header>
+            <div class="admin-placeholder-grid" id="admin-finance-metrics"></div>
+          </section>
+
+          <section class="admin-view" id="tab-config" data-admin-panel="config">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Loja</span>
+                <h1>Configurações</h1>
+              </div>
+            </header>
+            <form class="admin-config-form" id="admin-store-config-form">
+              <label for="admin-store-whatsapp">WhatsApp da loja</label>
+              <input id="admin-store-whatsapp" type="tel" value="5511960928234" />
+              <label for="admin-store-pix">Chave Pix</label>
+              <input id="admin-store-pix" type="text" placeholder="Opcional" />
+              <button class="btn btn-primary" type="submit">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Salvar neste navegador
+              </button>
+            </form>
+          </section>
+
+          <section class="admin-view" id="tab-equipe" data-admin-panel="equipe">
+            <header class="admin-view-header admin-team-header">
+              <div>
+                <span class="eyebrow">Equipe</span>
+                <h1>Gerenciar Equipe</h1>
+                <p>Central de acesso — Controle de cargos e permissões.</p>
+              </div>
+              <div class="admin-team-header-actions">
+                <label class="admin-search-field admin-team-search" for="admin-team-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    id="admin-team-search"
+                    type="search"
+                    autocomplete="off"
+                    placeholder="Buscar por nome ou e-mail"
+                  />
+                </label>
+                <button class="btn btn-secondary" type="button" data-admin-refresh-equipe>
+                  <i class="fa-solid fa-rotate"></i>
+                  Atualizar lista
+                </button>
+              </div>
+            </header>
+
+            <div id="admin-team-alert" class="admin-alert hidden" role="status"></div>
+
+            <div class="admin-team-container">
+              <div class="admin-team-card">
+                <table class="admin-team-table" role="table" aria-label="Tabela de membros da equipe">
+                  <thead>
+                    <tr>
+                      <th scope="col">Usuário</th>
+                      <th scope="col">Nível de Acesso</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-team-list">
+                    <tr>
+                      <td colspan="4" class="admin-empty-state">Carregando lista de usuários...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </header>
-          <div class="admin-placeholder-grid" id="admin-finance-metrics"></div>
-        </section>
+          </section>
 
-        <section class="admin-view" id="tab-config" data-admin-panel="config">
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Loja</span>
-              <h1>Configurações</h1>
-            </div>
-          </header>
-          <form class="admin-config-form" id="admin-store-config-form">
-            <label for="admin-store-whatsapp">WhatsApp da loja</label>
-            <input id="admin-store-whatsapp" type="tel" value="5511960928234">
-            <label for="admin-store-pix">Chave Pix</label>
-            <input id="admin-store-pix" type="text" placeholder="Opcional">
-            <button class="btn btn-primary" type="submit">
-              <i class="fa-solid fa-floppy-disk"></i>
-              Salvar neste navegador
-            </button>
-          </form>
-        </section>
+          <section
+            class="admin-view admin-developer-view"
+            id="tab-developer"
+            data-admin-panel="developer"
+            data-developer-only
+            hidden
+          >
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Área técnica</span>
+                <h1>Desenvolvedor</h1>
+                <p>Diagnóstico rápido do site, Supabase, assets e cache.</p>
+              </div>
+              <button class="btn btn-secondary" type="button" data-admin-refresh-developer>
+                <i class="fa-solid fa-rotate"></i>
+                Atualizar diagnóstico
+              </button>
+            </header>
 
-        <section class="admin-view admin-developer-view" id="tab-developer" data-admin-panel="developer" data-developer-only hidden>
-          <header class="admin-view-header">
-            <div>
-              <span class="eyebrow">Área técnica</span>
-              <h1>Desenvolvedor</h1>
-              <p>Diagnóstico rápido do site, Supabase, assets e cache.</p>
-            </div>
-            <button class="btn btn-secondary" type="button" data-admin-refresh-developer>
-              <i class="fa-solid fa-rotate"></i>
-              Atualizar diagnóstico
-            </button>
-          </header>
-
-          <section class="admin-developer-grid" id="admin-developer-diagnostics" aria-label="Diagnósticos do desenvolvedor"></section>
-        </section>
-      </div>
-    </main>
-  </div>
-</body>
+            <section
+              class="admin-developer-grid"
+              id="admin-developer-diagnostics"
+              aria-label="Diagnósticos do desenvolvedor"
+            ></section>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
 </html>

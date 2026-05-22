@@ -7,13 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ['marcelol527319@gmail.com', 'developer'],
     ['marcelol527319@gmail.co', 'developer'],
     ['patriciapaula01234@gmail.com', 'owner'],
-    ['marcelo52731@gmail.com', 'owner']
+    ['marcelo52731@gmail.com', 'owner'],
   ]);
   const ORDER_STATUS = {
     pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
     preparo: { label: 'Em Preparo', db: 'Preparando', column: 'lista-preparo' },
     entrega: { label: 'Saiu para Entrega', db: 'Saiu para entrega', column: 'lista-entrega' },
-    entregue: { label: 'Entregue', db: 'Entregue', column: 'lista-entregues' }
+    entregue: { label: 'Entregue', db: 'Entregue', column: 'lista-entregues' },
   };
   const PAYMENT_STATUS = ['Pendente', 'Pago', 'Cancelado'];
   const PRODUCT_BASIC_SELECT = 'id, nome, preco, categoria, descricao, imagem, ativo, estoque, created_at';
@@ -26,26 +26,29 @@ document.addEventListener('DOMContentLoaded', () => {
     'oferta_inicio',
     'oferta_fim',
     'kit_itens',
-    'estoque_minimo'
+    'estoque_minimo',
   ].join(', ');
-  const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS)
-    .reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
+  const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
 
   function orderStatusClass(statusUi = 'pendente') {
-    return {
-      pendente: 'is-status-received',
-      preparo: 'is-status-preparing',
-      entrega: 'is-status-delivery',
-      entregue: 'is-status-delivered'
-    }[statusUi] || 'is-status-received';
+    return (
+      {
+        pendente: 'is-status-received',
+        preparo: 'is-status-preparing',
+        entrega: 'is-status-delivery',
+        entregue: 'is-status-delivered',
+      }[statusUi] || 'is-status-received'
+    );
   }
 
   function orderPaymentClass(status = 'Pendente') {
-    return {
-      Pendente: 'is-payment-pending',
-      Pago: 'is-payment-paid',
-      Cancelado: 'is-payment-canceled'
-    }[PAYMENT_STATUS.includes(status) ? status : 'Pendente'] || 'is-payment-pending';
+    return (
+      {
+        Pendente: 'is-payment-pending',
+        Pago: 'is-payment-paid',
+        Cancelado: 'is-payment-canceled',
+      }[PAYMENT_STATUS.includes(status) ? status : 'Pendente'] || 'is-payment-pending'
+    );
   }
 
   const state = {
@@ -59,29 +62,34 @@ document.addEventListener('DOMContentLoaded', () => {
     user: null,
     profile: null,
     developerManifest: null,
-    auditLogs: []
+    auditLogs: [],
   };
   let productsExtendedReady = true;
   let ordersExtendedReady = true;
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-  const text = value => String(value ?? '');
-  const onlyDigits = value => text(value).replace(/\D/g, '');
-  const normalize = value => text(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
+  const text = (value) => String(value ?? '');
+  const onlyDigits = (value) => text(value).replace(/\D/g, '');
+  const normalize = (value) =>
+    text(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
 
   function escapeHTML(value) {
-    return text(value).replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[char]));
+    return text(value).replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;',
+        })[char],
+    );
   }
 
   function escapeSelector(value) {
@@ -91,11 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function parsePrice(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    const clean = text(value).trim().replace(/[^\d,.-]/g, '');
+    const clean = text(value)
+      .trim()
+      .replace(/[^\d,.-]/g, '');
     if (!clean) return 0;
-    const normalized = clean.includes(',')
-      ? clean.replace(/\./g, '').replace(',', '.')
-      : clean;
+    const normalized = clean.includes(',') ? clean.replace(/\./g, '').replace(',', '.') : clean;
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -103,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function formatMoney(value) {
     return Number(value || 0).toLocaleString('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     });
   }
 
@@ -115,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
       day: '2-digit',
       month: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
@@ -163,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (name.includes('escova') && name.includes('vaso')) return '../assets/produtos/v2/escova-vaso.png';
     if (name.includes('escova')) return '../assets/produtos/v2/escova-roupa.png';
     if (name.includes('limpa') && name.includes('aluminio')) return '../assets/produtos/v2/limpa-aluminio.png';
-    if (name.includes('limpa') && name.includes('pedra') && name.includes('500')) return '../assets/produtos/v2/limpa-pedra-500ml.png';
+    if (name.includes('limpa') && name.includes('pedra') && name.includes('500'))
+      return '../assets/produtos/v2/limpa-pedra-500ml.png';
     if (name.includes('limpa') && name.includes('pedra')) return '../assets/produtos/v2/limpa-pedra-2l.png';
     if (name.includes('sabao') && name.includes('coco')) return '../assets/produtos/v2/sabao-coco.png';
     if (name.includes('sabao')) return '../assets/produtos/v2/sabao-omo.png';
@@ -185,9 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const src = text(product.imagem || '').trim();
     const fallback = productImageFallback(product);
     if (!src && !fallback) return '<i class="fa-solid fa-box"></i>';
-    const onerror = fallback && src !== fallback
-      ? ` onerror="this.onerror=null;this.src='${escapeHTML(fallback)}';"`
-      : ' onerror="this.onerror=null;this.closest(\'.admin-product-thumb\').innerHTML=\'<i class=&quot;fa-solid fa-box&quot;></i>\';"';
+    const onerror =
+      fallback && src !== fallback
+        ? ` onerror="this.onerror=null;this.src='${escapeHTML(fallback)}';"`
+        : " onerror=\"this.onerror=null;this.closest('.admin-product-thumb').innerHTML='<i class=&quot;fa-solid fa-box&quot;></i>';\"";
     return `<img src="${escapeHTML(src || fallback)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async"${onerror}>`;
   }
 
@@ -223,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
       p_id: pedidoId,
       p_status: payload.status ?? null,
       p_pagamento_status: payload.pagamento_status ?? null,
-      p_confirmado: payload.confirmado ?? null
+      p_confirmado: payload.confirmado ?? null,
     });
   }
 
@@ -238,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
     return api.rpc('admin_update_product', {
       p_id: productId,
-      p_payload: payload
+      p_payload: payload,
     });
   }
 
@@ -249,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
       p_action: action,
       p_entity_type: entityType,
       p_entity_id: text(entityId),
-      p_metadata: metadata || {}
+      p_metadata: metadata || {},
     });
     if (error) console.warn('[Admin Audit] Log nao registrado.', error);
   }
@@ -270,17 +280,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isMissingSchemaError(error, patterns = []) {
     const message = normalize(`${error?.message || ''} ${error?.details || ''}`);
-    return message.includes('does not exist') || message.includes('column')
-      || patterns.some(pattern => message.includes(normalize(pattern)));
+    return (
+      message.includes('does not exist') ||
+      message.includes('column') ||
+      patterns.some((pattern) => message.includes(normalize(pattern)))
+    );
   }
 
   function setDatabaseAlert(message = '') {
     const alert = qs('#admin-db-alert');
     if (!alert) return;
     alert.classList.toggle('hidden', !message);
-    alert.innerHTML = message
-      ? `<strong>Ação necessária no Supabase</strong><span>${escapeHTML(message)}</span>`
-      : '';
+    alert.innerHTML = message ? `<strong>Ação necessária no Supabase</strong><span>${escapeHTML(message)}</span>` : '';
   }
 
   function setAccessState(title, message, options = {}) {
@@ -317,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyDeveloperAccessUI() {
     const developer = isDeveloperAdmin();
     document.body.classList.toggle('admin-developer', developer);
-    qsa('[data-developer-only]').forEach(element => {
+    qsa('[data-developer-only]').forEach((element) => {
       element.classList.toggle('hidden', !developer);
       element.hidden = !developer;
       element.setAttribute('aria-hidden', String(!developer));
@@ -327,7 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
   async function verificarAcessoAdmin() {
     const api = client();
     if (!api?.auth) {
-      setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', { icon: 'triangle-exclamation' });
+      setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', {
+        icon: 'triangle-exclamation',
+      });
       return false;
     }
 
@@ -335,10 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionError) console.warn('[Admin] Falha ao ler usuario autenticado.', sessionError);
     const user = sessionData?.user;
     if (!user?.id) {
-      setAccessState('Acesso restrito', 'Entre com uma conta administrativa para abrir o painel.', {
-        icon: 'right-to-bracket',
-        login: true
-      });
+      // Redireciona para login se não estiver autenticado
+      window.location.href = 'login.html?redirect=painel.html';
       return false;
     }
 
@@ -357,15 +368,35 @@ document.addEventListener('DOMContentLoaded', () => {
       email: user.email,
       nome: user.user_metadata?.name || user.email,
       is_admin: Boolean(fallbackRole),
-      admin_role: fallbackRole || 'customer'
+      admin_role: fallbackRole || 'customer',
     };
+    // Tenta ler a role na tabela `perfis_usuarios` (tenta user_id então id)
+    try {
+      let perfisRow = null;
+      const byUser = await api.from('perfis_usuarios').select('id, user_id, role').eq('user_id', user.id).maybeSingle();
+      if (byUser?.data) perfisRow = byUser.data;
+      else {
+        const byId = await api.from('perfis_usuarios').select('id, user_id, role').eq('id', user.id).maybeSingle();
+        if (byId?.data) perfisRow = byId.data;
+      }
+      if (perfisRow) {
+        state.profile.perfis = perfisRow;
+        state.profile.role = perfisRow.role || state.profile.admin_role || fallbackRole || '';
+      } else {
+        state.profile.role = state.profile.admin_role || fallbackRole || '';
+      }
+    } catch (err) {
+      console.warn('[Admin] falha ao ler perfis_usuarios', err);
+      state.profile.role = state.profile.admin_role || fallbackRole || '';
+    }
 
     const role = currentAdminRole();
-    const admin = Boolean(state.profile.is_admin || ['developer', 'owner', 'staff'].includes(role));
+    const validAdminRoles = ['developer', 'owner', 'manager', 'admin', 'staff'];
+    const isAdminRole = validAdminRoles.includes(role);
+    const admin = Boolean(state.profile.is_admin || isAdminRole);
     if (!admin) {
-      setAccessState('Acesso negado', 'Sua conta existe, mas ainda não está marcada como administradora.', {
-        icon: 'shield-halved'
-      });
+      // Redireciona para login quando usuário não tem cargo administrativo válido
+      window.location.href = 'login.html?redirect=painel.html';
       return false;
     }
 
@@ -379,19 +410,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderAdminTab(tab = 'pedidos') {
     let nextTab = qs(`[data-admin-panel="${tab}"]`) ? tab : 'pedidos';
-    if (nextTab === 'developer' && !isDeveloperAdmin()) {
+    if ((nextTab === 'developer' || nextTab === 'dev-console') && !isDeveloperAdmin()) {
       nextTab = 'pedidos';
       showToast('Área exclusiva do desenvolvedor.', 'error');
     }
     state.activeTab = nextTab;
 
-    qsa('[data-admin-tab]').forEach(button => {
+    qsa('[data-admin-tab]').forEach((button) => {
       const active = button.dataset.adminTab === nextTab;
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
     });
 
-    qsa('[data-admin-panel]').forEach(panel => {
+    qsa('[data-admin-panel]').forEach((panel) => {
       const active = panel.dataset.adminPanel === nextTab;
       panel.classList.toggle('active', active);
       panel.hidden = !active;
@@ -400,7 +431,9 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState(null, '', `#${nextTab}`);
     if (nextTab === 'financeiro') renderFinanceiro();
     if (nextTab === 'entregas') renderEntregas();
+    if (nextTab === 'equipe') carregarEquipeAdmin();
     if (nextTab === 'developer') renderDeveloperAdmin();
+    if (nextTab === 'dev-console') renderDevConsole();
   }
 
   function dbStatusToUi(status = '') {
@@ -412,7 +445,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function orderShortId(order) {
-    return text(order.codigo || order.id).replace(/[^a-z0-9]/gi, '').slice(0, 5).toUpperCase() || 'NOVO';
+    return (
+      text(order.codigo || order.id)
+        .replace(/[^a-z0-9]/gi, '')
+        .slice(0, 5)
+        .toUpperCase() || 'NOVO'
+    );
   }
 
   function mapOrder(row = {}) {
@@ -420,15 +458,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ...row,
       items: Array.isArray(row.pedido_itens) ? row.pedido_itens : [],
       statusUi: dbStatusToUi(row.status),
-      totalNumber: Number(row.total || 0)
+      totalNumber: Number(row.total || 0),
     };
   }
 
   function unreadAdminOrders(pedidos = state.pedidos) {
     const list = pedidos || [];
-    const unconfirmed = list.filter(order => order.confirmado === false);
+    const unconfirmed = list.filter((order) => order.confirmado === false);
     if (unconfirmed.length) return unconfirmed;
-    return list.filter(order => order.statusUi !== 'entregue');
+    return list.filter((order) => order.statusUi !== 'entregue');
   }
 
   function adminSearchQuery(selector) {
@@ -437,45 +475,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function orderMatchesSearch(order = {}, query = '') {
     if (!query) return true;
-    const items = (order.items || []).map(item => `${item.nome || ''} ${item.variacao || ''}`).join(' ');
-    const haystack = normalize([
-      order.codigo,
-      order.id,
-      order.cliente_nome,
-      order.cliente_email,
-      order.cliente_telefone,
-      onlyDigits(order.cliente_telefone),
-      order.endereco_entrega,
-      order.pagamento,
-      order.pagamento_status,
-      order.status,
-      order.total,
-      items
-    ].join(' '));
+    const items = (order.items || []).map((item) => `${item.nome || ''} ${item.variacao || ''}`).join(' ');
+    const haystack = normalize(
+      [
+        order.codigo,
+        order.id,
+        order.cliente_nome,
+        order.cliente_email,
+        order.cliente_telefone,
+        onlyDigits(order.cliente_telefone),
+        order.endereco_entrega,
+        order.pagamento,
+        order.pagamento_status,
+        order.status,
+        order.total,
+        items,
+      ].join(' '),
+    );
     return haystack.includes(query);
   }
 
   function productMatchesSearch(product = {}, query = '') {
     if (!query) return true;
-    const stock = product.estoque === null || product.estoque === undefined ? 'sem estoque cadastrado' : `${product.estoque} estoque`;
+    const stock =
+      product.estoque === null || product.estoque === undefined
+        ? 'sem estoque cadastrado'
+        : `${product.estoque} estoque`;
     const offer = productOfferActive(product) ? 'oferta promocao destaque' : '';
     const active = product.ativo === false ? 'desativado inativo' : 'ativo';
-    const haystack = normalize([
-      product.nome,
-      product.categoria,
-      product.descricao,
-      product.tipo,
-      stock,
-      offer,
-      active,
-      product.preco
-    ].join(' '));
+    const haystack = normalize(
+      [product.nome, product.categoria, product.descricao, product.tipo, stock, offer, active, product.preco].join(' '),
+    );
     return haystack.includes(query);
   }
 
   function updateOrderStatusTabs(pedidos = [], query = '') {
-    Object.keys(ORDER_STATUS).forEach(key => {
-      const count = pedidos.filter(order => order.statusUi === key).length;
+    Object.keys(ORDER_STATUS).forEach((key) => {
+      const count = pedidos.filter((order) => order.statusUi === key).length;
       const button = qs(`[data-admin-order-filter="${key}"]`);
       const badge = qs(`[data-admin-order-filter-count="${key}"]`);
       if (badge) badge.textContent = String(count);
@@ -517,23 +553,20 @@ document.addEventListener('DOMContentLoaded', () => {
       'entrega',
       'total',
       'brinde',
-      'pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)'
+      'pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)',
     ].join(', ');
-    const baseSelect = 'id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, total';
+    const baseSelect =
+      'id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, total';
 
-    let { data, error } = await api
-      .from('pedidos')
-      .select(extendedSelect)
-      .order('created_at', { ascending: false });
+    let { data, error } = await api.from('pedidos').select(extendedSelect).order('created_at', { ascending: false });
 
     if (error && isMissingSchemaError(error, ['pagamento_status', 'confirmado'])) {
       console.warn('[Admin] Busca completa de pedidos falhou, tentando campos basicos.', error);
       ordersExtendedReady = false;
-      setDatabaseAlert('A tabela pedidos ainda não tem as colunas de pagamento/confirmacao. Execute supabase/reparar-painel-admin.sql para liberar status completo, pagamento e confirmação.');
-      const fallback = await api
-        .from('pedidos')
-        .select(baseSelect)
-        .order('created_at', { ascending: false });
+      setDatabaseAlert(
+        'A tabela pedidos ainda não tem as colunas de pagamento/confirmacao. Execute supabase/reparar-painel-admin.sql para liberar status completo, pagamento e confirmação.',
+      );
+      const fallback = await api.from('pedidos').select(baseSelect).order('created_at', { ascending: false });
       data = fallback.data;
       error = fallback.error;
     } else if (!error) {
@@ -558,10 +591,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function orderItemsHTML(order) {
     if (!order.items?.length) return '<li>Itens não carregados</li>';
-    return order.items.map(item => {
-      const variant = item.variacao ? ` - ${item.variacao}` : '';
-      return `<li>${escapeHTML(item.quantidade || 1)} x ${escapeHTML(item.nome || 'Produto')}${escapeHTML(variant)}</li>`;
-    }).join('');
+    return order.items
+      .map((item) => {
+        const variant = item.variacao ? ` - ${item.variacao}` : '';
+        return `<li>${escapeHTML(item.quantidade || 1)} x ${escapeHTML(item.nome || 'Produto')}${escapeHTML(variant)}</li>`;
+      })
+      .join('');
   }
 
   function orderStatusSelect(order) {
@@ -569,16 +604,20 @@ document.addEventListener('DOMContentLoaded', () => {
       <label class="admin-order-status-select">
         <span>Status</span>
         <select data-admin-order-status="${escapeHTML(order.id)}">
-          ${Object.entries(ORDER_STATUS).map(([key, config]) => `
+          ${Object.entries(ORDER_STATUS)
+            .map(
+              ([key, config]) => `
             <option value="${escapeHTML(key)}" ${key === order.statusUi ? 'selected' : ''}>${escapeHTML(config.label)}</option>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </select>
       </label>
     `;
   }
 
   function orderPaymentSelect(order) {
-      const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
+    const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
     if (!ordersExtendedReady) {
       return `
         <label class="admin-order-status-select">
@@ -593,9 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <label class="admin-order-status-select">
         <span>Pagamento</span>
         <select data-admin-order-payment="${escapeHTML(order.id)}">
-          ${PAYMENT_STATUS.map(status => `
+          ${PAYMENT_STATUS.map(
+            (status) => `
             <option value="${escapeHTML(status)}" ${status === payment ? 'selected' : ''}>${escapeHTML(status)}</option>
-          `).join('')}
+          `,
+          ).join('')}
         </select>
       </label>
     `;
@@ -627,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${orderPaymentSelect(order)}
           <button class="btn btn-secondary ${order.confirmado ? 'is-confirmed' : ''}" type="button" data-admin-order-confirm="${escapeHTML(order.id)}" ${order.confirmado || !ordersExtendedReady ? 'disabled' : ''}>
             <i class="fa-solid ${order.confirmado ? 'fa-circle-check' : 'fa-check-double'}"></i>
-            ${!ordersExtendedReady ? 'Atualize o banco' : (order.confirmado ? 'Pedido confirmado' : 'Confirmar pedido')}
+            ${!ordersExtendedReady ? 'Atualize o banco' : order.confirmado ? 'Pedido confirmado' : 'Confirmar pedido'}
           </button>
           <button class="btn btn-secondary admin-danger" type="button" data-admin-order-delete="${escapeHTML(order.id)}">
             <i class="fa-solid fa-trash"></i>
@@ -640,25 +681,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderizarPedidosAdmin(pedidos = state.pedidos, options = {}) {
     const query = adminSearchQuery('#admin-order-search');
-    const visiblePedidos = query ? pedidos.filter(order => orderMatchesSearch(order, query)) : pedidos;
+    const visiblePedidos = query ? pedidos.filter((order) => orderMatchesSearch(order, query)) : pedidos;
     const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
     const activeConfig = ORDER_STATUS[activeStatus];
-    const activePedidos = visiblePedidos.filter(order => order.statusUi === activeStatus);
+    const activePedidos = visiblePedidos.filter((order) => order.statusUi === activeStatus);
 
-    Object.values(ORDER_STATUS).forEach(config => {
+    Object.values(ORDER_STATUS).forEach((config) => {
       const column = qs(`#${config.column}`);
       if (column) column.innerHTML = '';
     });
 
     const activeColumn = qs(`#${activeConfig.column}`);
-    activePedidos.forEach(order => {
+    activePedidos.forEach((order) => {
       if (activeColumn) activeColumn.insertAdjacentHTML('beforeend', orderCardHTML(order, options.highlightId));
     });
 
     Object.entries(ORDER_STATUS).forEach(([key, config]) => {
       const column = qs(`#${config.column}`);
       const wrapper = qs(`[data-status-column="${key}"]`);
-      const count = visiblePedidos.filter(order => order.statusUi === key).length;
+      const count = visiblePedidos.filter((order) => order.statusUi === key).length;
       wrapper?.style.setProperty('--admin-column-count', `"${count}"`);
       wrapper?.classList.toggle('is-active', key === activeStatus);
       if (wrapper) wrapper.hidden = key !== activeStatus;
@@ -671,7 +712,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (badge) badge.textContent = String(openCount);
     if (badge) {
       badge.classList.toggle('is-empty', openCount === 0);
-      badge.setAttribute('aria-label', `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`);
+      badge.setAttribute(
+        'aria-label',
+        `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`,
+      );
     }
 
     if (options.announce) {
@@ -692,14 +736,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.realtimeChannel = api
       .channel('monte-sinai-admin-pedidos-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, (payload) => {
         const isInsert = payload.eventType === 'INSERT';
         carregarPedidosAdmin({
           highlightId: payload.new?.id || '',
-          announce: isInsert
+          announce: isInsert,
         });
       })
-      .subscribe(result => {
+      .subscribe((result) => {
         if (status) {
           status.textContent = result === 'SUBSCRIBED' ? 'Realtime ativo' : 'Reconectando...';
           status.classList.toggle('is-live', result === 'SUBSCRIBED');
@@ -739,9 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.pedidos = state.pedidos.map(order => order.id === pedidoId
-      ? { ...order, status, statusUi }
-      : order);
+    state.pedidos = state.pedidos.map((order) => (order.id === pedidoId ? { ...order, status, statusUi } : order));
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_status', 'pedido', pedidoId, { status });
     await carregarPedidosAdmin({ highlightId: pedidoId });
@@ -757,7 +799,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!ordersExtendedReady) {
       showToast('Execute o SQL de reparo no Supabase para controlar pagamento.', 'error');
-      setDatabaseAlert('A coluna pedidos.pagamento_status não existe no banco. Execute supabase/reparar-painel-admin.sql.');
+      setDatabaseAlert(
+        'A coluna pedidos.pagamento_status não existe no banco. Execute supabase/reparar-painel-admin.sql.',
+      );
       return false;
     }
 
@@ -768,7 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .from('pedidos')
       .update({
         pagamento_status: pagamentoStatus,
-        pagamento_confirmado_em: pagamentoStatus === 'Pago' ? new Date().toISOString() : null
+        pagamento_confirmado_em: pagamentoStatus === 'Pago' ? new Date().toISOString() : null,
       })
       .eq('id', pedidoId)
       .select('id, pagamento_status')
@@ -788,9 +832,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.pedidos = state.pedidos.map(order => order.id === pedidoId
-      ? { ...order, pagamento_status: pagamentoStatus }
-      : order);
+    state.pedidos = state.pedidos.map((order) =>
+      order.id === pedidoId ? { ...order, pagamento_status: pagamentoStatus } : order,
+    );
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_pagamento', 'pedido', pedidoId, { pagamento_status: pagamentoStatus });
     showToast('Pagamento atualizado.', 'success');
@@ -829,9 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.pedidos = state.pedidos.map(order => order.id === pedidoId
-      ? { ...order, confirmado: true }
-      : order);
+    state.pedidos = state.pedidos.map((order) => (order.id === pedidoId ? { ...order, confirmado: true } : order));
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_confirmado', 'pedido', pedidoId, { confirmado: true });
     showToast('Pedido confirmado.', 'success');
@@ -841,14 +883,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function excluirPedidoAdmin(pedidoId) {
     const api = client();
     if (!api || !pedidoId) return false;
-    const order = state.pedidos.find(item => item.id === pedidoId);
+    const order = state.pedidos.find((item) => item.id === pedidoId);
     const label = order ? `#${orderShortId(order)} de ${order.cliente_nome || 'cliente'}` : 'este pedido';
     if (!confirm(`Apagar ${label}? Esta acao remove o pedido e os itens dele.`)) return false;
 
-    let { error } = await api
-      .from('pedidos')
-      .delete()
-      .eq('id', pedidoId);
+    let { error } = await api.from('pedidos').delete().eq('id', pedidoId);
 
     if (error) {
       const rpc = await rpcExcluirPedido(pedidoId);
@@ -861,13 +900,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.pedidos = state.pedidos.filter(item => item.id !== pedidoId);
+    state.pedidos = state.pedidos.filter((item) => item.id !== pedidoId);
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
     renderEntregas();
     await logAdminAction('pedido_excluido', 'pedido', pedidoId, {
       codigo: order?.codigo || '',
-      cliente: order?.cliente_nome || ''
+      cliente: order?.cliente_nome || '',
     });
     showToast('Pedido apagado.', 'success');
     return true;
@@ -881,9 +920,14 @@ document.addEventListener('DOMContentLoaded', () => {
       .select(PRODUCT_EXTENDED_SELECT)
       .order('created_at', { ascending: false });
 
-    if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque', 'tipo', 'kit_itens'])) {
+    if (
+      error &&
+      isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque', 'tipo', 'kit_itens'])
+    ) {
       productsExtendedReady = false;
-      setDatabaseAlert('A tabela produtos ainda não tem todas as colunas de oferta/estoque. Execute supabase/reparar-painel-admin.sql para liberar todos os controles.');
+      setDatabaseAlert(
+        'A tabela produtos ainda não tem todas as colunas de oferta/estoque. Execute supabase/reparar-painel-admin.sql para liberar todos os controles.',
+      );
       const fallback = await api
         .from('produtos')
         .select(PRODUCT_BASIC_SELECT)
@@ -908,10 +952,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = qs('#lista-produtos-admin');
     const count = qs('#admin-products-count');
     const query = adminSearchQuery('#admin-product-search');
-    const visibleProdutos = query ? produtos.filter(product => productMatchesSearch(product, query)) : produtos;
+    const visibleProdutos = query ? produtos.filter((product) => productMatchesSearch(product, query)) : produtos;
     if (count) count.textContent = query ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
     if (!list) return;
-    if (state.selectedProductId && !produtos.some(product => product.id === state.selectedProductId)) {
+    if (state.selectedProductId && !produtos.some((product) => product.id === state.selectedProductId)) {
       state.selectedProductId = '';
       renderProductDetailsPanel();
     }
@@ -921,17 +965,27 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    list.innerHTML = visibleProdutos.map(product => {
-      const offer = productOfferActive(product);
-      const stock = product.estoque ?? '';
-      const active = product.ativo !== false;
-      const stockLabel = stock === '' || stock === null ? 'Sem estoque cadastrado' : (Number(stock) <= 0 ? 'Esgotado' : `${stock} em estoque`);
-      const statusBadges = [
-        `<span class="admin-product-badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>`,
-        stock !== '' && stock !== null && Number(stock) <= 0 ? '<span class="admin-product-badge is-out">Esgotado</span>' : '',
-        offer ? '<span class="admin-product-badge is-offer">Oferta</span>' : ''
-      ].filter(Boolean).join('');
-      return `
+    list.innerHTML = visibleProdutos
+      .map((product) => {
+        const offer = productOfferActive(product);
+        const stock = product.estoque ?? '';
+        const active = product.ativo !== false;
+        const stockLabel =
+          stock === '' || stock === null
+            ? 'Sem estoque cadastrado'
+            : Number(stock) <= 0
+              ? 'Esgotado'
+              : `${stock} em estoque`;
+        const statusBadges = [
+          `<span class="admin-product-badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>`,
+          stock !== '' && stock !== null && Number(stock) <= 0
+            ? '<span class="admin-product-badge is-out">Esgotado</span>'
+            : '',
+          offer ? '<span class="admin-product-badge is-offer">Oferta</span>' : '',
+        ]
+          .filter(Boolean)
+          .join('');
+        return `
         <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''} ${product.id === state.selectedProductId ? 'is-selected' : ''}" role="button" tabindex="0" data-admin-product-open="${escapeHTML(product.id)}">
           <span class="admin-product-thumb">
             ${productImageHTML(product)}
@@ -964,7 +1018,8 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </article>
       `;
-    }).join('');
+      })
+      .join('');
     renderProductDetailsPanel();
   }
 
@@ -1020,13 +1075,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProductDetailsPanel() {
     const panel = qs('#admin-product-detail-panel');
     if (!panel) return;
-    const product = state.produtos.find(item => item.id === state.selectedProductId);
+    const product = state.produtos.find((item) => item.id === state.selectedProductId);
     panel.classList.toggle('hidden', !product);
     panel.innerHTML = product ? productDetailsPanelHTML(product) : '';
   }
 
   function openProductDetails(productId) {
-    const product = state.produtos.find(item => item.id === productId);
+    const product = state.produtos.find((item) => item.id === productId);
     if (!product) return;
     state.selectedProductId = productId;
     renderProductDetailsPanel();
@@ -1145,7 +1200,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function openProductEditor(productId) {
-    const product = state.produtos.find(item => item.id === productId);
+    const product = state.produtos.find((item) => item.id === productId);
     if (!product) return;
     const modal = ensureProductEditorModal();
     const content = qs('.admin-product-editor-content', modal);
@@ -1162,7 +1217,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function adminProductPayloadFromCard(productId) {
-    const field = name => productCardField(productId, name);
+    const field = (name) => productCardField(productId, name);
     const offerActive = field('oferta_ativa')?.value === 'true';
     return {
       nome: field('nome')?.value.trim() || '',
@@ -1170,14 +1225,15 @@ document.addEventListener('DOMContentLoaded', () => {
       categoria: field('categoria')?.value.trim() || 'Produtos',
       imagem: field('imagem')?.value.trim() || '',
       descricao: field('descricao')?.value.trim() || '',
-      estoque: field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
+      estoque:
+        field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
       estoque_minimo: Math.max(0, Math.round(parsePrice(field('estoque_minimo')?.value || 0))),
       ativo: field('ativo')?.value !== 'false',
       destaque: field('destaque')?.value === 'true' || offerActive,
       oferta_ativa: offerActive,
       preco_promocional: offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null,
-      oferta_inicio: offerActive ? (isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString()) : null,
-      oferta_fim: offerActive ? isoFromLocal(field('oferta_fim')?.value) : null
+      oferta_inicio: offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null,
+      oferta_fim: offerActive ? isoFromLocal(field('oferta_fim')?.value) : null,
     };
   }
 
@@ -1206,12 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    let { data, error } = await api
-      .from('produtos')
-      .update(payload)
-      .eq('id', productId)
-      .select('id')
-      .maybeSingle();
+    let { data, error } = await api.from('produtos').update(payload).eq('id', productId).select('id').maybeSingle();
 
     if (error || !data) {
       const rpc = await rpcAtualizarProduto(productId, payload);
@@ -1221,21 +1272,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
       productsExtendedReady = false;
-      setDatabaseAlert('Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.');
+      setDatabaseAlert(
+        'Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.',
+      );
       const basePayload = {
         nome: payload.nome,
         preco: payload.preco,
         categoria: payload.categoria,
         descricao: payload.descricao,
-        ativo: payload.ativo
+        ativo: payload.ativo,
       };
       if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
-      const fallback = await api
-        .from('produtos')
-        .update(basePayload)
-        .eq('id', productId)
-        .select('id')
-        .maybeSingle();
+      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id').maybeSingle();
       data = fallback.data;
       error = fallback.error;
     }
@@ -1245,12 +1293,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.produtos = state.produtos.map(product => product.id === productId
-      ? { ...product, ...payload }
-      : product);
+    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload } : product));
     renderizarProdutosAdmin(state.produtos);
     await logAdminAction(override ? 'produto_atalho' : 'produto_atualizado', 'produto', productId, {
-      campos: Object.keys(payload)
+      campos: Object.keys(payload),
     });
     showToast('Produto atualizado.', 'success');
     carregarProdutosAdmin();
@@ -1260,14 +1306,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function excluirProdutoAdmin(productId) {
     const api = client();
     if (!api || !productId) return;
-    const product = state.produtos.find(item => item.id === productId);
+    const product = state.produtos.find((item) => item.id === productId);
     const name = product?.nome || 'este produto';
     if (!confirm(`Excluir ${name} da loja?`)) return;
 
-    const { error } = await api
-      .from('produtos')
-      .delete()
-      .eq('id', productId);
+    const { error } = await api.from('produtos').delete().eq('id', productId);
 
     if (error) {
       showToast(friendlyDbError(error, 'Nao consegui excluir o produto.'), 'error');
@@ -1280,10 +1323,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function safeFileName(value = 'produto') {
-    return normalize(value)
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-      .slice(0, 70) || 'produto';
+    return (
+      normalize(value)
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 70) || 'produto'
+    );
   }
 
   function imageExtension(file) {
@@ -1336,13 +1381,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const extension = imageExtension(file);
     const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
     const path = `${safeFileName(productName)}/${Date.now()}-${safeFileName(file.name)}.${extension}`;
-    const { error } = await api.storage
-      .from(PRODUCT_IMAGE_BUCKET)
-      .upload(path, file, {
-        cacheControl: '3600',
-        contentType: file.type || `image/${extension}`,
-        upsert: false
-      });
+    const { error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type || `image/${extension}`,
+      upsert: false,
+    });
 
     if (error) throw error;
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
@@ -1383,9 +1426,9 @@ document.addEventListener('DOMContentLoaded', () => {
         destaque: qs('#prod-destaque')?.value === 'true' || offerActive,
         oferta_ativa: offerActive,
         preco_promocional: offerActive ? parsePrice(qs('#prod-preco-promocional')?.value || 0) : null,
-        oferta_inicio: offerActive ? (isoFromLocal(qs('#prod-oferta-inicio')?.value) || new Date().toISOString()) : null,
+        oferta_inicio: offerActive ? isoFromLocal(qs('#prod-oferta-inicio')?.value) || new Date().toISOString() : null,
         oferta_fim: offerActive ? isoFromLocal(qs('#prod-oferta-fim')?.value) : null,
-        estoque_minimo: Math.max(0, Math.round(parsePrice(qs('#prod-estoque-minimo')?.value || 3)))
+        estoque_minimo: Math.max(0, Math.round(parsePrice(qs('#prod-estoque-minimo')?.value || 3))),
       };
       if (estoqueValue !== '') payload.estoque = Math.max(0, Math.round(parsePrice(estoqueValue || 0)));
 
@@ -1397,26 +1440,23 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Informe o preco promocional para ativar a oferta.');
       }
 
-      let { data: insertedProduct, error } = await api
-        .from('produtos')
-        .insert(payload)
-        .select('id')
-        .maybeSingle();
-      if (error && normalize(error.message || error.details || '').match(/oferta|promocional|estoque_minimo|destaque|tipo|kit_itens/)) {
+      let { data: insertedProduct, error } = await api.from('produtos').insert(payload).select('id').maybeSingle();
+      if (
+        error &&
+        normalize(error.message || error.details || '').match(
+          /oferta|promocional|estoque_minimo|destaque|tipo|kit_itens/,
+        )
+      ) {
         const basePayload = {
           nome: payload.nome,
           preco: payload.preco,
           categoria: payload.categoria,
           descricao: payload.descricao,
           imagem: payload.imagem,
-          ativo: payload.ativo
+          ativo: payload.ativo,
         };
         if (estoqueValue !== '') basePayload.estoque = payload.estoque;
-        const fallback = await api
-          .from('produtos')
-          .insert(basePayload)
-          .select('id')
-          .maybeSingle();
+        const fallback = await api.from('produtos').insert(basePayload).select('id').maybeSingle();
         insertedProduct = fallback.data;
         error = fallback.error;
       }
@@ -1442,31 +1482,35 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderMetric(containerId, rows) {
     const container = qs(containerId);
     if (!container) return;
-    container.innerHTML = rows.map(row => `
+    container.innerHTML = rows
+      .map(
+        (row) => `
       <article class="admin-metric-card">
         <span>${escapeHTML(row.label)}</span>
         <strong>${escapeHTML(row.value)}</strong>
       </article>
-    `).join('');
+    `,
+      )
+      .join('');
   }
 
   function renderFinanceiro() {
     const pedidos = state.pedidos;
     const total = pedidos.reduce((sum, order) => sum + Number(order.total || 0), 0);
-    const pagos = pedidos.filter(order => normalize(order.pagamento_status) === 'pago');
+    const pagos = pedidos.filter((order) => normalize(order.pagamento_status) === 'pago');
     renderMetric('#admin-finance-metrics', [
       { label: 'Pedidos', value: String(pedidos.length) },
       { label: 'Total vendido', value: formatMoney(total) },
-      { label: 'Pagos no painel', value: String(pagos.length) }
+      { label: 'Pagos no painel', value: String(pagos.length) },
     ]);
   }
 
   function renderEntregas() {
     const pedidos = state.pedidos;
     renderMetric('#admin-delivery-metrics', [
-      { label: 'Pendentes', value: String(pedidos.filter(order => order.statusUi === 'pendente').length) },
-      { label: 'Em preparo', value: String(pedidos.filter(order => order.statusUi === 'preparo').length) },
-      { label: 'Em rota', value: String(pedidos.filter(order => order.statusUi === 'entrega').length) }
+      { label: 'Pendentes', value: String(pedidos.filter((order) => order.statusUi === 'pendente').length) },
+      { label: 'Em preparo', value: String(pedidos.filter((order) => order.statusUi === 'preparo').length) },
+      { label: 'Em rota', value: String(pedidos.filter((order) => order.statusUi === 'entrega').length) },
     ]);
   }
 
@@ -1475,12 +1519,16 @@ document.addEventListener('DOMContentLoaded', () => {
       <article class="admin-developer-card">
         <h2><i class="fa-solid fa-${escapeHTML(icon)}"></i> ${escapeHTML(title)}</h2>
         <dl>
-          ${rows.map(row => `
+          ${rows
+            .map(
+              (row) => `
             <div>
               <dt>${escapeHTML(row.label)}</dt>
               <dd>${escapeHTML(row.value)}</dd>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </dl>
       </article>
     `;
@@ -1508,15 +1556,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!audit.ready) {
       return [
         { label: 'Status', value: 'Execute supabase/reparar-painel-admin.sql' },
-        { label: 'Tabela', value: 'admin_audit_logs' }
+        { label: 'Tabela', value: 'admin_audit_logs' },
       ];
     }
     if (!audit.logs.length) {
       return [{ label: 'Status', value: 'Nenhuma alteracao registrada ainda' }];
     }
-    return audit.logs.map(log => ({
+    return audit.logs.map((log) => ({
       label: `${formatDateTime(log.created_at)} - ${log.actor_email || 'admin'}`,
-      value: `${log.action} ${log.entity_type || ''} ${text(log.entity_id).slice(0, 8)}`
+      value: `${log.action} ${log.entity_type || ''} ${text(log.entity_id).slice(0, 8)}`,
     }));
   }
 
@@ -1525,7 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const summary = {
       status: 'Não carregado',
       total: '0',
-      generated: 'Sem data'
+      generated: 'Sem data',
     };
 
     try {
@@ -1552,9 +1600,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.innerHTML = '<p class="admin-empty-state">Carregando diagnóstico técnico...</p>';
     const manifest = await readAssetManifestSummary();
-    const cacheKeys = 'caches' in window
-      ? await caches.keys().catch(() => [])
-      : [];
+    const cacheKeys = 'caches' in window ? await caches.keys().catch(() => []) : [];
     const audit = await loadAdminAuditLogs();
     const realtimeText = qs('#admin-realtime-status')?.textContent || 'Não iniciado';
     const profile = state.profile || {};
@@ -1563,34 +1609,317 @@ document.addEventListener('DOMContentLoaded', () => {
       developerCardHTML('Acesso', 'user-shield', [
         { label: 'Conta', value: profile.email || state.user?.email || 'Sem email' },
         { label: 'Cargo', value: currentAdminRole() || 'Sem cargo' },
-        { label: 'Perfil', value: profile.is_admin ? 'Administrador no Supabase' : 'Fallback por email conhecido' }
+        { label: 'Perfil', value: profile.is_admin ? 'Administrador no Supabase' : 'Fallback por email conhecido' },
       ]),
       developerCardHTML('Supabase', 'database', [
         { label: 'Cliente', value: client() ? 'Carregado' : 'Indisponível' },
         { label: 'Realtime', value: realtimeText },
         { label: 'Pedidos em memória', value: String(state.pedidos.length) },
-        { label: 'Produtos em memória', value: String(state.produtos.length) }
+        { label: 'Produtos em memória', value: String(state.produtos.length) },
       ]),
       developerCardHTML('Assets e PWA', 'gears', [
         { label: 'Manifest de imagens', value: manifest.status },
         { label: 'Assets mapeados', value: manifest.total },
         { label: 'Gerado em', value: manifest.generated },
-        { label: 'Caches do navegador', value: cacheKeys.length ? cacheKeys.join(', ') : 'Nenhum cache listado' }
+        { label: 'Caches do navegador', value: cacheKeys.length ? cacheKeys.join(', ') : 'Nenhum cache listado' },
       ]),
       developerCardHTML('Esqueleto do site', 'sitemap', [
         { label: 'Paginas publicas', value: 'inicio, produtos, catalogo, pedido, perfil, pagamento' },
         { label: 'Painel admin', value: 'pedidos, produtos, entregas, financeiro, configuracoes' },
         { label: 'Arquivos principais', value: 'pages/*.html, css/style.css, js/script.js, js/admin.js' },
-        { label: 'SQL operacional', value: 'supabase/reparar-painel-admin.sql' }
+        { label: 'SQL operacional', value: 'supabase/reparar-painel-admin.sql' },
       ]),
       developerCardHTML('Funcoes alteraveis', 'sliders', [
         { label: 'Produtos', value: 'nome, preco, categoria, estoque, status, oferta, imagem' },
         { label: 'Pedidos', value: 'status, pagamento, confirmacao, remocao' },
         { label: 'Loja', value: 'WhatsApp, Pix e caches locais' },
-        { label: 'Auditoria', value: audit.ready ? 'Ativa' : 'Aguardando SQL de reparo' }
+        { label: 'Auditoria', value: audit.ready ? 'Ativa' : 'Aguardando SQL de reparo' },
       ]),
-      developerCardHTML('Auditoria admin', 'clipboard-list', auditRows(audit))
+      developerCardHTML('Auditoria admin', 'clipboard-list', auditRows(audit)),
     ].join('');
+  }
+
+  /* === Developer Console (SQL + Logs) === */
+  async function carregarLogsConsole() {
+    const api = client();
+    const container = qs('#admin-console-logs');
+    if (!api || !container) return;
+    container.innerHTML = '<p class="admin-empty-state">Carregando logs...</p>';
+    try {
+      const { data, error } = await api
+        .from('admin_audit_logs')
+        .select('id, created_at, action, actor_email, entity_type, entity_id, metadata')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) {
+        console.warn('[Admin] Falha ao carregar logs', error);
+        container.innerHTML = `<p class="admin-empty-state">${escapeHTML(friendlyDbError(error, 'Falha ao carregar logs.'))}</p>`;
+        return;
+      }
+      state.auditLogs = data || [];
+      if (!state.auditLogs.length) {
+        container.innerHTML = '<p class="admin-empty-state">Nenhum log encontrado.</p>';
+      } else {
+        container.innerHTML = state.auditLogs.map(renderConsoleLogEntry).join('');
+      }
+      subscribeAdminAuditRealtime();
+    } catch (err) {
+      console.warn('[Admin] Erro ao carregar logs', err);
+      container.innerHTML = '<p class="admin-empty-state">Erro ao carregar logs.</p>';
+    }
+  }
+
+  function renderConsoleLogEntry(log = {}) {
+    const badgeClass = String(log.action || '')
+      .toLowerCase()
+      .includes('error')
+      ? 'error'
+      : String(log.action || '')
+            .toLowerCase()
+            .includes('success')
+        ? 'success'
+        : 'info';
+    const metaDate = formatDateTime(log.created_at);
+    const actor = escapeHTML(log.actor_email || log.actor || 'system');
+    const action = escapeHTML(log.action || 'log');
+    const entity = escapeHTML(`${text(log.entity_type || '')} ${text(log.entity_id || '')}`.trim());
+    const payload = escapeHTML(text(JSON.stringify(log.metadata || {})));
+    return `
+      <div class="console-log-entry" data-log-id="${escapeHTML(log.id || '')}">
+        <div class="console-log-body">
+          <div class="console-log-head"><strong>${action}</strong><span class="console-log-meta">${metaDate} • ${actor}</span></div>
+          <div class="console-log-payload">${payload}</div>
+        </div>
+        <div>
+          <span class="console-log-badge ${badgeClass}">${escapeHTML(action)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function subscribeAdminAuditRealtime() {
+    const api = client();
+    if (!api?.channel) return;
+    if (state.realtimeConsoleChannel) return;
+    try {
+      state.realtimeConsoleChannel = api
+        .channel('monte-sinai-admin-audit-logs')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_audit_logs' }, (payload) => {
+          const log = payload?.new;
+          if (!log) return;
+          state.auditLogs = [log].concat(state.auditLogs || []);
+          const container = qs('#admin-console-logs');
+          if (container) container.insertAdjacentHTML('afterbegin', renderConsoleLogEntry(log));
+        })
+        .subscribe((status) => {
+          // status is 'SUBSCRIBED' or other lifecycle events
+          const realtime = qs('#admin-realtime-status');
+          if (realtime) realtime.textContent = status === 'SUBSCRIBED' ? 'Realtime ativo' : 'Reconectando...';
+        });
+    } catch (err) {
+      console.warn('[Admin] Falha ao inscrever realtime de logs', err);
+    }
+  }
+
+  async function executeAdminSql(sql) {
+    const api = client();
+    if (!api?.rpc) {
+      showToast('RPC admin_execute_sql indisponível no cliente.', 'error');
+      return null;
+    }
+    try {
+      const { data, error } = await api.rpc('admin_execute_sql', { p_sql: sql });
+      if (error) {
+        showToast(friendlyDbError(error, 'Erro ao executar SQL.'), 'error');
+        await logAdminAction('sql_failed', 'console', state.user?.id, { error: error?.message || '' });
+        return null;
+      }
+      showToast('SQL executado. Verifique logs.', 'success');
+      await logAdminAction('sql_executed', 'console', state.user?.id, { sql: sql.slice(0, 1200) });
+      // if data is returned, append a lightweight result entry
+      if (Array.isArray(data) && data.length) {
+        const preview = {
+          id: `local-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          action: 'sql_result',
+          actor_email: state.user?.email,
+          entity_type: 'rpc',
+          entity_id: '',
+          metadata: { rows: data.length },
+        };
+        const container = qs('#admin-console-logs');
+        if (container) container.insertAdjacentHTML('afterbegin', renderConsoleLogEntry(preview));
+      }
+      return data;
+    } catch (err) {
+      console.warn('[Admin] Execucao SQL falhou', err);
+      showToast('Falha ao executar SQL.', 'error');
+      return null;
+    }
+  }
+
+  function renderDevConsole() {
+    if (!isDeveloperAdmin()) return;
+    // garante carregar os logs e conectar realtime
+    carregarLogsConsole();
+  }
+
+  /* === Gerenciar Equipe (perfis_usuarios) === */
+  async function carregarEquipeAdmin() {
+    const api = client();
+    const container = qs('#admin-team-list');
+    if (!api || !container) return;
+    container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuários...</p>';
+
+    const { data: profiles, error: profilesErr } = await api
+      .from('profiles')
+      .select('id, email, nome, is_admin, admin_role')
+      .order('email', { ascending: true });
+    if (profilesErr) {
+      console.warn('[Admin] Falha ao carregar profiles', profilesErr);
+      container.innerHTML = `<p class="admin-empty-state">${escapeHTML(friendlyDbError(profilesErr, 'Falha ao carregar perfis.'))}</p>`;
+      return;
+    }
+
+    const { data: perfisData, error: perfisErr } = await api.from('perfis_usuarios').select('id, user_id, role');
+    if (perfisErr) console.warn('[Admin] perfis_usuarios nao lido', perfisErr);
+
+    const perfisMap = {};
+    (perfisData || []).forEach((p) => {
+      const key = p.user_id || p.id;
+      perfisMap[key] = p;
+    });
+
+    // inclui perfis que não estão em profiles
+    const extraFromPerfis = (perfisData || []).filter((p) => !profiles.some((pr) => pr.id === (p.user_id || p.id)));
+
+    const rows = [
+      ...profiles.map((pr) => ({
+        id: pr.id,
+        email: pr.email,
+        nome: pr.nome,
+        is_admin: pr.is_admin,
+        admin_role: pr.admin_role,
+      })),
+      ...extraFromPerfis.map((pf) => ({
+        id: pf.user_id || pf.id,
+        email: '',
+        nome: '',
+        is_admin: false,
+        admin_role: '',
+        _perfisRow: pf,
+      })),
+    ];
+
+    const currentRole = currentAdminRole();
+    const canEditAll = ['developer', 'owner'].includes(currentRole);
+    const canEditSome = ['developer', 'owner', 'manager', 'admin'].includes(currentRole);
+    const rolesOptions = [
+      { value: 'owner', label: 'Dono' },
+      { value: 'developer', label: 'Desenvolvedor' },
+      { value: 'manager', label: 'Gerente' },
+      { value: 'admin', label: 'Administrador' },
+      { value: 'staff', label: 'Staff' },
+      { value: 'customer', label: 'Cliente' },
+    ];
+
+    const html = rows
+      .map((row) => {
+        const perf = perfisMap[row.id] || row._perfisRow || null;
+        const userRole = perf?.role || row.admin_role || (row.is_admin ? 'admin' : 'customer');
+        const perfisId = perf?.id || '';
+
+        let selectDisabled = false;
+        if (['owner', 'developer'].includes(userRole) && !canEditAll) selectDisabled = true;
+
+        const optionsHtml = rolesOptions
+          .map((opt) => {
+            const disableOpt = ['owner', 'developer'].includes(opt.value) && !canEditAll ? 'disabled' : '';
+            return `<option value="${escapeHTML(opt.value)}" ${opt.value === userRole ? 'selected' : ''} ${disableOpt}>${escapeHTML(opt.label)}</option>`;
+          })
+          .join('');
+
+        const active = userRole !== 'customer';
+        const statusHtml = `<span class="team-badge ${active ? 'is-active' : 'is-inactive'}"><span class="team-badge-dot" aria-hidden="true"></span>${active ? 'Ativo' : 'Inativo'}</span>`;
+
+        return `
+          <tr data-team-row="${escapeHTML(row.id)}">
+            <td class="team-user">
+              <div class="team-user-name">${escapeHTML(row.nome || row.email || 'Usuário')}</div>
+              <div class="team-user-email">${escapeHTML(row.email || '')}</div>
+            </td>
+            <td class="team-role">
+              <div class="select-wrap ${selectDisabled ? 'disabled' : ''}">
+                <select class="team-role-select" data-admin-team-role="${escapeHTML(row.id)}" data-perfis-id="${escapeHTML(perfisId)}" ${selectDisabled ? 'disabled' : ''} aria-label="Selecionar cargo">
+                  ${optionsHtml}
+                </select>
+              </div>
+            </td>
+            <td class="team-status">${statusHtml}</td>
+            <td class="team-actions">
+              <button class="btn btn-ghost team-action-btn" type="button" data-admin-team-save="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} title="Salvar alterações">
+                <i class="fa-solid fa-floppy-disk"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    // Se o container for um <tbody>, inserir tr corretamente; senão, substituir diretamente
+    if (container.tagName && container.tagName.toLowerCase() === 'tbody') {
+      container.innerHTML =
+        html || '<tr><td colspan="4" class="admin-empty-state">Nenhum usuário encontrado.</td></tr>';
+    } else {
+      container.innerHTML = html || '<p class="admin-empty-state">Nenhum usuário encontrado.</p>';
+    }
+  }
+
+  async function atualizarCargoUsuario(userId, newRole, perfisId = '') {
+    const api = client();
+    if (!api || !userId) return false;
+    try {
+      // tenta atualizar por user_id
+      let res = await api.from('perfis_usuarios').update({ role: newRole }).eq('user_id', userId).select();
+      if (res.error) {
+        console.warn('[Admin] Erro atualizando perfis_usuarios por user_id', res.error);
+      }
+
+      const hasData = res.data && (Array.isArray(res.data) ? res.data.length > 0 : true);
+      if (!hasData) {
+        // tenta atualizar por id da tabela perfis_usuarios
+        if (perfisId) {
+          const byId = await api.from('perfis_usuarios').update({ role: newRole }).eq('id', perfisId).select();
+          if (byId.error) console.warn('[Admin] Erro atualizando perfis_usuarios por id', byId.error);
+          if (byId.data && byId.data.length) {
+            showToast('Cargo atualizado.', 'success');
+            await carregarEquipeAdmin();
+            await logAdminAction('role_updated', 'user', userId, { role: newRole });
+            return true;
+          }
+        }
+
+        // se nada foi atualizado, insere novo registro
+        const inserted = await api.from('perfis_usuarios').insert({ user_id: userId, role: newRole }).select();
+        if (inserted.error) {
+          showToast(friendlyDbError(inserted.error, 'Falha ao alterar cargo.'), 'error');
+          return false;
+        }
+        showToast('Cargo atribuído.', 'success');
+        await carregarEquipeAdmin();
+        await logAdminAction('role_assigned', 'user', userId, { role: newRole });
+        return true;
+      }
+
+      showToast('Cargo atualizado.', 'success');
+      await carregarEquipeAdmin();
+      await logAdminAction('role_updated', 'user', userId, { role: newRole });
+      return true;
+    } catch (err) {
+      console.warn('[Admin] Falha ao atualizar cargo', err);
+      showToast('Erro ao atualizar cargo.', 'error');
+      return false;
+    }
   }
 
   async function logoutAdmin() {
@@ -1600,7 +1929,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function bindAdminEvents() {
-    qsa('[data-admin-tab]').forEach(button => {
+    qsa('[data-admin-tab]').forEach((button) => {
       button.addEventListener('click', () => renderAdminTab(button.dataset.adminTab || 'pedidos'));
     });
 
@@ -1610,27 +1939,56 @@ document.addEventListener('DOMContentLoaded', () => {
       state.developerManifest = null;
       renderDeveloperAdmin();
     });
+    qs('[data-admin-refresh-console]')?.addEventListener('click', () => carregarLogsConsole());
+    qs('#admin-sql-execute')?.addEventListener('click', async (event) => {
+      event.preventDefault();
+      const btn = event.currentTarget;
+      const sql = qs('#admin-sql-console')?.value || '';
+      if (!sql.trim()) return showToast('SQL vazio.', 'error');
+      try {
+        if (btn) btn.disabled = true;
+        await executeAdminSql(sql);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+    qs('#admin-sql-clear')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (qs('#admin-sql-console')) qs('#admin-sql-console').value = '';
+    });
+    qs('[data-admin-refresh-equipe]')?.addEventListener('click', () => carregarEquipeAdmin());
     qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
     qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
     qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));
-    qsa('[data-admin-order-filter]').forEach(button => {
+    qs('#admin-team-search')?.addEventListener('input', (event) => {
+      const query = normalize(event.target.value || '');
+      qsa('#admin-team-list tr[data-team-row]').forEach((tr) => {
+        const name = normalize(qs('.team-user-name', tr)?.textContent || '');
+        const email = normalize(qs('.team-user-email', tr)?.textContent || '');
+        tr.hidden = query && !(name.includes(query) || email.includes(query));
+      });
+    });
+    qsa('[data-admin-order-filter]').forEach((button) => {
       button.addEventListener('click', () => setActiveOrderStatus(button.dataset.adminOrderFilter));
     });
-    qsa('[data-admin-product-view]').forEach(button => {
+    qsa('[data-admin-product-view]').forEach((button) => {
       button.addEventListener('click', () => setAdminProductView(button.dataset.adminProductView || 'list'));
     });
-    qs('#admin-store-config-form')?.addEventListener('submit', event => {
+    qs('#admin-store-config-form')?.addEventListener('submit', (event) => {
       event.preventDefault();
-      localStorage.setItem('ms_admin_store_config', JSON.stringify({
-        whatsapp: qs('#admin-store-whatsapp')?.value || '',
-        pix: qs('#admin-store-pix')?.value || '',
-        savedAt: new Date().toISOString()
-      }));
+      localStorage.setItem(
+        'ms_admin_store_config',
+        JSON.stringify({
+          whatsapp: qs('#admin-store-whatsapp')?.value || '',
+          pix: qs('#admin-store-pix')?.value || '',
+          savedAt: new Date().toISOString(),
+        }),
+      );
       showToast('Configuração salva neste navegador.', 'success');
     });
 
-    document.body.addEventListener('change', event => {
+    document.body.addEventListener('change', (event) => {
       const select = event.target.closest('[data-admin-order-status]');
       if (select) {
         atualizarStatusPedido(select.dataset.adminOrderStatus, select.value);
@@ -1639,9 +1997,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const payment = event.target.closest('[data-admin-order-payment]');
       if (payment) atualizarPagamentoPedido(payment.dataset.adminOrderPayment, payment.value);
+      // Mudanca de cargo na aba Gerenciar Equipe
+      const teamSelect = event.target.closest('[data-admin-team-role]');
+      if (teamSelect) {
+        const userId = teamSelect.dataset.adminTeamRole;
+        const newRole = teamSelect.value;
+        const perfisId = teamSelect.dataset.perfisId || '';
+        atualizarCargoUsuario(userId, newRole, perfisId);
+        return;
+      }
     });
 
-    document.body.addEventListener('click', event => {
+    document.body.addEventListener('click', (event) => {
       const editorClose = event.target.closest('[data-admin-product-editor-close]');
       if (editorClose) {
         closeProductEditor();
@@ -1662,13 +2029,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-    const save = event.target.closest('[data-admin-product-save]');
-    if (save) {
-      salvarEdicaoProduto(save.dataset.adminProductSave).then(saved => {
-        if (saved) closeProductEditor();
-      });
-      return;
-    }
+      const save = event.target.closest('[data-admin-product-save]');
+      if (save) {
+        salvarEdicaoProduto(save.dataset.adminProductSave).then((saved) => {
+          if (saved) closeProductEditor();
+        });
+        return;
+      }
 
       const stockZero = event.target.closest('[data-admin-product-stock-zero]');
       if (stockZero) {
@@ -1678,14 +2045,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const offer24 = event.target.closest('[data-admin-product-offer-24]');
       if (offer24) {
-        const product = state.produtos.find(item => item.id === offer24.dataset.adminProductOffer24);
+        const product = state.produtos.find((item) => item.id === offer24.dataset.adminProductOffer24);
         const price = Number(product?.preco || 0);
         salvarEdicaoProduto(offer24.dataset.adminProductOffer24, {
           destaque: true,
           oferta_ativa: true,
           preco_promocional: Math.max(0, Number((price * 0.9).toFixed(2))),
           oferta_inicio: new Date().toISOString(),
-          oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         });
         return;
       }
@@ -1695,7 +2062,7 @@ document.addEventListener('DOMContentLoaded', () => {
         salvarEdicaoProduto(offerEnd.dataset.adminProductOfferEnd, {
           oferta_ativa: false,
           preco_promocional: null,
-          oferta_fim: new Date().toISOString()
+          oferta_fim: new Date().toISOString(),
         });
         return;
       }
@@ -1722,9 +2089,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (productOpen && !event.target.closest('button, a, input, select, textarea, label')) {
         openProductDetails(productOpen.dataset.adminProductOpen);
       }
+      const teamSave = event.target.closest('[data-admin-team-save]');
+      if (teamSave) {
+        const userId = teamSave.dataset.adminTeamSave;
+        const select = qs(`[data-admin-team-role="${escapeSelector(userId)}"]`);
+        if (select) atualizarCargoUsuario(userId, select.value, select.dataset.perfisId || '');
+        return;
+      }
     });
 
-    document.body.addEventListener('keydown', event => {
+    document.body.addEventListener('keydown', (event) => {
       const productOpen = event.target.closest?.('[data-admin-product-open]');
       if (!productOpen || !['Enter', ' '].includes(event.key)) return;
       event.preventDefault();
@@ -1737,7 +2111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const layout = qs('[data-admin-products-layout]');
     layout?.classList.toggle('is-new-mode', mode === 'new');
     layout?.classList.toggle('is-list-mode', mode === 'list');
-    qsa('[data-admin-product-view]').forEach(button => {
+    qsa('[data-admin-product-view]').forEach((button) => {
       const active = button.dataset.adminProductView === mode;
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
@@ -1752,10 +2126,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initialTab = text(location.hash).replace('#', '') || 'pedidos';
     renderAdminTab(initialTab);
-    await Promise.all([
-      carregarPedidosAdmin(),
-      carregarProdutosAdmin()
-    ]);
+    await Promise.all([carregarPedidosAdmin(), carregarProdutosAdmin()]);
     assinarPedidosRealtime();
   }
 
@@ -1768,6 +2139,11 @@ document.addEventListener('DOMContentLoaded', () => {
   window.carregarProdutosAdmin = carregarProdutosAdmin;
   window.salvarProdutoAdmin = salvarProdutoAdmin;
   window.uploadImagemProduto = uploadImagemProduto;
+  window.carregarEquipeAdmin = carregarEquipeAdmin;
+  window.atualizarCargoUsuario = atualizarCargoUsuario;
+  window.carregarLogsConsole = carregarLogsConsole;
+  window.executeAdminSql = executeAdminSql;
+  window.renderDevConsole = renderDevConsole;
 
   window.switchTab = renderAdminTab;
   window.salvarProduto = salvarProdutoAdmin;
