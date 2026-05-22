@@ -26971,7 +26971,7 @@ body.light-mode .navbar {
   .hero-home h1,
   .hero-copy h1 {
     max-width: 100% !important;
-    font-size: clamp(1.72rem, 8vw, 2.35rem) !important;
+    font-size: clamp(1.95rem, 7.6vw, 2.55rem) !important;
     line-height: 1.06 !important;
     letter-spacing: 0 !important;
     text-wrap: balance;
@@ -27069,21 +27069,22 @@ body.light-mode .navbar {
   }
 
   .admin-sidebar-menu {
-    display: flex !important;
-    grid-template-columns: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 7px !important;
-    overflow-x: auto !important;
+    overflow: visible !important;
     padding: 4px 2px 8px !important;
-    scroll-snap-type: x proximity;
+    scroll-snap-type: none !important;
   }
 
   .admin-menu-btn {
-    flex: 0 0 76px !important;
+    flex: none !important;
+    width: 100% !important;
     min-width: 76px !important;
     min-height: 66px !important;
     padding: 7px 6px !important;
     gap: 5px !important;
-    scroll-snap-align: start;
+    scroll-snap-align: none !important;
   }
 
   .admin-menu-btn i {
@@ -27116,5 +27117,9 @@ body.light-mode .navbar {
   .navbar .brand-logo {
     max-width: 128px !important;
     height: 52px !important;
+  }
+
+  .admin-sidebar-menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
