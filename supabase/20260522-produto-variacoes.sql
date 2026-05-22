@@ -8,7 +8,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.produto_variacoes (
   id uuid primary key default gen_random_uuid(),
-  produto_id uuid not null references public.produtos(id) on delete cascade,
+  produto_id uuid not null references public.produtos(id) on delete restrict,
   nome text not null,
   slug text not null,
   sku text,
@@ -23,7 +23,7 @@ create table if not exists public.produto_variacoes (
 );
 
 alter table public.produto_variacoes
-  add column if not exists produto_id uuid references public.produtos(id) on delete cascade,
+  add column if not exists produto_id uuid references public.produtos(id) on delete restrict,
   add column if not exists nome text,
   add column if not exists slug text,
   add column if not exists sku text,
@@ -47,12 +47,26 @@ alter table public.produto_variacoes
 
 do $$
 begin
+  if exists (
+    select 1
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where c.conname = 'produto_variacoes_produto_id_fkey'
+      and n.nspname = 'public'
+      and t.relname = 'produto_variacoes'
+      and c.confdeltype = 'c'
+  ) then
+    alter table public.produto_variacoes
+      drop constraint produto_variacoes_produto_id_fkey;
+  end if;
+
   if not exists (
     select 1 from pg_constraint where conname = 'produto_variacoes_produto_id_fkey'
   ) then
     alter table public.produto_variacoes
       add constraint produto_variacoes_produto_id_fkey
-      foreign key (produto_id) references public.produtos(id) on delete cascade;
+      foreign key (produto_id) references public.produtos(id) on delete restrict;
   end if;
 
   if not exists (
