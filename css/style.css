@@ -23419,6 +23419,11 @@ textarea {
   color: #ffaaaa;
 }
 
+.admin-product-badge.is-low {
+  border-color: rgba(255, 212, 0, 0.42);
+  color: var(--accent);
+}
+
 .admin-product-badge.is-offer {
   border-color: rgba(255, 212, 0, 0.42);
   color: var(--accent);

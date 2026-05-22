@@ -70,6 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let productsExtendedReady = true;
   let ordersExtendedReady = true;
+  let productCreateSaving = false;
+  const productSaveLocks = new Set();
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -150,6 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!product.preco_promocional || Number(product.preco_promocional) <= 0) return false;
     if (!product.oferta_fim) return true;
     return new Date(product.oferta_fim).getTime() > Date.now();
+  }
+
+  function productStockLow(product = {}) {
+    if (product.estoque === '' || product.estoque === null || product.estoque === undefined) return false;
+    const stock = Number(product.estoque);
+    const minimum = Number(product.estoque_minimo ?? 3);
+    return Number.isFinite(stock) && Number.isFinite(minimum) && stock > 0 && stock <= minimum;
   }
 
   function productCardField(id, field) {
@@ -259,13 +268,17 @@ document.addEventListener('DOMContentLoaded', () => {
   async function logAdminAction(action, entityType, entityId, metadata = {}) {
     const api = client();
     if (!api?.rpc) return;
-    const { error } = await api.rpc('admin_log_action', {
-      p_action: action,
-      p_entity_type: entityType,
-      p_entity_id: text(entityId),
-      p_metadata: metadata || {},
-    });
-    if (error) console.warn('[Admin Audit] Log nao registrado.', error);
+    try {
+      const { error } = await api.rpc('admin_log_action', {
+        p_action: action,
+        p_entity_type: entityType,
+        p_entity_id: text(entityId),
+        p_metadata: metadata || {},
+      });
+      if (error) console.warn('[Admin Audit] Log nao registrado.', error);
+    } catch (error) {
+      console.warn('[Admin Audit] Log nao registrado.', error);
+    }
   }
 
   function friendlyDbError(error, fallback) {
@@ -521,6 +534,34 @@ document.addEventListener('DOMContentLoaded', () => {
       [product.nome, product.categoria, product.descricao, product.tipo, stock, offer, active, product.preco].join(' '),
     );
     return haystack.includes(query);
+  }
+
+  function productAuditActions(previous = {}, payload = {}, fallbackAction = 'produto_atualizado') {
+    const actions = new Set([fallbackAction]);
+    if (Object.prototype.hasOwnProperty.call(payload, 'ativo') && payload.ativo === false && previous.ativo !== false) {
+      actions.add('produto_desativado');
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'estoque') && Number(payload.estoque) !== Number(previous.estoque)) {
+      actions.add('estoque_alterado');
+    }
+    if (
+      ['oferta_ativa', 'preco_promocional', 'oferta_inicio', 'oferta_fim'].some((key) =>
+        Object.prototype.hasOwnProperty.call(payload, key),
+      )
+    ) {
+      actions.add('oferta_alterada');
+    }
+    return [...actions];
+  }
+
+  async function logProductActions(productId, previous, payload, fallbackAction = 'produto_atualizado') {
+    const metadata = {
+      nome: payload.nome || previous?.nome || '',
+      campos: Object.keys(payload),
+    };
+    for (const action of productAuditActions(previous, payload, fallbackAction)) {
+      await logAdminAction(action, 'produto', productId, metadata);
+    }
   }
 
   function updateOrderStatusTabs(pedidos = [], query = '') {
@@ -984,17 +1025,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const offer = productOfferActive(product);
         const stock = product.estoque ?? '';
         const active = product.ativo !== false;
+        const lowStock = productStockLow(product);
         const stockLabel =
           stock === '' || stock === null
             ? 'Sem estoque cadastrado'
             : Number(stock) <= 0
               ? 'Esgotado'
-              : `${stock} em estoque`;
+              : lowStock
+                ? `${stock} em estoque - baixo`
+                : `${stock} em estoque`;
         const statusBadges = [
           `<span class="admin-product-badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativo' : 'Desativado'}</span>`,
           stock !== '' && stock !== null && Number(stock) <= 0
             ? '<span class="admin-product-badge is-out">Esgotado</span>'
             : '',
+          lowStock ? '<span class="admin-product-badge is-low">Estoque baixo</span>' : '',
           offer ? '<span class="admin-product-badge is-offer">Oferta</span>' : '',
         ]
           .filter(Boolean)
@@ -1041,7 +1086,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const offer = productOfferActive(product);
     const active = product.ativo !== false;
     const stock = product.estoque ?? '';
-    const stockLabel = stock === '' || stock === null ? 'Sem estoque cadastrado' : `${stock} em estoque`;
+    const lowStock = productStockLow(product);
+    const stockLabel =
+      stock === '' || stock === null
+        ? 'Sem estoque cadastrado'
+        : `${stock} em estoque${lowStock ? ' - baixo' : ''}`;
     return `
       <article class="admin-product-detail-card">
         <header>
@@ -1237,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nome: field('nome')?.value.trim() || '',
       preco: parsePrice(field('preco')?.value || 0),
       categoria: field('categoria')?.value.trim() || 'Produtos',
-      imagem: field('imagem')?.value.trim() || '',
+      imagem: ensureSafeProductImageValue(field('imagem')?.value || ''),
       descricao: field('descricao')?.value.trim() || '',
       estoque:
         field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
@@ -1251,10 +1300,35 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function setProductSaveBusy(productId, busy) {
+    qsa(`[data-admin-product-save="${escapeSelector(productId)}"]`).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
+  }
+
+  function unlockProductSave(productId) {
+    productSaveLocks.delete(productId);
+    setProductSaveBusy(productId, false);
+  }
+
   async function salvarEdicaoProduto(productId, override = null) {
     const api = client();
     if (!api || !productId) return false;
-    const payload = override || adminProductPayloadFromCard(productId);
+    if (productSaveLocks.has(productId)) return false;
+    productSaveLocks.add(productId);
+    setProductSaveBusy(productId, true);
+
+    const previousProduct = state.produtos.find((product) => product.id === productId) || {};
+    let payload;
+    try {
+      payload = override || adminProductPayloadFromCard(productId);
+    } catch (error) {
+      unlockProductSave(productId);
+      showToast(friendlyDbError(error, error.message || 'Nao consegui preparar o produto.'), 'error');
+      return false;
+    }
+
     if (!override) {
       const file = qs(`[data-admin-product-image-file="${escapeSelector(productId)}"]`)?.files?.[0] || null;
       if (file) {
@@ -1262,21 +1336,27 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('Enviando nova imagem...', 'info');
           payload.imagem = await resolveProductImage(file, payload.nome || productId);
         } catch (error) {
+          unlockProductSave(productId);
           showToast(friendlyDbError(error, error.message || 'Nao consegui enviar a imagem.'), 'error');
           return false;
         }
       }
     }
     if (!override && !payload.nome) {
+      unlockProductSave(productId);
       showToast('Informe o nome do produto.', 'error');
       return false;
     }
     if (payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
+      unlockProductSave(productId);
       showToast('Informe o preco promocional para ativar a oferta.', 'error');
       return false;
     }
 
-    let { data, error } = await api.from('produtos').update(payload).eq('id', productId).select('id').maybeSingle();
+    let data;
+    let error;
+    try {
+      ({ data, error } = await api.from('produtos').update(payload).eq('id', productId).select('id').maybeSingle());
 
     if (error || !data) {
       const rpc = await rpcAtualizarProduto(productId, payload);
@@ -1293,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nome: payload.nome,
         preco: payload.preco,
         categoria: payload.categoria,
+        imagem: payload.imagem,
         descricao: payload.descricao,
         ativo: payload.ativo,
       };
@@ -1301,19 +1382,24 @@ document.addEventListener('DOMContentLoaded', () => {
       data = fallback.data;
       error = fallback.error;
     }
+    } catch (requestError) {
+      unlockProductSave(productId);
+      showToast(friendlyDbError(requestError, 'Nao consegui alterar o produto.'), 'error');
+      return false;
+    }
 
     if (error || !data) {
+      unlockProductSave(productId);
       showToast(friendlyDbError(error, 'Nao consegui alterar o produto.'), 'error');
       return false;
     }
 
     state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload } : product));
     renderizarProdutosAdmin(state.produtos);
-    await logAdminAction(override ? 'produto_atalho' : 'produto_atualizado', 'produto', productId, {
-      campos: Object.keys(payload),
-    });
+    await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
     showToast('Produto atualizado.', 'success');
     carregarProdutosAdmin();
+    unlockProductSave(productId);
     return true;
   }
 
@@ -1364,14 +1450,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function fileToDataUrl(file) {
-    validateProductImageFile(file);
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(text(reader.result || ''));
-      reader.onerror = () => reject(new Error('Nao consegui ler a imagem selecionada.'));
-      reader.readAsDataURL(file);
-    });
+  function ensureSafeProductImageValue(value = '') {
+    const image = text(value).trim();
+    if (/^data:/i.test(image)) {
+      throw new Error('Imagem em base64/DataURL nao pode ser salva no produto. Envie a imagem pelo Storage ou use uma URL.');
+    }
+    return image;
   }
 
   async function resolveProductImage(file, productNameOverride = '') {
@@ -1380,9 +1464,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       return await uploadImagemProduto(file, productNameOverride);
     } catch (error) {
-      console.warn('[Admin] Upload no Storage falhou, usando imagem embutida no cadastro.', error);
-      showToast('Storage nao aceitou a imagem; salvando direto no produto.', 'info');
-      return fileToDataUrl(file);
+      console.warn('[Admin] Upload no Storage falhou.', error);
+      throw new Error(
+        friendlyDbError(
+          error,
+          'Nao consegui enviar a imagem para o Storage. Confira o bucket produtos e tente novamente.',
+        ),
+      );
     }
   }
 
@@ -1418,6 +1506,9 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Supabase indisponível para salvar produto.', 'error');
       return;
     }
+
+    if (productCreateSaving) return;
+    productCreateSaving = true;
 
     if (submit) {
       submit.disabled = true;
@@ -1486,6 +1577,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (feedback) feedback.textContent = 'Falha ao salvar.';
       showToast(friendlyDbError(error, error.message || 'Não consegui salvar o produto.'), 'error');
     } finally {
+      productCreateSaving = false;
       if (submit) {
         submit.disabled = false;
         submit.classList.remove('is-loading');
