@@ -1233,11 +1233,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function storeProducts() {
-    return productIndex.filter((product) => normalizeProduct(product).storeVisible);
+    return productIndex.filter((product) => {
+      const normalized = normalizeProduct(product);
+      return normalized.active && normalized.storeVisible;
+    });
   }
 
   function catalogProducts() {
-    return productIndex.filter((product) => normalizeProduct(product).catalogVisible);
+    return productIndex.filter((product) => {
+      const normalized = normalizeProduct(product);
+      return normalized.active && normalized.catalogVisible;
+    });
   }
 
   function compareCatalogProducts(a, b) {
@@ -1297,6 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
     const stock = productStockLevel(raw);
     const lowStockLimit = productLowStockLimit(raw);
+    const active = raw.ativo ?? raw.active ?? true;
     const catalogVisible = raw.catalogo_visivel ?? raw.catalogVisible ?? true;
     const storeVisible = raw.loja_visivel ?? raw.storeVisible ?? true;
     const catalogOrder = raw.catalogo_ordem ?? raw.catalogOrder ?? null;
@@ -1325,6 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stock,
       lowStockLimit,
       stockState: productStockState({ estoque: stock, estoque_minimo: lowStockLimit }),
+      active: active !== false,
       catalogVisible: catalogVisible !== false,
       storeVisible: storeVisible !== false,
       catalogOrder: Number.isFinite(Number(catalogOrder)) ? Number(catalogOrder) : null,
@@ -1441,6 +1449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unique = products
       .map(normalizeProduct)
       .filter((product) => product.name)
+      .filter((product) => product.active !== false)
       .filter((product) => {
         const key = normalizeText(product.name);
         if (seen.has(key)) return false;
@@ -1453,6 +1462,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setProductIndex(products) {
     productIndex = uniqueProductList(products);
+  }
+
+  function pruneCartUnavailableProducts(products = []) {
+    const activeIds = new Set(
+      products
+        .filter((product) => normalizeProduct(product).active !== false)
+        .map((product) => String(product.id || ''))
+        .filter(Boolean),
+    );
+    if (!activeIds.size) return;
+
+    const previousLength = cart.length;
+    cart = cart.filter((item) => !item.productId || activeIds.has(String(item.productId)));
+    if (cart.length !== previousLength) {
+      saveCart();
+      renderCart();
+    }
   }
 
   function syncProductsFromRenderedCards() {
@@ -1648,12 +1674,9 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
     if (!client) {
-      console.warn('[Supabase] Cliente não encontrado. Usando produtos locais como fallback.');
-      const localProducts = await loadLocalCatalogProducts().catch(() => []);
-      if (localProducts.length) {
-        setProductIndex(localProducts);
-        renderSupabaseProducts();
-      }
+      console.warn('[Supabase] Cliente nao encontrado. Catalogo publico nao carregado.');
+      setProductIndex([]);
+      renderSupabaseProducts();
       return;
     }
 
@@ -1699,16 +1722,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
       setProductIndex(products);
+      pruneCartUnavailableProducts(products);
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
-      const localProducts = await loadLocalCatalogProducts().catch(() => []);
-      if (localProducts.length) {
-        setProductIndex(localProducts);
-        renderSupabaseProducts();
-      }
+      setProductIndex([]);
+      renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
-        showToast('Não foi possível carregar os produtos do Supabase. Mantive o catálogo local.');
+        showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
       }
     }
   }
@@ -2174,6 +2195,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function productAssetPath(product, card = productCatalogCard(product)) {
     const productImage = resolveProductImagePath(product?.image || '', product?.name || '');
     if (productImage) return productImage;
+    if (product?.id && !String(product.id).startsWith('local-') && Object.prototype.hasOwnProperty.call(product, 'image')) {
+      return '';
+    }
 
     const cardImage = card?.querySelector('.product-image')?.getAttribute('src');
     if (cardImage) return canonicalAssetPath(cardImage);
@@ -4181,9 +4205,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDynamicProductRail() {
     const rail = qs('[data-product-rail]');
-    if (!rail || !productIndex.length) return;
+    if (!rail) return;
 
     const products = storeProducts();
+    if (!products.length) {
+      rail.innerHTML = `
+      <a class="more-card rail-product more-card-3d tilt-3d" href="${catalogHref()}" aria-label="Ver catalogo completo">
+        <div class="product-icon"><i class="fa-solid fa-arrow-right"></i></div>
+        <h3>Ver catalogo</h3>
+        <p>Abra o catalogo completo quando os produtos estiverem disponiveis.</p>
+        <span class="btn btn-secondary">Ver catalogo completo</span>
+      </a>
+    `;
+      return;
+    }
     const recommended = products.filter((product) => isRecommendedProduct(product));
     const recommendedNames = new Set(recommended.map((product) => normalizeText(product.name)));
     const featured = [
@@ -4217,9 +4252,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function fullCatalogStockText(product) {
     const normalized = normalizeProduct(product);
     if (normalized.stockState === 'out') return 'Indisponivel';
-    if (normalized.stockState === 'low') return `${normalized.stock} na loja`;
+    if (normalized.stockState === 'low') return `${normalized.stock} em estoque`;
     if (normalized.stock === null) return 'Quantidade livre';
-    return `${normalized.stock} na loja`;
+    return `${normalized.stock} em estoque`;
   }
 
   function fullCatalogStatusText(product) {
@@ -4679,6 +4714,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function addToCart(product) {
     const displayName = product.variant ? `${product.name} - ${product.variant}` : product.name;
+    const catalogProduct = product.productId
+      ? productIndex.find((item) => String(normalizeProduct(item).id) === String(product.productId))
+      : productIndex.find((item) => normalizeText(normalizeProduct(item).name) === normalizeText(product.name));
+    if (catalogProduct && normalizeProduct(catalogProduct).active === false) {
+      showToast(`${displayName} nao esta disponivel.`);
+      return;
+    }
     const id = makeCartId(product.name, product.variant);
     const existing = cart.find((item) => item.id === id);
     const stock =
