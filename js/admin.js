@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState(null, '', `#${nextTab}`);
     if (nextTab === 'financeiro') renderFinanceiro();
     if (nextTab === 'entregas') renderEntregas();
+    if (nextTab === 'perfil') renderAdminProfile();
     if (nextTab === 'equipe') carregarEquipeAdmin();
     if (nextTab === 'developer') renderDeveloperAdmin();
     if (nextTab === 'dev-console') renderDevConsole();
@@ -835,6 +836,14 @@ document.addEventListener('DOMContentLoaded', () => {
         `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`,
       );
     }
+    qsa('[data-admin-mobile-orders]').forEach((mobileBadge) => {
+      mobileBadge.textContent = String(openCount);
+      mobileBadge.classList.toggle('is-empty', openCount === 0);
+      mobileBadge.setAttribute(
+        'aria-label',
+        `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`,
+      );
+    });
 
     if (options.announce) {
       const alert = qs('#admin-new-order-alert');
@@ -845,6 +854,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     renderSystemConsoleSummary();
+  }
+
+  function renderAdminProfile() {
+    const name =
+      state.profile?.nome ||
+      state.profile?.name ||
+      state.user?.user_metadata?.nome ||
+      state.user?.email?.split('@')[0] ||
+      'Administrador Monte Sinai';
+    const email = state.profile?.email || state.user?.email || 'Conta administrativa';
+    const role = currentAdminRole() || 'admin';
+    setText('#admin-profile-name', name);
+    setText('#admin-profile-email', email);
+    setText('#admin-profile-role', role === 'developer' ? 'Desenvolvedor' : role === 'owner' ? 'Proprietário' : 'Equipe');
   }
 
   function assinarPedidosRealtime() {
@@ -2452,7 +2475,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (qs('#admin-sql-console')) qs('#admin-sql-console').value = '';
     });
     qs('[data-admin-refresh-equipe]')?.addEventListener('click', () => carregarEquipeAdmin());
-    qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
+    qsa('[data-admin-logout]').forEach((button) => {
+      button.addEventListener('click', logoutAdmin);
+    });
     qsa('[data-admin-theme-toggle]').forEach((button) => {
       button.addEventListener('click', toggleAdminTheme);
     });

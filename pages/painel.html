@@ -60,6 +60,10 @@
             <i class="fa-solid fa-truck-fast"></i>
             <span>Entregas</span>
           </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="perfil">
+            <i class="fa-solid fa-user-gear"></i>
+            <span>Perfil</span>
+          </button>
           <button class="admin-menu-btn" type="button" data-admin-tab="financeiro">
             <i class="fa-solid fa-chart-line"></i>
             <span>Financeiro</span>
@@ -105,6 +109,26 @@
           </button>
         </div>
       </aside>
+
+      <nav class="admin-mobile-bottom-nav" aria-label="Navegação principal do painel">
+        <button class="active" type="button" data-admin-tab="pedidos">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <span>Pedidos</span>
+          <strong class="admin-mobile-badge" data-admin-mobile-orders>0</strong>
+        </button>
+        <button type="button" data-admin-tab="produtos">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <span>Produtos</span>
+        </button>
+        <button type="button" data-admin-tab="entregas">
+          <i class="fa-solid fa-truck-fast"></i>
+          <span>Entregas</span>
+        </button>
+        <button type="button" data-admin-tab="perfil">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Perfil</span>
+        </button>
+      </nav>
 
       <main class="admin-main">
         <section class="admin-access-card" id="admin-access-state">
@@ -428,6 +452,77 @@
               </div>
             </header>
             <div class="admin-placeholder-grid" id="admin-delivery-metrics"></div>
+          </section>
+
+          <section class="admin-view admin-profile-view" id="tab-perfil" data-admin-panel="perfil">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Administrador</span>
+                <h1>Perfil do painel</h1>
+                <p>Centralize configurações, relatórios e ferramentas administrativas em um só lugar.</p>
+              </div>
+              <span class="admin-live-pill" id="admin-profile-role">Painel Admin</span>
+            </header>
+
+            <div class="admin-profile-summary">
+              <span class="admin-profile-avatar"><i class="fa-solid fa-user-shield"></i></span>
+              <div>
+                <strong id="admin-profile-name">Administrador Monte Sinai</strong>
+                <p id="admin-profile-email">Conta administrativa</p>
+              </div>
+            </div>
+
+            <div class="admin-profile-grid" aria-label="Opções administrativas">
+              <button class="admin-profile-action" type="button" data-admin-tab="config">
+                <i class="fa-solid fa-sliders"></i>
+                <span>
+                  <strong>Configurações da loja</strong>
+                  <small>WhatsApp, Pix e preferências do site</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="financeiro">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>
+                  <strong>Financeiro</strong>
+                  <small>Resumo, pagamentos e indicadores</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="equipe">
+                <i class="fa-solid fa-users"></i>
+                <span>
+                  <strong>Gerenciar equipe</strong>
+                  <small>Acessos administrativos e funções</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="dev-console" data-developer-only hidden>
+                <i class="fa-solid fa-heart-pulse"></i>
+                <span>
+                  <strong>Central do sistema</strong>
+                  <small>Status, logs e ferramentas avançadas</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="developer" data-developer-only hidden>
+                <i class="fa-solid fa-code"></i>
+                <span>
+                  <strong>Desenvolvedor</strong>
+                  <small>Diagnósticos técnicos do ambiente</small>
+                </span>
+              </button>
+              <a class="admin-profile-action" href="produtos.html#todos-produtos">
+                <i class="fa-solid fa-store"></i>
+                <span>
+                  <strong>Ver loja</strong>
+                  <small>Abrir a experiência pública</small>
+                </span>
+              </a>
+              <button class="admin-profile-action is-danger" type="button" data-admin-logout>
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>
+                  <strong>Sair</strong>
+                  <small>Encerrar sessão administrativa</small>
+                </span>
+              </button>
+            </div>
           </section>
 
           <section class="admin-view" id="tab-financeiro" data-admin-panel="financeiro">
