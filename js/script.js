@@ -129,8 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
-  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, created_at, updated_at';
-  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, estoque, estoque_minimo, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
+  const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const ADMIN_ORDER_POLL_MS = 25000;
   const ORDER_NOTIFICATION_SELECT =
     'id, pedido_id, user_id, cliente_email, cliente_telefone, titulo, mensagem, tipo, lida, created_at';
@@ -185,6 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let remoteOrdersLoaded = false;
   let adminProductsCache = [];
   let adminProductsSource = 'supabase';
+  let adminProductSaving = false;
+  const adminProductActionLocks = new Set();
   let localCatalogProductsCache = null;
   let adminProfileCache = null;
   let productExtendedColumnsReady = true;
@@ -195,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let productSearchResults = [];
   let activeSearchSuggestionContext = null;
   let searchSuggestionFrame = 0;
+  let lockedPageScrollY = 0;
   let deferredInstallPrompt = null;
   let installPromptVisible = false;
   let adminOrderPollTimer = null;
@@ -209,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const authReady = initSupabaseAuth();
   initSiteConfig();
   upgradeProductImages();
-  syncProductsFromRenderedCards();
+  clearPublicProductShell();
   enhanceNavigation();
   bindProfilePhotoPreview();
   applySiteConfig();
@@ -575,6 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .map((item) => ({
         id: item.id || makeCartId(item.name, item.variant),
         productId: item.productId || '',
+        variationId: item.variationId || item.variacao_id || '',
         name: item.name,
         variant: item.variant || '',
         price: Number(item.price || 0),
@@ -1160,6 +1166,16 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  function isMissingProductVariationTableError(error) {
+    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return (
+      text.includes('produto_variacoes') ||
+      text.includes('could not find') ||
+      text.includes('pgrst205') ||
+      text.includes('pgrst204')
+    );
+  }
+
   function escapeHTML(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -1231,11 +1247,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function storeProducts() {
-    return productIndex.filter((product) => normalizeProduct(product).storeVisible);
+    return productIndex.filter((product) => {
+      const normalized = normalizeProduct(product);
+      return normalized.active && normalized.storeVisible;
+    });
   }
 
   function catalogProducts() {
-    return productIndex.filter((product) => normalizeProduct(product).catalogVisible);
+    return productIndex.filter((product) => {
+      const normalized = normalizeProduct(product);
+      return normalized.active && normalized.catalogVisible;
+    });
   }
 
   function compareCatalogProducts(a, b) {
@@ -1267,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function productTerms(product) {
     const optionTerms = Array.isArray(product?.options)
-      ? product.options.map((option) => `${option.label || ''} ${option.value || ''}`).join(' ')
+      ? product.options.map((option) => `${option.label || ''} ${option.value || ''} ${option.name || ''}`).join(' ')
       : '';
     return `${product?.name || ''} ${product?.category || ''} ${product?.description || ''} ${product?.kitItems || ''} ${product?.terms || ''} ${optionTerms}`;
   }
@@ -1279,6 +1301,31 @@ document.addEventListener('DOMContentLoaded', () => {
       blob.includes('agua') ||
       blob.includes('gas')
     );
+  }
+
+  function normalizeProductVariation(raw = {}, product = {}) {
+    const name = String(raw.nome ?? raw.name ?? '').trim();
+    const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name || product.name || '');
+    const stock =
+      raw.estoque === null || raw.stock === null || raw.estoque === ''
+        ? null
+        : Number.isFinite(Number(raw.estoque ?? raw.stock))
+          ? Number(raw.estoque ?? raw.stock)
+          : null;
+
+    return {
+      id: raw.id ?? raw.variationId ?? '',
+      productId: raw.produto_id ?? raw.productId ?? product.id ?? '',
+      name,
+      slug: String(raw.slug ?? '').trim(),
+      sku: String(raw.sku ?? '').trim(),
+      price: parsePrice(raw.preco ?? raw.price ?? product.price ?? 0),
+      stock,
+      active: (raw.ativo ?? raw.active ?? true) !== false,
+      image,
+      attributes: raw.atributos ?? raw.attributes ?? {},
+      order: Number.isFinite(Number(raw.ordem ?? raw.order)) ? Number(raw.ordem ?? raw.order) : 0,
+    };
   }
 
   function normalizeProduct(raw = {}) {
@@ -1295,11 +1342,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
     const stock = productStockLevel(raw);
     const lowStockLimit = productLowStockLimit(raw);
+    const active = raw.ativo ?? raw.active ?? true;
     const catalogVisible = raw.catalogo_visivel ?? raw.catalogVisible ?? true;
     const storeVisible = raw.loja_visivel ?? raw.storeVisible ?? true;
     const catalogOrder = raw.catalogo_ordem ?? raw.catalogOrder ?? null;
     const detailedDescription = String(raw.descricao_detalhada ?? raw.detailedDescription ?? '').trim();
     const catalogHighlight = Boolean(raw.catalogo_destaque ?? raw.catalogHighlight ?? false);
+    const productBase = { id: raw.id ?? raw.productId ?? '', name, price };
+    const sourceVariations = Array.isArray(raw.variacoes)
+      ? raw.variacoes
+      : Array.isArray(raw.variations)
+        ? raw.variations
+        : Array.isArray(raw.options)
+          ? raw.options
+          : [];
+    const options = sourceVariations
+      .map((variation) => normalizeProductVariation(variation, productBase))
+      .filter((variation) => variation.active && variation.name)
+      .sort((a, b) => a.order - b.order || String(a.name).localeCompare(String(b.name), 'pt-BR'));
+    const hasVariations = options.length > 0;
+    const stockState = hasVariations
+      ? productVariationsStockState(options, lowStockLimit)
+      : productStockState({ estoque: stock, estoque_minimo: lowStockLimit });
 
     return {
       id: raw.id ?? raw.productId ?? '',
@@ -1322,13 +1386,15 @@ document.addEventListener('DOMContentLoaded', () => {
       kitItems: raw.kit_itens ?? raw.kitItems ?? '',
       stock,
       lowStockLimit,
-      stockState: productStockState({ estoque: stock, estoque_minimo: lowStockLimit }),
+      stockState,
+      active: active !== false,
       catalogVisible: catalogVisible !== false,
       storeVisible: storeVisible !== false,
       catalogOrder: Number.isFinite(Number(catalogOrder)) ? Number(catalogOrder) : null,
-      options: Array.isArray(raw.options) ? raw.options : [],
+      options,
+      hasVariations,
       recommended: highlight || catalogHighlight,
-      terms: `${name} ${category} ${description} ${detailedDescription}`,
+      terms: `${name} ${category} ${description} ${detailedDescription} ${options.map((option) => option.name).join(' ')}`,
     };
   }
 
@@ -1439,6 +1505,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unique = products
       .map(normalizeProduct)
       .filter((product) => product.name)
+      .filter((product) => product.active !== false)
       .filter((product) => {
         const key = normalizeText(product.name);
         if (seen.has(key)) return false;
@@ -1446,32 +1513,46 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
       });
 
-    return groupProductVariants(unique);
+    return unique;
   }
 
   function setProductIndex(products) {
     productIndex = uniqueProductList(products);
   }
 
-  function syncProductsFromRenderedCards() {
-    const products = qsa('.catalog-product, .rail-product')
-      .filter((card) => card.querySelector('.btn-add-cart'))
-      .map((card) => {
-        const button = card.querySelector('.btn-add-cart');
-        const name = button?.dataset.name || card.dataset.name || card.querySelector('h3')?.textContent || '';
-        const image = card.querySelector('.product-image')?.getAttribute('src') || button?.dataset.image || '';
+  function clearPublicProductShell() {
+    if (!['index.html', 'produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) return;
+    productIndex = [];
+    qsa('#todos-produtos .section-head, #todos-produtos .grid-produtos, [data-product-rail] .product-card, [data-promotions-grid] .product-card').forEach((node) =>
+      node.remove(),
+    );
+  }
 
-        return {
-          name,
-          category: card.dataset.category || card.querySelector('.eyebrow')?.textContent || 'Produtos',
-          price: button?.dataset.price || card.querySelector('strong')?.textContent || 0,
-          description: card.querySelector('p')?.textContent || '',
-          image,
-          recommended: card.dataset.recommended === 'true' || card.classList.contains('is-recommended'),
-        };
-      });
+  function pruneCartUnavailableProducts(products = []) {
+    const activeIds = new Set(
+      products
+        .filter((product) => normalizeProduct(product).active !== false)
+        .map((product) => String(product.id || ''))
+        .filter(Boolean),
+    );
+    const activeVariationIds = new Set(
+      products
+        .flatMap((product) => normalizeProduct(product).options || [])
+        .map((variation) => String(variation.id || ''))
+        .filter(Boolean),
+    );
+    if (!activeIds.size) return;
 
-    if (products.length) setProductIndex(products);
+    const previousLength = cart.length;
+    cart = cart.filter(
+      (item) =>
+        (!item.productId || activeIds.has(String(item.productId))) &&
+        (!item.variationId || activeVariationIds.has(String(item.variationId))),
+    );
+    if (cart.length !== previousLength) {
+      saveCart();
+      renderCart();
+    }
   }
 
   function supabaseProductClient() {
@@ -1643,15 +1724,51 @@ document.addEventListener('DOMContentLoaded', () => {
     return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
   }
 
+  async function loadProductVariations(client, products = []) {
+    const ids = products.map((product) => product.id).filter(Boolean);
+    if (!client || !ids.length) return [];
+
+    const { data, error } = await client
+      .from('produto_variacoes')
+      .select(PRODUCT_VARIATION_SELECT)
+      .in('produto_id', ids)
+      .eq('ativo', true)
+      .order('ordem', { ascending: true })
+      .order('nome', { ascending: true });
+
+    if (error) {
+      if (isMissingProductVariationTableError(error)) {
+        console.info('[Supabase] produto_variacoes ainda nao existe. Produtos simples continuam funcionando.');
+        return [];
+      }
+      throw error;
+    }
+
+    return Array.isArray(data) ? data : [];
+  }
+
+  function attachProductVariations(products = [], variations = []) {
+    if (!variations.length) return products;
+    const byProduct = variations.reduce((map, variation) => {
+      const productId = String(variation.produto_id || '');
+      if (!productId) return map;
+      if (!map.has(productId)) map.set(productId, []);
+      map.get(productId).push(variation);
+      return map;
+    }, new Map());
+
+    return products.map((product) => ({
+      ...product,
+      variacoes: byProduct.get(String(product.id || '')) || [],
+    }));
+  }
+
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
     if (!client) {
-      console.warn('[Supabase] Cliente não encontrado. Usando produtos locais como fallback.');
-      const localProducts = await loadLocalCatalogProducts().catch(() => []);
-      if (localProducts.length) {
-        setProductIndex(localProducts);
-        renderSupabaseProducts();
-      }
+      console.warn('[Supabase] Cliente nao encontrado. Catalogo publico nao carregado.');
+      setProductIndex([]);
+      renderSupabaseProducts();
       return;
     }
 
@@ -1696,17 +1813,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
-      setProductIndex(products);
+      const variations = loadedTable === 'produtos' ? await loadProductVariations(client, products) : [];
+      const productsWithVariations = attachProductVariations(products, variations);
+      setProductIndex(productsWithVariations);
+      pruneCartUnavailableProducts(productsWithVariations);
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
-      const localProducts = await loadLocalCatalogProducts().catch(() => []);
-      if (localProducts.length) {
-        setProductIndex(localProducts);
-        renderSupabaseProducts();
-      }
+      setProductIndex([]);
+      renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
-        showToast('Não foi possível carregar os produtos do Supabase. Mantive o catálogo local.');
+        showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
       }
     }
   }
@@ -2172,6 +2289,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function productAssetPath(product, card = productCatalogCard(product)) {
     const productImage = resolveProductImagePath(product?.image || '', product?.name || '');
     if (productImage) return productImage;
+    if (product?.id && !String(product.id).startsWith('local-') && Object.prototype.hasOwnProperty.call(product, 'image')) {
+      return '';
+    }
 
     const cardImage = card?.querySelector('.product-image')?.getAttribute('src');
     if (cardImage) return canonicalAssetPath(cardImage);
@@ -2186,7 +2306,39 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  function normalizeVariationStockValue(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const stock = Number(value);
+    return Number.isFinite(stock) ? stock : null;
+  }
+
   function productOptions(product, card = productCatalogCard(product)) {
+    if (Array.isArray(product?.options) && product.options.length) {
+      return product.options.map((option) => ({
+        id: option.id || option.variationId || '',
+        label: option.label || option.name || option.value || 'Opcao',
+        value: option.id || option.variationId || option.value || option.name || option.label || '',
+        name: option.name || option.value || option.label || '',
+        price: Number(option.price || product.price || 0),
+        stock: normalizeVariationStockValue(option.stock),
+        image: option.image || '',
+      }));
+    }
+
+    const existingSelect = card?.querySelector('.product-option');
+    if (existingSelect) {
+      return [...existingSelect.options].map((option) => ({
+        id: option.dataset.variationId || '',
+        label: option.textContent.trim(),
+        value: option.value || option.textContent.trim(),
+        name: option.dataset.variationName || option.textContent.trim(),
+        price: Number(option.dataset.price || product.price || 0),
+        stock: normalizeVariationStockValue(option.dataset.stock),
+        image: option.dataset.image || '',
+      }));
+    }
+
+    return [{ id: '', label: 'Padrao', value: '', name: '', price: Number(product.price || 0), stock: product.stock, image: '' }];
     if (Array.isArray(product?.options) && product.options.length) {
       return product.options.map((option) => ({
         label: option.label || option.value || 'Opção',
@@ -2264,10 +2416,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedIndex = Number(qs('[data-product-search-variant]', modal)?.value || 0);
       const selected = options[selectedIndex] || options[0];
       addToCart({
+        productId: activeSearchProduct.id || '',
+        variationId: selected?.id || '',
         name: activeSearchProduct.name,
-        variant: selected?.value || '',
+        variant: selected?.name || '',
         price: Number(selected?.price || activeSearchProduct.price || 0),
-        image: productAssetPath(activeSearchProduct),
+        image: selected?.image || productAssetPath(activeSearchProduct),
+        stock: selected?.stock ?? activeSearchProduct.stock,
       });
       closeProductSearchModal();
     });
@@ -2289,6 +2444,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal) return;
     modal.dataset.searchTerm = query;
     renderProductSearchModal(resolved);
+    lockPageScroll();
     modal.classList.add('open');
     document.body.classList.add('product-search-open');
   }
@@ -2296,6 +2452,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeProductSearchModal() {
     qs('.product-search-modal')?.classList.remove('open');
     document.body.classList.remove('product-search-open');
+    unlockPageScroll();
     activeSearchProduct = null;
   }
 
@@ -2323,8 +2480,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="product-search-more-thumb">
                     ${
                       resultImage
-                        ? `<img src="${escapeHTML(resultImage)}" alt="" loading="lazy" decoding="async">`
-                        : `<i class="fa-solid ${smartProductIcon(result)}" aria-hidden="true"></i>`
+                        ? `<img src="${escapeHTML(resultImage)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(result, 'product-placeholder-compact')}`
+                        : productPlaceholderHTML(result, 'product-placeholder-compact')
                     }
                   </span>
                   <span>${escapeHTML(result.name)}</span>
@@ -2339,20 +2496,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     content.innerHTML = `
       <div class="product-search-media">
-        ${image ? `<img src="${assetHref(image)}" alt="${escapeHTML(activeSearchProduct.name)}" loading="lazy" decoding="async">` : `<i class="fa-solid ${smartProductIcon(activeSearchProduct)}"></i>`}
+        ${productMediaHTML(activeSearchProduct, image)}
       </div>
       <div class="product-search-info">
         <span class="eyebrow">Produto encontrado</span>
         <h2>${escapeHTML(activeSearchProduct.name)}</h2>
         <p>${escapeHTML(description)}</p>
         <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
+        <small class="product-stock-line">${escapeHTML(activeSearchProduct.hasVariations ? optionStockText(firstOption, activeSearchProduct) : productStockText(activeSearchProduct))}</small>
         ${
-          options.length > 1
+          activeSearchProduct.hasVariations && options.length
             ? `
           <label class="product-search-variant">
             <span>Escolha uma opção</span>
             <select data-product-search-variant>
-              ${options.map((option, index) => `<option value="${index}">${escapeHTML(option.label)}</option>`).join('')}
+              ${options.map((option, index) => `<option value="${index}">${escapeHTML(optionPriceLabel(option, activeSearchProduct))}</option>`).join('')}
             </select>
           </label>
         `
@@ -2566,6 +2724,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'ok';
   }
 
+  function variationStockState(variation = {}, lowStockLimit = siteConfig.stockAlertThreshold) {
+    const stock = variation.stock;
+    if (stock === null || stock === undefined || stock === '') return 'untracked';
+    const value = Number(stock);
+    if (!Number.isFinite(value)) return 'untracked';
+    if (value <= 0) return 'out';
+    if (value <= lowStockLimit) return 'low';
+    return 'ok';
+  }
+
+  function productVariationsStockState(variations = [], lowStockLimit = siteConfig.stockAlertThreshold) {
+    if (!variations.length) return 'untracked';
+    const states = variations.map((variation) => variationStockState(variation, lowStockLimit));
+    if (states.every((state) => state === 'out')) return 'out';
+    if (states.some((state) => state === 'low')) return 'low';
+    if (states.some((state) => state === 'ok')) return 'ok';
+    return 'untracked';
+  }
+
   function ownerDeliveryFee() {
     const value = parsePrice(ownerConfig.deliveryFee ?? DELIVERY_FEE);
     return Number.isFinite(value) && value >= 0 ? value : DELIVERY_FEE;
@@ -2600,8 +2777,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return onlyDigits(ownerConfig.whatsapp) || DEFAULT_OWNER.whatsapp;
   }
 
-  function makeCartId(name, variant = '') {
-    return normalizeText(`${name} ${variant}`)
+  function makeCartId(name, variant = '', variationId = '') {
+    return normalizeText(`${name} ${variationId || variant}`)
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
@@ -3753,8 +3930,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="search-suggestion-media">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`
+              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+              : productPlaceholderHTML(product, 'product-placeholder-compact')
           }
         </span>
         <span>
@@ -3779,6 +3956,28 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideSearchSuggestions(suggestions) {
     suggestions?.classList.remove('show');
     clearSearchSuggestionsPosition(suggestions);
+  }
+
+  function lockPageScroll() {
+    if (document.body.dataset.scrollLocked === 'true') return;
+    lockedPageScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.dataset.scrollLocked = 'true';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedPageScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockPageScroll() {
+    if (document.body.dataset.scrollLocked !== 'true') return;
+    document.body.dataset.scrollLocked = 'false';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lockedPageScrollY);
   }
 
   function closeOtherSearchSuggestions(activeSuggestions) {
@@ -3975,8 +4174,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="smart-search-product-icon">
                   ${
                     imageSrc
-                      ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
-                      : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`
+                      ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+                      : productPlaceholderHTML(product, 'product-placeholder-compact')
                   }
                 </span>
                 <span class="smart-search-product-copy">
@@ -4017,13 +4216,167 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'fa-spray-can-sparkles';
   }
 
+  function productPlaceholderTone(product = {}) {
+    const blob = normalizeText(productTerms(product));
+    if (blob.includes('gas')) return 'gas';
+    if (blob.includes('agua')) return 'agua';
+    if (blob.includes('vassoura') || blob.includes('rodo') || blob.includes('pa') || blob.includes('utensilio'))
+      return 'utensilios';
+    if (blob.includes('higiene') || blob.includes('sabonete') || blob.includes('banheiro')) return 'higiene';
+    return 'limpeza';
+  }
+
+  function productPlaceholderHTML(product = {}, modifier = '') {
+    const tone = productPlaceholderTone(product);
+    const classes = ['product-placeholder', `product-placeholder-${tone}`, modifier].filter(Boolean).join(' ');
+    return `
+      <span class="${classes}" aria-hidden="true">
+        <i class="fa-solid ${smartProductIcon(product)}"></i>
+        <small>${escapeHTML(product.category || product.categoria || 'Produto')}</small>
+      </span>
+    `;
+  }
+
+  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '') {
+    const placeholder = productPlaceholderHTML(product, modifier);
+    if (!image) return placeholder;
+    return `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
+  }
+
+  function productStockText(product = {}) {
+    const normalized = normalizeProduct(product);
+    if (normalized.stockState === 'out') return 'Esgotado';
+    if (normalized.stock === null) return 'Quantidade livre';
+    return `${normalized.stock} em estoque`;
+  }
+
+  function optionStockText(option = {}, product = {}) {
+    const normalized = normalizeProduct(product);
+    const stock = option.stock;
+    if (stock === null || stock === undefined || stock === '') return 'Quantidade livre';
+    const value = Number(stock);
+    if (!Number.isFinite(value)) return 'Quantidade livre';
+    if (value <= 0) return 'Esgotado';
+    return `${value} em estoque${value <= normalized.lowStockLimit ? ' - baixo' : ''}`;
+  }
+
+  function optionOutOfStock(option = {}) {
+    const stock = option.stock;
+    return stock !== null && stock !== undefined && stock !== '' && Number(stock) <= 0;
+  }
+
+  function optionPriceLabel(option = {}, product = {}) {
+    const price = Number(option.price || normalizeProduct(product).price || 0);
+    return `${option.name || option.label || 'Opcao'} - ${formatMoney(price)}`;
+  }
+
+  function optionSelectLabel(option = {}) {
+    return option.name || option.label || 'Opcao';
+  }
+
+  function productOptionsHTML(options = [], product = {}) {
+    return options
+      .map((option) => {
+        const image = option.image || productAssetPath(product);
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="${option.stock == null ? '' : escapeHTML(option.stock)}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+      })
+      .join('');
+  }
+
+  function variationFromProductIndex(productId = '', variationId = '') {
+    if (!productId || !variationId) return null;
+    const product = productIndex.find((item) => String(normalizeProduct(item).id) === String(productId));
+    if (!product) return null;
+    const normalized = normalizeProduct(product);
+    return normalized.options.find((option) => String(option.id) === String(variationId)) || null;
+  }
+
+  function selectedVariationState(option, card) {
+    const button = card?.querySelector('.btn-add-cart');
+    const productId = button?.dataset.productId || card?.dataset.productId || '';
+    const variationId = option?.dataset.variationId || button?.dataset.variationId || '';
+    const current = variationFromProductIndex(productId, variationId);
+    const stock = normalizeVariationStockValue(current ? current.stock : option?.dataset.stock);
+    const price = Number(current?.price ?? option?.dataset.price ?? button?.dataset.price ?? 0);
+    const image = current?.image || option?.dataset.image || button?.dataset.image || '';
+    const name = current?.name || option?.dataset.variationName || option?.textContent?.trim() || '';
+    const out = stock !== null && stock <= 0;
+
+    return {
+      variationId,
+      name,
+      price: Number.isFinite(price) ? price : 0,
+      stock,
+      image,
+      out,
+      stockText: stock === null ? 'Quantidade livre' : stock <= 0 ? 'Esgotado' : `${stock} em estoque`,
+      statusText: out ? 'Esgotado' : 'Disponivel',
+    };
+  }
+
+  function updateSelectedVariationUI(select) {
+    const option = select?.selectedOptions[0];
+    const card = select?.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
+    if (!option || !card) return;
+
+    const state = selectedVariationState(option, card);
+    const priceEl = card.querySelector('[data-product-price-display]') || card.querySelector('strong');
+    const stockLine = card.querySelector('.product-stock-line');
+    const button = card.querySelector('.btn-add-cart');
+    const imageEl = card.querySelector('.product-image');
+    const availabilityNote = card.querySelector('.catalog-availability-note');
+    const statusBadge = card.querySelector('.catalog-status-badge:not(.is-offer):not(.is-kit)');
+    const productCard = card.classList.contains('product-card') ? card : card.closest('.product-card');
+    const fullCatalogItem = card.classList.contains('full-catalog-item') ? card : card.closest('.full-catalog-item');
+    const stockBadge = productCard?.querySelector('.stock-badge');
+
+    if (priceEl) {
+      priceEl.textContent = state.out ? 'Indisponivel' : formatMoney(state.price);
+      priceEl.classList.toggle('product-unavailable', state.out);
+    }
+    if (stockLine) stockLine.textContent = state.stockText;
+    if (state.image && imageEl) imageEl.src = assetHref(state.image);
+    if (availabilityNote) {
+      const label = state.out
+        ? 'Indisponivel no momento'
+        : availabilityNote.classList.contains('catalog-detail-note')
+          ? 'Disponivel para comprar na loja'
+          : 'Disponivel na loja';
+      availabilityNote.innerHTML = `<i class="fa-solid ${state.out ? 'fa-ban' : 'fa-circle-check'}"></i> ${label}`;
+    }
+    if (statusBadge) {
+      statusBadge.textContent = state.statusText;
+      statusBadge.classList.toggle('is-out', state.out);
+      statusBadge.classList.toggle('is-ok', !state.out);
+      statusBadge.classList.toggle('is-low', false);
+    }
+    productCard?.classList.toggle('is-out-of-stock', state.out);
+    fullCatalogItem?.classList.toggle('is-out-of-stock', state.out);
+    if (stockBadge) {
+      stockBadge.textContent = state.out ? 'Esgotado' : state.stock === null ? 'Disponivel' : `${state.stock} em estoque`;
+    }
+    if (button) {
+      button.dataset.price = String(state.price);
+      button.dataset.stock = state.stock === null ? '' : String(state.stock);
+      button.dataset.image = state.image || button.dataset.image || '';
+      button.dataset.variationId = state.variationId || '';
+      button.dataset.variationName = state.name || '';
+      button.disabled = state.out;
+      button.setAttribute('aria-disabled', String(state.out));
+      button.classList.toggle('btn-primary', !state.out);
+      button.classList.toggle('btn-esgotado', state.out);
+      button.innerHTML = state.out ? 'Esgotado' : 'Adicionar';
+    }
+  }
+
   function productCardHTML(product, mode = 'catalog') {
     const normalized = normalizeProduct(product);
     const recommended = isRecommendedProduct(normalized);
-    const image = productAssetPath(normalized);
     const options = productOptions(normalized);
-    const hasOptions = options.length > 1;
+    const hasOptions = normalized.hasVariations && options.length > 0;
     const firstOption = options[0] || { price: normalized.price };
+    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : normalized.stockState === 'out';
     const outOfStock = normalized.stockState === 'out';
     const lowStock = normalized.stockState === 'low';
     const detailKey = normalized.id || normalized.name;
@@ -4055,11 +4408,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     : ''
         }
         <div class="product-media">
-          ${
-            image
-              ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
-          }
+          ${productMediaHTML(normalized, image)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
@@ -4069,17 +4418,16 @@ document.addEventListener('DOMContentLoaded', () => {
           hasOptions
             ? `
           <select class="product-option" aria-label="${escapeHTML(normalized.name.includes('Desinfetante') ? 'Escolher fragrância do desinfetante' : 'Escolher tipo do produto')}">
-            ${options.map((option) => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+            ${productOptionsHTML(options, normalized)}
           </select>
         `
             : ''
         }
-        <strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <small class="product-stock-line">${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : productStockText(normalized))}</small>
         <div class="product-card-actions">
           ${
-            outOfStock
-              ? '<button disabled class="btn btn-esgotado" type="button">Esgotado</button>'
-              : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">Adicionar</button>`
+            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
           }
           <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
             Ver detalhes
@@ -4179,9 +4527,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDynamicProductRail() {
     const rail = qs('[data-product-rail]');
-    if (!rail || !productIndex.length) return;
+    if (!rail) return;
 
     const products = storeProducts();
+    if (!products.length) {
+      rail.innerHTML = `
+      <a class="more-card rail-product more-card-3d tilt-3d" href="${catalogHref()}" aria-label="Ver catalogo completo">
+        <div class="product-icon"><i class="fa-solid fa-arrow-right"></i></div>
+        <h3>Ver catalogo</h3>
+        <p>Abra o catalogo completo quando os produtos estiverem disponiveis.</p>
+        <span class="btn btn-secondary">Ver catalogo completo</span>
+      </a>
+    `;
+      return;
+    }
     const recommended = products.filter((product) => isRecommendedProduct(product));
     const recommendedNames = new Set(recommended.map((product) => normalizeText(product.name)));
     const featured = [
@@ -4213,11 +4572,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fullCatalogStockText(product) {
-    const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Indisponivel';
-    if (normalized.stockState === 'low') return `${normalized.stock} na loja`;
-    if (normalized.stock === null) return 'Quantidade livre';
-    return `${normalized.stock} na loja`;
+    return productStockText(product);
   }
 
   function fullCatalogStatusText(product) {
@@ -4248,15 +4603,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const key = normalized.id || normalized.name;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
+    const hasOptions = normalized.hasVariations && options.length > 0;
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const displayImage = (hasOptions && firstOption.image) || image;
 
     return `
       <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
         <div class="full-catalog-media">
-          ${
-            image
-              ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`
-          }
+          ${productMediaHTML(normalized, displayImage)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
@@ -4269,20 +4623,20 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
         </div>
         <div class="full-catalog-stock">
-          <strong>${escapeHTML(stockText)}</strong>
+          <strong>${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : stockText)}</strong>
           <span>${escapeHTML(normalized.category)}</span>
         </div>
         <div class="full-catalog-action">
           ${
-            options.length > 1
+            hasOptions
               ? `
             <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
-              ${options.map((option) => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+              ${productOptionsHTML(options, normalized)}
             </select>
           `
               : ''
           }
-          <strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
           ${
             outOfStock
               ? `<button disabled class="btn btn-esgotado" type="button">
@@ -4419,16 +4773,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
+    const hasOptions = normalized.hasVariations && options.length > 0;
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const displayImage = (hasOptions && firstOption.image) || image;
     const catalogOnly = currentPage() === 'catalogo.html';
 
     if (body) {
       body.innerHTML = `
         <div class="catalog-detail-media">
-          ${
-            image
-              ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`
-          }
+          ${productMediaHTML(normalized, displayImage)}
         </div>
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
@@ -4441,17 +4794,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
-            <div><span>Estoque</span><strong>${escapeHTML(stockText)}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
+            <div><span>Estoque</span><strong class="product-stock-line">${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : stockText)}</strong></div>
             <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
           </div>
           ${
-            options.length > 1
+            hasOptions
               ? `
             <label class="product-choice catalog-detail-choice">
               <span>Escolha a opcao</span>
               <select class="product-option" aria-label="Escolher opcao do produto">
-                ${options.map((option) => `<option value="${escapeHTML(option.value)}" data-price="${escapeHTML(option.price)}">${escapeHTML(option.label)}</option>`).join('')}
+                ${productOptionsHTML(options, normalized)}
               </select>
             </label>
           `
@@ -4459,19 +4812,14 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           <div class="catalog-detail-actions">
             ${
-              outOfStock
-                ? `<button disabled class="btn btn-esgotado" type="button">
-              <i class="fa-solid fa-ban"></i>
-              Esgotado
-            </button>`
-                : catalogOnly
+              catalogOnly
                   ? `<span class="catalog-availability-note catalog-detail-note">
               <i class="fa-solid fa-circle-check"></i>
-              Disponivel para comprar na loja
+              ${selectedOutOfStock ? 'Indisponivel no momento' : 'Disponivel para comprar na loja'}
             </span>`
-                  : `<button class="btn btn-primary btn-add-cart" type="button" data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-stock="${normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
+                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
               <i class="fa-solid fa-cart-plus"></i>
-              Adicionar ao carrinho
+              ${selectedOutOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
             </button>`
             }
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
@@ -4488,6 +4836,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     modal.classList.remove('hidden');
+    lockPageScroll();
     document.body.classList.add('catalog-detail-open');
     requestAnimationFrame(() => modal.classList.add('show'));
   }
@@ -4497,7 +4846,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal || modal.classList.contains('hidden')) return;
     modal.classList.remove('show');
     document.body.classList.remove('catalog-detail-open');
-    window.setTimeout(() => modal.classList.add('hidden'), 180);
+    window.setTimeout(() => {
+      modal.classList.add('hidden');
+      unlockPageScroll();
+    }, 180);
   }
 
   function bindFullCatalogPage() {
@@ -4613,15 +4965,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('change', (event) => {
       const select = event.target.closest('.product-option');
       if (!select) return;
-
-      const option = select?.selectedOptions[0];
-      const card = select.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
-      const price = Number(option?.dataset.price || card?.querySelector('.btn-add-cart')?.dataset.price || 0);
-      const priceEl = card?.querySelector('[data-product-price-display]') || card?.querySelector('strong');
-      const button = card?.querySelector('.btn-add-cart');
-
-      if (priceEl) priceEl.textContent = formatMoney(price);
-      if (button && option?.dataset.price) button.dataset.price = option.dataset.price;
+      updateSelectedVariationUI(select);
     });
 
     document.body.addEventListener('click', (event) => {
@@ -4645,22 +4989,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = button.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
       const select = card?.querySelector('.product-option');
       const option = select?.selectedOptions[0];
+      const selectedState = select ? selectedVariationState(option, card) : null;
       const baseName = button.dataset.name || card?.dataset.name || card?.querySelector('h3')?.textContent.trim();
-      const variant = option?.value || '';
-      const price = Number(option?.dataset.price || button.dataset.price || 0);
+      const variant = selectedState?.name || option?.dataset.variationName || button.dataset.variationName || '';
+      const variationId = selectedState?.variationId || option?.dataset.variationId || button.dataset.variationId || '';
+      const price = Number(selectedState?.price ?? option?.dataset.price ?? button.dataset.price ?? 0);
       const image = canonicalAssetPath(
-        card?.querySelector('.product-image')?.getAttribute('src') || button.dataset.image || '',
+        selectedState?.image || card?.querySelector('.product-image')?.getAttribute('src') || button.dataset.image || '',
       );
 
       if (!baseName || Number.isNaN(price)) return;
 
       addToCart({
         productId: button.dataset.productId || card?.dataset.productId || '',
+        variationId,
         name: baseName,
         variant,
         price,
         image,
-        stock: button.dataset.stock === '' ? null : Number(button.dataset.stock),
+        stock: selectedState ? selectedState.stock : button.dataset.stock === '' ? null : Number(button.dataset.stock),
       });
       closeCatalogDetailModal();
 
@@ -4677,12 +5024,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function addToCart(product) {
     const displayName = product.variant ? `${product.name} - ${product.variant}` : product.name;
-    const id = makeCartId(product.name, product.variant);
+    const catalogProduct = product.productId
+      ? productIndex.find((item) => String(normalizeProduct(item).id) === String(product.productId))
+      : productIndex.find((item) => normalizeText(normalizeProduct(item).name) === normalizeText(product.name));
+    const normalizedCatalogProduct = catalogProduct ? normalizeProduct(catalogProduct) : null;
+    const selectedVariation = product.variationId
+      ? normalizedCatalogProduct?.options.find((option) => String(option.id) === String(product.variationId))
+      : null;
+    if (normalizedCatalogProduct && normalizedCatalogProduct.active === false) {
+      showToast(`${displayName} nao esta disponivel.`);
+      return;
+    }
+    if (product.variationId && !selectedVariation) {
+      showToast(`${displayName} nao esta disponivel.`);
+      return;
+    }
+    const id = makeCartId(product.name, product.variant, product.variationId);
     const existing = cart.find((item) => item.id === id);
+    const effectiveStock = selectedVariation ? selectedVariation.stock : product.stock;
     const stock =
-      product.stock === null || product.stock === undefined || Number.isNaN(Number(product.stock))
+      effectiveStock === null || effectiveStock === undefined || Number.isNaN(Number(effectiveStock))
         ? null
-        : Number(product.stock);
+        : Number(effectiveStock);
 
     if (stock !== null && stock <= 0) {
       showToast(`${displayName} esta esgotado.`);
@@ -4700,6 +5063,7 @@ document.addEventListener('DOMContentLoaded', () => {
       cart.push({
         id,
         productId: product.productId || '',
+        variationId: product.variationId || '',
         name: displayName,
         baseName: product.name,
         variant: product.variant || '',
@@ -5012,8 +5376,9 @@ document.addEventListener('DOMContentLoaded', () => {
     cart = order.items.map((item) => {
       const baseName = item.baseName || item.name;
       return {
-        id: makeCartId(baseName, item.variant || ''),
+        id: makeCartId(baseName, item.variant || '', item.variationId || ''),
         productId: item.productId || '',
+        variationId: item.variationId || '',
         name: item.variant ? `${baseName} - ${item.variant}` : item.name,
         baseName,
         variant: item.variant || '',
@@ -5873,6 +6238,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function orderItemsPayload(order) {
     return order.items.map((item) => ({
       produto_id: isUUID(item.productId) ? item.productId : null,
+      variacao_id: isUUID(item.variationId) ? item.variationId : null,
       nome: item.name,
       variacao: item.variant || '',
       quantidade: Number(item.quantity || 1),
@@ -5975,8 +6341,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (sessionStorage.getItem('ms_sw_reloaded_v1') === 'true') return;
-      sessionStorage.setItem('ms_sw_reloaded_v1', 'true');
+      if (sessionStorage.getItem('ms_sw_reloaded_v2') === 'true') return;
+      sessionStorage.setItem('ms_sw_reloaded_v2', 'true');
       window.location.reload();
     });
   }
@@ -7402,19 +7768,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const price = event.target.closest('[data-admin-product-price-save]');
     if (price) {
-      await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+      const key = `price:${price.dataset.adminProductPriceSave}`;
+      if (!lockAdminProductAction(key, price)) return;
+      try {
+        await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+      } finally {
+        unlockAdminProductAction(key, price);
+      }
       return;
     }
 
     const stock = event.target.closest('[data-admin-product-stock-save]');
     if (stock) {
-      await saveAdminProductStock(stock.dataset.adminProductStockSave);
+      const key = `stock:${stock.dataset.adminProductStockSave}`;
+      if (!lockAdminProductAction(key, stock)) return;
+      try {
+        await saveAdminProductStock(stock.dataset.adminProductStockSave);
+      } finally {
+        unlockAdminProductAction(key, stock);
+      }
       return;
     }
 
     const stockSet = event.target.closest('[data-admin-product-stock-set]');
     if (stockSet) {
-      await setAdminProductStock(stockSet.dataset.adminProductStockSet, stockSet.dataset.stockValue);
+      const key = `stock-set:${stockSet.dataset.adminProductStockSet}`;
+      if (!lockAdminProductAction(key, stockSet)) return;
+      try {
+        await setAdminProductStock(stockSet.dataset.adminProductStockSet, stockSet.dataset.stockValue);
+      } finally {
+        unlockAdminProductAction(key, stockSet);
+      }
     }
   }
 
@@ -7964,11 +8348,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
 
+    const imagem = safeAdminProductImageValue(qs('#admin-product-image')?.value || '');
+    if (imagem === null) return null;
+
     const payload = {
       nome,
       preco,
       categoria: tipo === 'kit' && !normalizeText(categoria).includes('kit') ? 'Kits' : categoria,
-      imagem: qs('#admin-product-image')?.value.trim() || '',
+      imagem,
       descricao: qs('#admin-product-description')?.value.trim() || '',
       ativo: qs('#admin-product-active')?.value !== 'false',
     };
@@ -8007,6 +8394,40 @@ document.addEventListener('DOMContentLoaded', () => {
   function productImageUploadStatus(message = '') {
     const status = qs('#admin-product-upload-status');
     if (status) status.textContent = message;
+  }
+
+  function safeAdminProductImageValue(value = '') {
+    const image = String(value || '').trim();
+    if (/^data:/i.test(image)) {
+      showToast('Imagem em base64/DataURL nao pode ser salva. Envie pelo Storage ou use uma URL.');
+      return null;
+    }
+    return image;
+  }
+
+  function setAdminProductFormBusy(form, busy) {
+    qsa('button[type="submit"]', form || qs('#admin-product-form') || document).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
+  }
+
+  function lockAdminProductAction(key, button = null) {
+    if (adminProductActionLocks.has(key)) return false;
+    adminProductActionLocks.add(key);
+    if (button) {
+      button.disabled = true;
+      button.classList.add('is-loading');
+    }
+    return true;
+  }
+
+  function unlockAdminProductAction(key, button = null) {
+    adminProductActionLocks.delete(key);
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-loading');
+    }
   }
 
   function updateAdminProductPreview(src = '') {
@@ -8132,57 +8553,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveAdminProduct(event) {
     event.preventDefault();
-    const uploadedUrl = await ensureAdminProductImageUploaded();
-    if (selectedAdminProductImageFile() && !uploadedUrl) return;
-
-    const payload = adminProductPayload();
-    if (!payload) return;
-
+    if (adminProductSaving) return;
+    adminProductSaving = true;
+    setAdminProductFormBusy(event.currentTarget, true);
     const id = qs('#admin-product-id')?.value || '';
-    const client = ordersClient();
-    if (!client) {
-      showToast('Supabase indisponivel para salvar o produto.');
-      return;
-    }
+    try {
+      const hasSelectedFile = Boolean(selectedAdminProductImageFile());
+      const uploadedUrl = await ensureAdminProductImageUploaded();
+      if (hasSelectedFile && !uploadedUrl) {
+        showToast('Upload da imagem falhou. Tente novamente antes de salvar.');
+        return;
+      }
 
-    const request = id
-      ? client.from('produtos').update(payload).eq('id', id).select('id').maybeSingle()
-      : client.from('produtos').insert(payload).select('id').maybeSingle();
+      const payload = adminProductPayload();
+      if (!payload) return;
 
-    let { data, error } = await request;
-    if (id && (error || !data)) {
-      const rpc = await rpcAdminUpdateProduct(id, payload);
-      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-      error = rpc.error;
-    }
-    if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
-      productExtendedColumnsReady = false;
-      const basePayload = {
-        nome: payload.nome,
-        preco: payload.preco,
-        categoria: payload.categoria,
-        imagem: payload.imagem,
-        descricao: payload.descricao,
-        ativo: payload.ativo,
-      };
-      const fallback = id
-        ? await client.from('produtos').update(basePayload).eq('id', id).select('id').maybeSingle()
-        : await client.from('produtos').insert(basePayload).select('id').maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-      showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
-    }
+      const client = ordersClient();
+      if (!client) {
+        showToast('Supabase indisponivel para salvar o produto.');
+        return;
+      }
 
-    if (error || !data) {
-      showToast('Nao consegui salvar o produto. Execute o SQL de reparo no Supabase.');
+      const request = id
+        ? client.from('produtos').update(payload).eq('id', id).select('id').maybeSingle()
+        : client.from('produtos').insert(payload).select('id').maybeSingle();
+
+      let { data, error } = await request;
+      if (id && (error || !data)) {
+        const rpc = await rpcAdminUpdateProduct(id, payload);
+        data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+        error = rpc.error;
+      }
+      if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+        productExtendedColumnsReady = false;
+        const basePayload = {
+          nome: payload.nome,
+          preco: payload.preco,
+          categoria: payload.categoria,
+          imagem: payload.imagem,
+          descricao: payload.descricao,
+          ativo: payload.ativo,
+        };
+        const fallback = id
+          ? await client.from('produtos').update(basePayload).eq('id', id).select('id').maybeSingle()
+          : await client.from('produtos').insert(basePayload).select('id').maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+        showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
+      }
+
+      if (error || !data) {
+        showToast('Nao consegui salvar o produto. Execute o SQL de reparo no Supabase.');
+        console.warn('[Supabase] Erro ao salvar produto.', error);
+        return;
+      }
+
+      resetAdminProductForm();
+      closeAdminModal('product');
+      await refreshAdminProducts({ force: true });
+      showToast(id ? 'Produto atualizado.' : 'Produto criado.');
+    } catch (error) {
+      showToast('Nao consegui salvar o produto. Tente novamente.');
       console.warn('[Supabase] Erro ao salvar produto.', error);
-      return;
+    } finally {
+      adminProductSaving = false;
+      setAdminProductFormBusy(event.currentTarget, false);
     }
-
-    resetAdminProductForm();
-    closeAdminModal('product');
-    await refreshAdminProducts({ force: true });
-    showToast(id ? 'Produto atualizado.' : 'Produto criado.');
   }
 
   function fillAdminProductForm(product) {
