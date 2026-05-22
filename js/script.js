@@ -2290,10 +2290,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedIndex = Number(qs('[data-product-search-variant]', modal)?.value || 0);
       const selected = options[selectedIndex] || options[0];
       addToCart({
+        productId: activeSearchProduct.id || '',
         name: activeSearchProduct.name,
         variant: selected?.value || '',
         price: Number(selected?.price || activeSearchProduct.price || 0),
         image: productAssetPath(activeSearchProduct),
+        stock: activeSearchProduct.stock,
       });
       closeProductSearchModal();
     });
@@ -2349,8 +2351,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="product-search-more-thumb">
                     ${
                       resultImage
-                        ? `<img src="${escapeHTML(resultImage)}" alt="" loading="lazy" decoding="async">`
-                        : `<i class="fa-solid ${smartProductIcon(result)}" aria-hidden="true"></i>`
+                        ? `<img src="${escapeHTML(resultImage)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(result, 'product-placeholder-compact')}`
+                        : productPlaceholderHTML(result, 'product-placeholder-compact')
                     }
                   </span>
                   <span>${escapeHTML(result.name)}</span>
@@ -2365,13 +2367,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     content.innerHTML = `
       <div class="product-search-media">
-        ${image ? `<img src="${assetHref(image)}" alt="${escapeHTML(activeSearchProduct.name)}" loading="lazy" decoding="async">` : `<i class="fa-solid ${smartProductIcon(activeSearchProduct)}"></i>`}
+        ${productMediaHTML(activeSearchProduct, image)}
       </div>
       <div class="product-search-info">
         <span class="eyebrow">Produto encontrado</span>
         <h2>${escapeHTML(activeSearchProduct.name)}</h2>
         <p>${escapeHTML(description)}</p>
         <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
+        <small class="product-stock-line">${escapeHTML(productStockText(activeSearchProduct))}</small>
         ${
           options.length > 1
             ? `
@@ -3779,8 +3782,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="search-suggestion-media">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`
+              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+              : productPlaceholderHTML(product, 'product-placeholder-compact')
           }
         </span>
         <span>
@@ -4001,8 +4004,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="smart-search-product-icon">
                   ${
                     imageSrc
-                      ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">`
-                      : `<i class="fa-solid ${smartProductIcon(product)}" aria-hidden="true"></i>`
+                      ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+                      : productPlaceholderHTML(product, 'product-placeholder-compact')
                   }
                 </span>
                 <span class="smart-search-product-copy">
@@ -4043,6 +4046,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'fa-spray-can-sparkles';
   }
 
+  function productPlaceholderTone(product = {}) {
+    const blob = normalizeText(productTerms(product));
+    if (blob.includes('gas')) return 'gas';
+    if (blob.includes('agua')) return 'agua';
+    if (blob.includes('vassoura') || blob.includes('rodo') || blob.includes('pa') || blob.includes('utensilio'))
+      return 'utensilios';
+    if (blob.includes('higiene') || blob.includes('sabonete') || blob.includes('banheiro')) return 'higiene';
+    return 'limpeza';
+  }
+
+  function productPlaceholderHTML(product = {}, modifier = '') {
+    const tone = productPlaceholderTone(product);
+    const classes = ['product-placeholder', `product-placeholder-${tone}`, modifier].filter(Boolean).join(' ');
+    return `
+      <span class="${classes}" aria-hidden="true">
+        <i class="fa-solid ${smartProductIcon(product)}"></i>
+        <small>${escapeHTML(product.category || product.categoria || 'Produto')}</small>
+      </span>
+    `;
+  }
+
+  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '') {
+    const placeholder = productPlaceholderHTML(product, modifier);
+    if (!image) return placeholder;
+    return `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
+  }
+
+  function productStockText(product = {}) {
+    const normalized = normalizeProduct(product);
+    if (normalized.stockState === 'out') return 'Indisponivel';
+    if (normalized.stock === null) return 'Quantidade livre';
+    return `${normalized.stock} em estoque`;
+  }
+
   function productCardHTML(product, mode = 'catalog') {
     const normalized = normalizeProduct(product);
     const recommended = isRecommendedProduct(normalized);
@@ -4081,11 +4118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     : ''
         }
         <div class="product-media">
-          ${
-            image
-              ? `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
-          }
+          ${productMediaHTML(normalized, image)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
@@ -4101,6 +4134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : ''
         }
         <strong data-product-price-display class="${outOfStock ? 'product-unavailable' : ''}">${outOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <small class="product-stock-line">${escapeHTML(productStockText(normalized))}</small>
         <div class="product-card-actions">
           ${
             outOfStock
@@ -4289,11 +4323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `
       <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
         <div class="full-catalog-media">
-          ${
-            image
-              ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`
-          }
+          ${productMediaHTML(normalized, image)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
@@ -4461,11 +4491,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (body) {
       body.innerHTML = `
         <div class="catalog-detail-media">
-          ${
-            image
-              ? `<img src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(normalized.name)}" loading="lazy" decoding="async">`
-              : `<i class="fa-solid ${smartProductIcon(normalized)}" aria-hidden="true"></i>`
-          }
+          ${productMediaHTML(normalized, image)}
         </div>
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">

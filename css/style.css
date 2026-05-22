@@ -23808,6 +23808,344 @@ textarea {
   text-align: left !important;
 }
 
+/* Etapa 3: product UX polish, official catalog placeholders and responsive admin cards. */
+.product-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  place-items: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 42% 24%, rgba(255, 212, 31, 0.18), transparent 48%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-soft) 86%, transparent), color-mix(in srgb, var(--surface) 88%, #000 6%));
+  color: var(--primary);
+  text-align: center;
+}
+
+.product-placeholder i {
+  font-size: clamp(1.35rem, 4vw, 2.4rem);
+}
+
+.product-placeholder small {
+  max-width: 92%;
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.product-placeholder-gas {
+  border-color: rgba(255, 128, 77, 0.34);
+  color: #ff9d6b;
+}
+
+.product-placeholder-agua {
+  border-color: rgba(57, 184, 255, 0.36);
+  color: #55c7ff;
+}
+
+.product-placeholder-utensilios {
+  border-color: rgba(255, 212, 31, 0.34);
+  color: var(--accent);
+}
+
+.product-placeholder-higiene {
+  border-color: rgba(117, 240, 189, 0.34);
+  color: #75f0bd;
+}
+
+.product-placeholder-compact {
+  min-height: 0;
+  border-radius: 999px;
+}
+
+.product-placeholder-compact small {
+  display: none;
+}
+
+.product-placeholder-compact i {
+  font-size: 0.85rem;
+}
+
+.product-image + .product-placeholder,
+.full-catalog-media img + .product-placeholder,
+.catalog-detail-media img + .product-placeholder,
+.product-search-media img + .product-placeholder,
+.search-suggestion-media img + .product-placeholder,
+.smart-search-product-icon img + .product-placeholder,
+.product-search-more-thumb img + .product-placeholder,
+.admin-product-thumb img + .product-placeholder {
+  display: none;
+}
+
+.product-media .product-placeholder,
+.full-catalog-media .product-placeholder,
+.catalog-detail-media .product-placeholder,
+.product-search-media .product-placeholder {
+  min-height: 100%;
+}
+
+.product-stock-line {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line));
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.product-card .product-stock-line {
+  margin-top: -2px;
+}
+
+.admin-product-simple-card.admin-product-manage-card {
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.admin-product-manage-body {
+  min-width: 0;
+}
+
+.admin-product-manage-title {
+  min-width: 0;
+}
+
+.admin-product-manage-title strong {
+  overflow-wrap: anywhere;
+}
+
+.admin-product-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-product-quick-actions .btn {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.admin-product-thumb .product-placeholder,
+.admin-product-detail-media .product-placeholder {
+  min-height: 100%;
+  border-radius: inherit;
+}
+
+.admin-product-editor-panel {
+  scrollbar-gutter: stable;
+}
+
+.catalog-detail-actions .btn,
+.product-search-actions .btn {
+  min-height: 44px;
+}
+
+@media (max-width: 980px) {
+  .admin-product-simple-card.admin-product-manage-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .admin-product-quick-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-product-quick-actions .btn {
+    flex: 0 1 auto;
+  }
+
+  .catalog-detail-panel,
+  .product-search-content {
+    grid-template-columns: minmax(180px, 0.78fr) minmax(0, 1fr);
+  }
+
+  .catalog-detail-media,
+  .product-search-media {
+    min-height: 260px;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-products-layout,
+  .admin-products-layout.is-list-mode,
+  .admin-products-layout.is-new-mode {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .admin-product-simple-card.admin-product-manage-card {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 10px;
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .admin-product-thumb {
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 12px;
+  }
+
+  .admin-product-manage-title {
+    gap: 3px;
+  }
+
+  .admin-product-manage-title strong {
+    font-size: 0.94rem;
+    line-height: 1.15;
+  }
+
+  .admin-product-manage-title small,
+  .admin-product-badge {
+    font-size: 0.7rem;
+  }
+
+  .admin-product-badges {
+    gap: 4px;
+  }
+
+  .admin-product-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .admin-product-quick-actions .btn {
+    min-width: 0 !important;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 8px;
+    font-size: 0.76rem;
+  }
+
+  .admin-product-quick-actions .btn i {
+    font-size: 0.78rem;
+  }
+
+  .admin-product-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-product-detail-media {
+    width: min(100%, 220px);
+    min-height: 150px;
+  }
+
+  .admin-product-editor-modal {
+    align-items: end;
+    padding: 8px;
+  }
+
+  .admin-product-editor-panel {
+    width: 100%;
+    max-height: calc(100dvh - 18px);
+    border-radius: 18px 18px 8px 8px;
+    padding: 14px;
+  }
+
+  .admin-product-editor-head {
+    margin: -14px -14px 12px;
+    padding: 12px 14px;
+  }
+
+  .admin-product-editor-media {
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .catalog-detail-modal,
+  .product-search-modal {
+    align-items: end;
+    padding: 8px;
+  }
+
+  .catalog-detail-panel,
+  .product-search-panel {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    border-radius: 18px 18px 8px 8px;
+  }
+
+  .catalog-detail-panel,
+  .product-search-content {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .product-search-content {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .catalog-detail-media,
+  .product-search-media {
+    min-height: 150px;
+    max-height: 190px;
+    border-radius: 16px;
+  }
+
+  .catalog-detail-media img,
+  .product-search-media img {
+    width: min(58%, 190px);
+    max-height: 170px;
+  }
+
+  .catalog-detail-media .product-placeholder,
+  .product-search-media .product-placeholder {
+    min-height: 150px;
+  }
+
+  .catalog-detail-copy {
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .catalog-detail-copy h2,
+  .product-search-info h2 {
+    font-size: clamp(1.35rem, 8vw, 2rem);
+    line-height: 1.08;
+  }
+
+  .catalog-detail-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-detail-actions,
+  .product-search-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .catalog-detail-actions .btn,
+  .product-search-actions .btn,
+  .catalog-detail-actions .catalog-availability-note {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .full-catalog-item {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .full-catalog-stock strong {
+    font-size: 0.9rem;
+  }
+}
+
 .nav-search .search-suggestion-media,
 .hero-search .search-suggestion-media,
 .catalog-search-form .search-suggestion-media,

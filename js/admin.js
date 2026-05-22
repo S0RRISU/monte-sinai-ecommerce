@@ -165,53 +165,44 @@ document.addEventListener('DOMContentLoaded', () => {
     return qs(`[data-admin-product-field="${field}"][data-product-id="${escapeSelector(id)}"]`);
   }
 
-  function productImageFallback(product = {}) {
-    const name = normalize(product.nome || '');
-    if (name.includes('agua')) return '../assets/produtos/v2/agua-mineral-20l.png';
-    if (name.includes('gas')) return '../assets/produtos/v2/gas-p13.png';
-    if (name.includes('desinfetante')) return '../assets/produtos/v2/desinfetante-2l.png';
-    if (name.includes('detergente')) return '../assets/produtos/v2/detergente-2l.png';
-    if (name.includes('alcool')) return '../assets/produtos/v2/alcool-perfumado.png';
-    if (name.includes('amaciante')) return '../assets/produtos/v2/amaciante-2l.png';
-    if (name.includes('candida') && name.includes('color')) return '../assets/produtos/v2/candida-colorida.png';
-    if (name.includes('candida')) return '../assets/produtos/v2/candida-2l.png';
-    if (name.includes('cloro') && name.includes('1l')) return '../assets/produtos/v2/cloro-1l.png';
-    if (name.includes('cloro')) return '../assets/produtos/v2/cloro-2l.png';
-    if (name.includes('bombril')) return '../assets/produtos/v2/bombril.png';
-    if (name.includes('esponja') && name.includes('aco')) return '../assets/produtos/v2/esponja-aco.png';
-    if (name.includes('esponja') && name.includes('louca')) return '../assets/produtos/v2/esponja-louca.png';
-    if (name.includes('esponja')) return '../assets/produtos/v2/esponjao.png';
-    if (name.includes('escova') && name.includes('vaso')) return '../assets/produtos/v2/escova-vaso.png';
-    if (name.includes('escova')) return '../assets/produtos/v2/escova-roupa.png';
-    if (name.includes('limpa') && name.includes('aluminio')) return '../assets/produtos/v2/limpa-aluminio.png';
-    if (name.includes('limpa') && name.includes('pedra') && name.includes('500'))
-      return '../assets/produtos/v2/limpa-pedra-500ml.png';
-    if (name.includes('limpa') && name.includes('pedra')) return '../assets/produtos/v2/limpa-pedra-2l.png';
-    if (name.includes('sabao') && name.includes('coco')) return '../assets/produtos/v2/sabao-coco.png';
-    if (name.includes('sabao')) return '../assets/produtos/v2/sabao-omo.png';
-    if (name.includes('sabonete')) return '../assets/produtos/v2/sabonete-liquido.png';
-    if (name.includes('saco')) return '../assets/produtos/v2/saco-lixo.png';
-    if (name.includes('rodo') && name.includes('pequeno')) return '../assets/produtos/v2/rodo-pequeno.png';
-    if (name.includes('rodo')) return '../assets/produtos/v2/rodo-grande.png';
-    if (name.includes('rodinho')) return '../assets/produtos/v2/rodinho-pia.png';
-    if (name.includes('prendedor') && name.includes('madeira')) return '../assets/produtos/v2/prendedor-madeira.png';
-    if (name.includes('prendedor')) return '../assets/produtos/v2/prendedor-plastico.png';
-    if (name.includes('pedra')) return '../assets/produtos/v2/pedra-vaso.png';
-    if (name.includes('pasta')) return '../assets/produtos/v2/pasta-brilho.png';
-    if (name === 'pa' || name.includes(' pa')) return '../assets/produtos/v2/pa.png';
-    if (name.includes('vassoura')) return '../assets/produtos/v2/vassoura.png';
-    return '';
+  function productPlaceholderTone(product = {}) {
+    const blob = normalize(`${product.nome || ''} ${product.categoria || ''} ${product.descricao || ''}`);
+    if (blob.includes('gas')) return 'gas';
+    if (blob.includes('agua')) return 'agua';
+    if (blob.includes('vassoura') || blob.includes('rodo') || blob.includes('pa') || blob.includes('utensilio'))
+      return 'utensilios';
+    if (blob.includes('higiene') || blob.includes('banheiro') || blob.includes('sabonete')) return 'higiene';
+    return 'limpeza';
+  }
+
+  function productPlaceholderIcon(product = {}) {
+    const tone = productPlaceholderTone(product);
+    return (
+      {
+        gas: 'fa-fire-flame-simple',
+        agua: 'fa-droplet',
+        utensilios: 'fa-broom',
+        higiene: 'fa-bath',
+        limpeza: 'fa-spray-can-sparkles',
+      }[tone] || 'fa-box'
+    );
+  }
+
+  function productPlaceholderHTML(product = {}) {
+    const tone = productPlaceholderTone(product);
+    return `
+      <span class="product-placeholder product-placeholder-${tone} admin-product-placeholder" aria-hidden="true">
+        <i class="fa-solid ${productPlaceholderIcon(product)}"></i>
+        <small>${escapeHTML(product.categoria || 'Produto')}</small>
+      </span>
+    `;
   }
 
   function productImageHTML(product = {}) {
     const src = text(product.imagem || '').trim();
-    const fallback = productImageFallback(product);
-    if (!src && !fallback) return '<i class="fa-solid fa-box"></i>';
-    const onerror =
-      fallback && src !== fallback
-        ? ` onerror="this.onerror=null;this.src='${escapeHTML(fallback)}';"`
-        : " onerror=\"this.onerror=null;this.closest('.admin-product-thumb').innerHTML='<i class=&quot;fa-solid fa-box&quot;></i>';\"";
-    return `<img src="${escapeHTML(src || fallback)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async"${onerror}>`;
+    const placeholder = productPlaceholderHTML(product);
+    if (!src) return placeholder;
+    return `<img src="${escapeHTML(src)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
   }
 
   function showToast(message, type = 'info') {
@@ -1090,7 +1081,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const stockLabel =
       stock === '' || stock === null
         ? 'Sem estoque cadastrado'
-        : `${stock} em estoque${lowStock ? ' - baixo' : ''}`;
+        : Number(stock) <= 0
+          ? 'Esgotado'
+          : `${stock} em estoque${lowStock ? ' - baixo' : ''}`;
     return `
       <article class="admin-product-detail-card">
         <header>
