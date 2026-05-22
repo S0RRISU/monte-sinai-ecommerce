@@ -1253,10 +1253,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function cardCategorySlug(card) {
+    const productId = card?.dataset?.productId || card?.dataset?.catalogProductKey || '';
+    const cardName = card?.dataset?.name || card?.querySelector?.('h3')?.textContent || '';
+    const indexed = productIndex.find((product) => {
+      const normalized = normalizeProduct(product);
+      return (
+        (productId && String(normalized.id) === String(productId)) ||
+        (cardName && normalizeText(normalized.name) === normalizeText(cardName))
+      );
+    });
+    if (indexed) return normalizeProduct(indexed).categorySlug;
+
     const explicit = categorySlug(card?.dataset?.category || '');
     if (explicit && explicit !== 'produtos' && explicit !== 'recommended') return explicit;
     const text = `${card?.dataset?.name || ''} ${card?.querySelector?.('h3')?.textContent || ''} ${card?.querySelector?.('p')?.textContent || ''}`;
     return categorySlug(text);
+  }
+
+  function categoryFilterLabel(slug = 'all') {
+    if (slug === 'all') return 'Todos';
+    const found = CATALOG_FILTER_CATEGORIES.find(([value]) => value === slug);
+    return found?.[1] || slug.replace(/-/g, ' ');
   }
 
   function categoryOrderIndex(slug) {
@@ -4480,9 +4497,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
-      '<button class="filter-chip" type="button" data-filter="recommended">Recomendados</button>',
-      '<button class="filter-chip" type="button" data-filter="ofertas">Ofertas</button>',
-      '<button class="filter-chip" type="button" data-filter="kits">Kits</button>',
       ...categories.map(
         ([slug, label]) =>
           `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
@@ -4961,16 +4975,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     products.forEach((card) => {
       const category = cardCategorySlug(card);
-      const recommended = card.dataset.recommended === 'true' || card.classList.contains('is-recommended');
       const matchesProduct = searchProducts.some((product) => cardMatchesCatalogProduct(card, product));
       const matchesCardText = !searchProducts.length && cardMatchesCatalogQuery(card, rawTerm, true);
       const matchesTerm = !term || matchesProduct || matchesCardText;
-      const matchesFilter =
-        filter === 'all' ||
-        category === filter ||
-        (filter === 'recommended' && recommended) ||
-        (filter === 'ofertas' && card.classList.contains('is-offer-product')) ||
-        (filter === 'kits' && card.classList.contains('is-kit-product'));
+      const matchesFilter = filter === 'all' || category === filter;
       const show = matchesTerm && matchesFilter;
       card.classList.toggle('hidden', !show);
       card.classList.toggle('is-related-result', false);
@@ -4988,6 +4996,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     qs('#catalog-empty', catalogRoot)?.classList.toggle('hidden', visible > 0);
+    const empty = qs('#catalog-empty', catalogRoot);
+    if (empty) {
+      empty.textContent =
+        filter !== 'all' && !term
+          ? `Nenhum produto encontrado nesta categoria (${categoryFilterLabel(filter)}).`
+          : 'Nenhum produto encontrado com esse filtro.';
+    }
     const result = qs('[data-catalog-results]');
     if (result) {
       const suffix = term ? ` para "${rawTerm.trim()}"` : '';
