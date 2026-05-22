@@ -1234,9 +1234,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function variationImageHTML(variation = {}, product = {}) {
-    const image = variation.imagem || product.imagem || '';
-    if (!image) return '<i class="fa-solid fa-box-open"></i>';
-    return `<img src="${escapeHTML(image)}" alt="" loading="lazy" decoding="async">`;
+    return productImageHTML({
+      ...product,
+      nome: variation.nome || product.nome || 'Variacao',
+      imagem: variation.imagem || '',
+    });
   }
 
   function productVariationsEditorHTML(product = {}) {
@@ -1259,38 +1261,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     const stock = variation.estoque ?? '';
                     return `
                     <article class="admin-variation-row ${active ? '' : 'is-inactive'}">
-                      <span class="admin-product-thumb">${variationImageHTML(variation, product)}</span>
-                      <div class="admin-variation-fields">
-                        <label>Nome
-                          <input type="text" value="${escapeHTML(variation.nome || '')}" data-admin-variation-field="nome" data-variation-id="${escapeHTML(variation.id)}">
-                        </label>
-                        <label>Preco
-                          <input type="number" min="0" step="0.01" value="${Number(variation.preco || 0).toFixed(2)}" data-admin-variation-field="preco" data-variation-id="${escapeHTML(variation.id)}">
-                        </label>
-                        <label>Estoque
-                          <input type="number" min="0" step="1" value="${escapeHTML(stock)}" placeholder="Livre" data-admin-variation-field="estoque" data-variation-id="${escapeHTML(variation.id)}">
-                        </label>
-                        <label>Status
-                          <select data-admin-variation-field="ativo" data-variation-id="${escapeHTML(variation.id)}">
-                            <option value="true" ${active ? 'selected' : ''}>Ativa</option>
-                            <option value="false" ${!active ? 'selected' : ''}>Desativada</option>
-                          </select>
-                        </label>
-                        <label class="admin-variation-wide">Imagem
-                          <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
-                        </label>
-                        <label class="admin-variation-wide">Enviar imagem
-                          <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-image-file="${escapeHTML(variation.id)}">
-                        </label>
+                      <div class="admin-variation-media">
+                        <span class="admin-product-thumb">${variationImageHTML(variation, product)}</span>
+                        <span class="admin-product-badge ${active ? 'is-active' : 'is-inactive'}">${active ? 'Ativa' : 'Desativada'}</span>
+                      </div>
+                      <div class="admin-variation-body">
+                        <div class="admin-variation-fields">
+                          <label class="admin-variation-name">Nome
+                            <input type="text" value="${escapeHTML(variation.nome || '')}" data-admin-variation-field="nome" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label>Preco
+                            <input type="number" min="0" step="0.01" value="${Number(variation.preco || 0).toFixed(2)}" data-admin-variation-field="preco" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label>Estoque
+                            <input type="number" min="0" step="1" value="${escapeHTML(stock)}" placeholder="Livre" data-admin-variation-field="estoque" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label>Status
+                            <select data-admin-variation-field="ativo" data-variation-id="${escapeHTML(variation.id)}">
+                              <option value="true" ${active ? 'selected' : ''}>Ativa</option>
+                              <option value="false" ${!active ? 'selected' : ''}>Desativada</option>
+                            </select>
+                          </label>
+                          <label class="admin-variation-image-url">Imagem
+                            <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label class="admin-variation-upload">
+                            <i class="fa-solid fa-image"></i>
+                            <span>Enviar imagem</span>
+                            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-image-file="${escapeHTML(variation.id)}">
+                          </label>
+                        </div>
                       </div>
                       <div class="admin-variation-actions">
                         <button class="btn btn-primary" type="button" data-admin-variation-save="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}">
                           <i class="fa-solid fa-floppy-disk"></i>
                           Salvar
                         </button>
-                        <button class="btn btn-secondary" type="button" data-admin-variation-disable="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}">
-                          <i class="fa-solid fa-eye-slash"></i>
-                          Desativar
+                        <button class="btn btn-secondary" type="button" data-admin-variation-toggle="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}" data-variation-active="${active ? 'true' : 'false'}">
+                          <i class="fa-solid ${active ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                          ${active ? 'Desativar' : 'Ativar'}
                         </button>
                       </div>
                     </article>
@@ -1301,7 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         </div>
         <div class="admin-variation-create" data-admin-variation-create="${escapeHTML(product.id)}">
-          <label>Nome
+          <label class="admin-variation-name">Nome
             <input type="text" data-admin-variation-new="nome" placeholder="Supergas, Pinho, Talco">
           </label>
           <label>Preco
@@ -1310,10 +1319,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <label>Estoque
             <input type="number" min="0" step="1" data-admin-variation-new="estoque" placeholder="Livre">
           </label>
-          <label>Imagem
+          <label class="admin-variation-image-url">Imagem
             <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
           </label>
-          <label class="admin-variation-wide">Enviar imagem
+          <label class="admin-variation-upload">
+            <i class="fa-solid fa-image"></i>
+            <span>Enviar imagem</span>
             <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-new-file>
           </label>
           <button class="btn btn-primary" type="button" data-admin-variation-add="${escapeHTML(product.id)}">
@@ -1489,7 +1500,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setVariationBusy(variationId, busy) {
-    qsa(`[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-disable="${escapeSelector(variationId)}"]`).forEach(
+    qsa(`[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-toggle="${escapeSelector(variationId)}"]`).forEach(
       (button) => {
         button.disabled = busy;
         button.classList.toggle('is-loading', busy);
@@ -2429,10 +2440,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const variationDisable = event.target.closest('[data-admin-variation-disable]');
-      if (variationDisable) {
-        salvarVariacaoAdmin(variationDisable.dataset.adminVariationDisable, variationDisable.dataset.productId, {
-          ativo: false,
+      const variationToggle = event.target.closest('[data-admin-variation-toggle]');
+      if (variationToggle) {
+        salvarVariacaoAdmin(variationToggle.dataset.adminVariationToggle, variationToggle.dataset.productId, {
+          ativo: variationToggle.dataset.variationActive !== 'true',
         });
         return;
       }

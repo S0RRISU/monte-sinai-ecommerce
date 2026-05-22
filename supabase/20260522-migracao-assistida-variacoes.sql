@@ -160,6 +160,7 @@ where lower(p.nome) in (
     lower('Gás de cozinha P13'),
     lower('Desinfetante 2L')
   )
+  and p.ativo is distinct from true
   and exists (
     select 1
     from public.produto_variacoes pv

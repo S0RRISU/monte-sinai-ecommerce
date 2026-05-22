@@ -4264,11 +4264,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${option.name || option.label || 'Opcao'} - ${formatMoney(price)}`;
   }
 
+  function optionSelectLabel(option = {}) {
+    return option.name || option.label || 'Opcao';
+  }
+
   function productOptionsHTML(options = [], product = {}) {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="${option.stock === null ? '' : escapeHTML(option.stock)}" data-image="${escapeHTML(image)}">${escapeHTML(optionPriceLabel(option, product))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="${option.stock === null ? '' : escapeHTML(option.stock)}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
