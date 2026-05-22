@@ -1044,17 +1044,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Prefer explicit profile role
     const role = normalizeText(profile?.admin_role || profile?.role || '');
     if (role) return role;
-    // If profile is not loaded, allow emergency fallback by email
-    if (!profile) {
-      const fallback = knownAdminRoleForEmail(profile?.email);
-      if (fallback) return fallback;
-    }
     return profile?.is_admin ? 'owner' : 'customer';
   }
 
   function isDeveloperProfile(profile = adminProfileCache) {
     if (adminRole(profile) === 'developer') return true;
-    if (!profile) return knownAdminRoleForEmail(profile?.email) === 'developer';
     return false;
   }
 
@@ -1634,10 +1628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (data) {
-      const fallbackRole = knownAdminRoleForEmail(data.email || authUser.email);
-      adminProfileCache = fallbackRole
-        ? { ...data, email: data.email || authUser.email || '', is_admin: true, admin_role: fallbackRole }
-        : data;
+      adminProfileCache = { ...data, email: data.email || authUser.email || '' };
       return adminProfileCache;
     }
 
@@ -1649,11 +1640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function isCurrentUserAdmin({ force = true } = {}) {
     const profile = await currentAdminProfile({ force });
-    return Boolean(
-      profile?.is_admin ||
-      knownAdminRoleForEmail(profile?.email) ||
-      ['developer', 'owner', 'staff'].includes(adminRole(profile)),
-    );
+    return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
   }
 
   async function loadProductsFromSupabase() {

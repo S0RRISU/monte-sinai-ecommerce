@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentAdminRole() {
-    // Prefer explicit role from `profiles.admin_role` (or legacy `profile.role`).
+    // Prefer explicit role from `profiles.admin_role`; `profile.role` is only a compatibility fallback.
     const profileRole = normalize(state.profile?.admin_role || state.profile?.role || '');
     if (profileRole && profileRole !== 'customer') return profileRole;
     // Only use fallback email mapping when profile is not available (emergency).
@@ -388,10 +388,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (byId?.data) perfisRow = byId.data;
       }
       if (perfisRow) {
-        if (!state.profile)
-          state.profile = { id: user.id, email: user.email, nome: user.user_metadata?.name || user.email };
-        state.profile.perfis = perfisRow;
-        state.profile.role = perfisRow.role || state.profile.admin_role || '';
+        if (state.profile) {
+          state.profile.perfis = perfisRow;
+          state.profile.role = state.profile.admin_role || '';
+        } else {
+          const fb = getFallbackRoleForEmail(user.email);
+          state.profile = {
+            id: user.id,
+            email: user.email,
+            nome: user.user_metadata?.name || user.email,
+            is_admin: Boolean(fb),
+            admin_role: fb || 'customer',
+            role: fb || 'customer',
+            perfis: perfisRow,
+          };
+        }
       } else {
         if (!state.profile) {
           // emergency fallback when no profile row exists
@@ -410,11 +421,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       console.warn('[Admin] falha ao ler perfis_usuarios', err);
-      state.profile.role = state.profile.admin_role || fallbackRole || '';
+      if (!state.profile) {
+        const fb = getFallbackRoleForEmail(user.email);
+        state.profile = {
+          id: user.id,
+          email: user.email,
+          nome: user.user_metadata?.name || user.email,
+          is_admin: Boolean(fb),
+          admin_role: fb || 'customer',
+          role: fb || 'customer',
+        };
+      } else {
+        state.profile.role = state.profile.admin_role || '';
+      }
     }
 
     const role = currentAdminRole();
-    const validAdminRoles = ['developer', 'owner', 'manager', 'admin', 'staff'];
+    const validAdminRoles = ['developer', 'owner', 'staff'];
     const isAdminRole = validAdminRoles.includes(role);
     const admin = Boolean(state.profile.is_admin || isAdminRole);
     if (!admin) {
@@ -428,7 +451,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('admin-ready');
     document.body.classList.toggle('admin-owner', role === 'owner');
     applyDeveloperAccessUI();
+    applyTeamAccessUI();
     return true;
+  }
+
+  function canManageTeam() {
+    return ['developer', 'owner'].includes(currentAdminRole());
+  }
+
+  function applyTeamAccessUI() {
+    const allowed = canManageTeam();
+    qsa('[data-admin-tab="equipe"]').forEach((element) => {
+      element.classList.toggle('hidden', !allowed);
+      element.hidden = !allowed;
+      element.setAttribute('aria-hidden', String(!allowed));
+    });
   }
 
   function renderAdminTab(tab = 'pedidos') {
@@ -436,6 +473,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((nextTab === 'developer' || nextTab === 'dev-console') && !isDeveloperAdmin()) {
       nextTab = 'pedidos';
       showToast('Área exclusiva do desenvolvedor.', 'error');
+    }
+    if (nextTab === 'equipe' && !canManageTeam()) {
+      nextTab = 'pedidos';
+      showToast('Área exclusiva para desenvolvedor e proprietários.', 'error');
     }
     state.activeTab = nextTab;
 
@@ -1792,6 +1833,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     const container = qs('#admin-team-list');
     if (!api || !container) return;
+    if (!canManageTeam()) {
+      container.innerHTML =
+        container.tagName && container.tagName.toLowerCase() === 'tbody'
+          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</td></tr>'
+          : '<p class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</p>';
+      return;
+    }
     container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuários...</p>';
 
     const { data: profiles, error: profilesErr } = await api
@@ -1837,13 +1885,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentRole = currentAdminRole();
     const isDeveloper = currentRole === 'developer';
     const isOwner = currentRole === 'owner';
-    const isStaff = currentRole === 'staff';
-    const canEditRoles = ['developer', 'owner', 'manager', 'admin'].includes(currentRole);
+    const canEditRoles = ['developer', 'owner'].includes(currentRole);
     const rolesOptions = [
-      { value: 'owner', label: 'Dono' },
-      { value: 'developer', label: 'Desenvolvedor' },
-      { value: 'manager', label: 'Gerente' },
-      { value: 'admin', label: 'Administrador' },
+      { value: 'developer', label: 'Desenvolvedor / Presidente' },
+      { value: 'owner', label: 'Proprietário' },
       { value: 'staff', label: 'Equipe' },
       { value: 'customer', label: 'Cliente' },
     ];
@@ -1851,22 +1896,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const html = rows
       .map((row) => {
         const perf = perfisMap[row.id] || row._perfisRow || null;
-        const userRole = perf?.role || row.admin_role || (row.is_admin ? 'admin' : 'customer');
+        const userRole = row.admin_role || perf?.role || (row.is_admin ? 'owner' : 'customer');
         const perfisId = perf?.id || '';
 
-        let selectDisabled = false;
+        let selectDisabled = !canEditRoles;
         // Do not allow non-developers to change a developer's role
         if (userRole === 'developer' && !isDeveloper) selectDisabled = true;
-        // Staff cannot edit developer/owner
-        if (isStaff && (userRole === 'developer' || userRole === 'owner')) selectDisabled = true;
 
         const optionsHtml = rolesOptions
           .map((opt) => {
             let disableOpt = '';
             // Only developer can assign another developer
             if (opt.value === 'developer' && !isDeveloper) disableOpt = 'disabled';
-            // Staff cannot assign owner or developer
-            if (isStaff && (opt.value === 'owner' || opt.value === 'developer')) disableOpt = 'disabled';
             // Owner cannot create developers
             if (isOwner && opt.value === 'developer') disableOpt = 'disabled';
             return `<option value="${escapeHTML(opt.value)}" ${opt.value === userRole ? 'selected' : ''} ${disableOpt}>${escapeHTML(opt.label)}</option>`;
