@@ -39,12 +39,14 @@ Se o banco ja existia antes desta versao, execute tambem as migracoes idempotent
 
 O site usa estas tabelas principais:
 
-- `profiles`: dados do cliente e identificacao de administrador.
-- `produtos`: catalogo, preco, imagem, categoria, descricao e status ativo/inativo.
+- `public.profiles`: tabela oficial de dados do cliente e permissoes administrativas.
+- `public.produtos`: tabela oficial do catalogo, preco, imagem, categoria, descricao e status ativo/inativo.
 - `pedidos`: cabecalho do pedido.
 - `pedido_itens`: itens de cada pedido.
 - `enderecos`: enderecos do cliente.
 - `site_configuracoes`: textos, identidade, entrega e vitrine controlados pelo painel.
+
+Tabelas antigas continuam preservadas apenas como legado: `public.produto` e `public.perfis_usuarios`. O site nao deve ler nem gravar nelas; quando existirem dados antigos, execute `supabase/20260522-unificar-tabelas-legadas.sql` para copiar o que for aproveitavel para `public.produtos` e `public.profiles` sem apagar as tabelas antigas.
 
 As policies de RLS deixam cada cliente ver seus proprios dados e pedidos. Administradores conseguem gerenciar produtos, ver todos os pedidos, confirmar pedidos e mudar status. Pedidos visitantes e logados sao criados pela funcao segura `create_order`, que valida dados, recalcula totais e atualiza estoque; visitantes aparecem no painel com `user_id = null`.
 

@@ -372,68 +372,18 @@ document.addEventListener('DOMContentLoaded', () => {
       .maybeSingle();
 
     if (error) console.warn('[Admin] Perfil admin nao foi lido.', error);
-    // If profile exists use it; otherwise leave profile empty and allow fallback only in emergency
     if (profile) {
-      state.profile = profile;
+      state.profile = { ...profile, role: profile.admin_role || '' };
     } else {
-      state.profile = null;
-    }
-    // Tenta ler a role na tabela `perfis_usuarios` (tenta user_id então id)
-    try {
-      let perfisRow = null;
-      const byUser = await api.from('perfis_usuarios').select('id, user_id, role').eq('user_id', user.id).maybeSingle();
-      if (byUser?.data) perfisRow = byUser.data;
-      else {
-        const byId = await api.from('perfis_usuarios').select('id, user_id, role').eq('id', user.id).maybeSingle();
-        if (byId?.data) perfisRow = byId.data;
-      }
-      if (perfisRow) {
-        if (state.profile) {
-          state.profile.perfis = perfisRow;
-          state.profile.role = state.profile.admin_role || '';
-        } else {
-          const fb = getFallbackRoleForEmail(user.email);
-          state.profile = {
-            id: user.id,
-            email: user.email,
-            nome: user.user_metadata?.name || user.email,
-            is_admin: Boolean(fb),
-            admin_role: fb || 'customer',
-            role: fb || 'customer',
-            perfis: perfisRow,
-          };
-        }
-      } else {
-        if (!state.profile) {
-          // emergency fallback when no profile row exists
-          const fb = getFallbackRoleForEmail(user.email);
-          state.profile = {
-            id: user.id,
-            email: user.email,
-            nome: user.user_metadata?.name || user.email,
-            is_admin: Boolean(fb),
-            admin_role: fb || 'customer',
-            role: fb || 'customer',
-          };
-        } else {
-          state.profile.role = state.profile.admin_role || '';
-        }
-      }
-    } catch (err) {
-      console.warn('[Admin] falha ao ler perfis_usuarios', err);
-      if (!state.profile) {
-        const fb = getFallbackRoleForEmail(user.email);
-        state.profile = {
-          id: user.id,
-          email: user.email,
-          nome: user.user_metadata?.name || user.email,
-          is_admin: Boolean(fb),
-          admin_role: fb || 'customer',
-          role: fb || 'customer',
-        };
-      } else {
-        state.profile.role = state.profile.admin_role || '';
-      }
+      const fb = getFallbackRoleForEmail(user.email);
+      state.profile = {
+        id: user.id,
+        email: user.email,
+        nome: user.user_metadata?.name || user.email,
+        is_admin: Boolean(fb),
+        admin_role: fb || 'customer',
+        role: fb || 'customer',
+      };
     }
 
     const role = currentAdminRole();
@@ -1828,7 +1778,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarLogsConsole();
   }
 
-  /* === Gerenciar Equipe (perfis_usuarios) === */
+  /* === Gerenciar Equipe (profiles) === */
   async function carregarEquipeAdmin() {
     const api = client();
     const container = qs('#admin-team-list');
@@ -1852,35 +1802,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const { data: perfisData, error: perfisErr } = await api.from('perfis_usuarios').select('id, user_id, role');
-    if (perfisErr) console.warn('[Admin] perfis_usuarios nao lido', perfisErr);
-
-    const perfisMap = {};
-    (perfisData || []).forEach((p) => {
-      const key = p.user_id || p.id;
-      perfisMap[key] = p;
-    });
-
-    // inclui perfis que não estão em profiles
-    const extraFromPerfis = (perfisData || []).filter((p) => !profiles.some((pr) => pr.id === (p.user_id || p.id)));
-
-    const rows = [
-      ...profiles.map((pr) => ({
-        id: pr.id,
-        email: pr.email,
-        nome: pr.nome,
-        is_admin: pr.is_admin,
-        admin_role: pr.admin_role,
-      })),
-      ...extraFromPerfis.map((pf) => ({
-        id: pf.user_id || pf.id,
-        email: '',
-        nome: '',
-        is_admin: false,
-        admin_role: '',
-        _perfisRow: pf,
-      })),
-    ];
+    const rows = profiles.map((pr) => ({
+      id: pr.id,
+      email: pr.email,
+      nome: pr.nome,
+      is_admin: pr.is_admin,
+      admin_role: pr.admin_role,
+    }));
 
     const currentRole = currentAdminRole();
     const isDeveloper = currentRole === 'developer';
@@ -1895,9 +1823,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const html = rows
       .map((row) => {
-        const perf = perfisMap[row.id] || row._perfisRow || null;
-        const userRole = row.admin_role || perf?.role || (row.is_admin ? 'owner' : 'customer');
-        const perfisId = perf?.id || '';
+        const userRole = row.admin_role || (row.is_admin ? 'owner' : 'customer');
 
         let selectDisabled = !canEditRoles;
         // Do not allow non-developers to change a developer's role
@@ -1925,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
             <td class="team-role">
               <div class="select-wrap ${selectDisabled ? 'disabled' : ''}">
-                <select class="team-role-select" data-admin-team-role="${escapeHTML(row.id)}" data-perfis-id="${escapeHTML(perfisId)}" ${selectDisabled ? 'disabled' : ''} aria-label="Selecionar cargo">
+                <select class="team-role-select" data-admin-team-role="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} aria-label="Selecionar cargo">
                   ${optionsHtml}
                 </select>
               </div>
@@ -1950,7 +1876,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function atualizarCargoUsuario(userId, newRole, perfisId = '') {
+  async function atualizarCargoUsuario(userId, newRole) {
     const api = client();
     if (!api || !userId) return false;
     try {
@@ -1971,43 +1897,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
       }
 
-      // Fallback (antigo fluxo direto em perfis_usuarios) — usado apenas se RPC indisponível.
-      // tenta atualizar por user_id
-      let res = await api.from('perfis_usuarios').update({ role: newRole }).eq('user_id', userId).select();
-      if (res.error) {
-        console.warn('[Admin] Erro atualizando perfis_usuarios por user_id', res.error);
-      }
-
-      const hasData = res.data && (Array.isArray(res.data) ? res.data.length > 0 : true);
-      if (!hasData) {
-        // tenta atualizar por id da tabela perfis_usuarios
-        if (perfisId) {
-          const byId = await api.from('perfis_usuarios').update({ role: newRole }).eq('id', perfisId).select();
-          if (byId.error) console.warn('[Admin] Erro atualizando perfis_usuarios por id', byId.error);
-          if (byId.data && byId.data.length) {
-            showToast('Cargo atualizado.', 'success');
-            await carregarEquipeAdmin();
-            await logAdminAction('role_updated', 'user', userId, { role: newRole });
-            return true;
-          }
-        }
-
-        // se nada foi atualizado, insere novo registro
-        const inserted = await api.from('perfis_usuarios').insert({ user_id: userId, role: newRole }).select();
-        if (inserted.error) {
-          showToast(friendlyDbError(inserted.error, 'Falha ao alterar cargo.'), 'error');
-          return false;
-        }
-        showToast('Cargo atribuído.', 'success');
-        await carregarEquipeAdmin();
-        await logAdminAction('role_assigned', 'user', userId, { role: newRole });
-        return true;
-      }
-
-      showToast('Cargo atualizado.', 'success');
-      await carregarEquipeAdmin();
-      await logAdminAction('role_updated', 'user', userId, { role: newRole });
-      return true;
+      showToast('RPC admin_set_user_role indisponível. Execute a migração de permissões no Supabase.', 'error');
+      return false;
     } catch (err) {
       console.warn('[Admin] Falha ao atualizar cargo', err);
       showToast('Erro ao atualizar cargo.', 'error');
@@ -2095,8 +1986,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (teamSelect) {
         const userId = teamSelect.dataset.adminTeamRole;
         const newRole = teamSelect.value;
-        const perfisId = teamSelect.dataset.perfisId || '';
-        atualizarCargoUsuario(userId, newRole, perfisId);
+        atualizarCargoUsuario(userId, newRole);
         return;
       }
     });
@@ -2186,7 +2076,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (teamSave) {
         const userId = teamSave.dataset.adminTeamSave;
         const select = qs(`[data-admin-team-role="${escapeSelector(userId)}"]`);
-        if (select) atualizarCargoUsuario(userId, select.value, select.dataset.perfisId || '');
+        if (select) atualizarCargoUsuario(userId, select.value);
         return;
       }
     });

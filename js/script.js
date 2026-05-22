@@ -1656,7 +1656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const tableNames = ['produtos', 'produto'];
+      const tableNames = ['produtos'];
       let products = [];
       let loadedTable = '';
       let lastError = null;
