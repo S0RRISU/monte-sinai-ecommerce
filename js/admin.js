@@ -844,6 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.setTimeout(() => alert.classList.add('hidden'), 5000);
       }
     }
+    renderSystemConsoleSummary();
   }
 
   function assinarPedidosRealtime() {
@@ -1185,6 +1186,7 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
     renderProductDetailsPanel();
+    renderSystemConsoleSummary();
   }
 
   function productDetailsPanelHTML(product = {}) {
@@ -2129,6 +2131,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* === Developer Console (SQL + Logs) === */
+  function renderSystemConsoleSummary() {
+    const realtime = text(qs('#admin-realtime-status')?.textContent || '');
+    const orders = state.pedidos || [];
+    const products = state.produtos || [];
+    const variations = state.variacoes || [];
+    const paidCount = orders.filter((order) => normalize(order.pagamento_status) === 'pago').length;
+    const pendingPayment = orders.filter((order) => normalize(order.pagamento_status) === 'pendente').length;
+    const openOrders = orders.filter((order) => normalize(order.status || order.statusUi) !== 'entregue').length;
+    const activeProducts = products.filter((product) => product.ativo !== false).length;
+    const lastOrder = orders[0]?.created_at ? ` Último pedido: ${formatDateTime(orders[0].created_at)}.` : '';
+
+    const statusEl = qs('#admin-system-status');
+    if (statusEl) statusEl.textContent = realtime || 'Sistema carregado.';
+
+    const ordersEl = qs('#admin-system-orders');
+    if (ordersEl)
+      ordersEl.textContent = orders.length
+        ? `${orders.length} pedido${orders.length === 1 ? '' : 's'} carregado${orders.length === 1 ? '' : 's'}, ${openOrders} em andamento.${lastOrder}`
+        : 'Nenhum pedido carregado ainda.';
+
+    const paymentsEl = qs('#admin-system-payments');
+    if (paymentsEl)
+      paymentsEl.textContent = orders.length
+        ? `${paidCount} pago${paidCount === 1 ? '' : 's'} e ${pendingPayment} pendente${pendingPayment === 1 ? '' : 's'}.`
+        : 'Aguardando dados de pagamento.';
+
+    const productsEl = qs('#admin-system-products');
+    if (productsEl)
+      productsEl.textContent = products.length
+        ? `${activeProducts} produto${activeProducts === 1 ? '' : 's'} ativo${activeProducts === 1 ? '' : 's'} de ${products.length} cadastrados, ${variations.length} variacao${variations.length === 1 ? '' : 'es'}.`
+        : 'Aguardando catálogo.';
+  }
+
   async function carregarLogsConsole() {
     const api = client();
     const container = qs('#admin-console-logs');
@@ -2204,6 +2239,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // status is 'SUBSCRIBED' or other lifecycle events
           const realtime = qs('#admin-realtime-status');
           if (realtime) realtime.textContent = status === 'SUBSCRIBED' ? 'Realtime ativo' : 'Reconectando...';
+          renderSystemConsoleSummary();
         });
     } catch (err) {
       console.warn('[Admin] Falha ao inscrever realtime de logs', err);
@@ -2249,7 +2285,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDevConsole() {
     if (!isDeveloperAdmin()) return;
-    // garante carregar os logs e conectar realtime
+    renderSystemConsoleSummary();
     carregarLogsConsole();
   }
 

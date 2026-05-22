@@ -79,8 +79,8 @@
             data-developer-only
             hidden
           >
-            <i class="fa-solid fa-terminal"></i>
-            <span>Console do Desenvolvedor</span>
+            <i class="fa-solid fa-heart-pulse"></i>
+            <span>Central do sistema</span>
           </button>
           <button
             class="admin-menu-btn admin-developer-menu"
@@ -220,46 +220,81 @@
           >
             <header class="admin-view-header">
               <div>
-                <span class="eyebrow">Ferramentas</span>
-                <h1>Console do Desenvolvedor</h1>
-                <p>Terminal SQL embutido e Feed de logs em tempo real.</p>
+                <span class="eyebrow">Sistema</span>
+                <h1>Central do sistema</h1>
+                <p>Acompanhe a saúde da loja, atualizações recentes e integrações em uma visão simples.</p>
               </div>
               <div class="settings-actions">
                 <button class="btn btn-secondary" type="button" data-admin-refresh-console>
                   <i class="fa-solid fa-rotate"></i>
-                  Atualizar logs
+                  Atualizar central
                 </button>
               </div>
             </header>
 
-            <div class="admin-console-grid">
+            <div class="admin-system-grid">
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-heart-pulse"></i></span>
+                <div>
+                  <strong>Status do sistema</strong>
+                  <p id="admin-system-status">Sistema carregado.</p>
+                </div>
+              </article>
+              <article class="admin-system-card admin-system-card-wide">
+                <span class="admin-system-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                <div>
+                  <strong>Logs recentes</strong>
+                  <div id="admin-console-logs" class="admin-console-logs">
+                    <p class="admin-empty-state">Carregando logs...</p>
+                  </div>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-bag-shopping"></i></span>
+                <div>
+                  <strong>Pedidos atualizados</strong>
+                  <p id="admin-system-orders">Nenhum pedido carregado ainda.</p>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-credit-card"></i></span>
+                <div>
+                  <strong>Pagamentos atualizados</strong>
+                  <p id="admin-system-payments">Aguardando dados de pagamento.</p>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-boxes-stacked"></i></span>
+                <div>
+                  <strong>Produtos e variações</strong>
+                  <p id="admin-system-products">Aguardando catálogo.</p>
+                </div>
+              </article>
+            </div>
+
+            <details class="admin-advanced-tools">
+              <summary>
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+                Mostrar ferramentas avançadas
+              </summary>
               <div class="admin-console-card">
                 <label for="admin-sql-console" class="eyebrow">Terminal SQL</label>
+                <p class="form-help-text">Use apenas com orientação técnica.</p>
                 <textarea
                   id="admin-sql-console"
                   class="sql-console"
-                  placeholder="Digite script SQL para execução (ex.: ALTER TABLE ...);"
+                  placeholder="Digite script SQL apenas quando houver orientação técnica."
                 ></textarea>
-                <div style="display: flex; gap: 12px; margin-top: 10px; align-items: center">
+                <div class="admin-advanced-actions">
                   <button class="btn btn-primary" id="admin-sql-execute">
-                    <i class="fa-solid fa-play"></i> Executar Script SQL
+                    <i class="fa-solid fa-play"></i> Executar script
                   </button>
                   <button class="btn btn-secondary" id="admin-sql-clear">
                     <i class="fa-solid fa-trash"></i> Limpar
                   </button>
-                  <small class="form-help-text"
-                    >A execução de SQL é poderosa. Verifique permissões e políticas RLS.</small
-                  >
                 </div>
               </div>
-
-              <div class="admin-console-card">
-                <label class="eyebrow">Feed de Logs</label>
-                <div id="admin-console-logs" class="admin-console-logs">
-                  <p class="admin-empty-state">Carregando logs...</p>
-                </div>
-              </div>
-            </div>
+            </details>
           </section>
 
           <section class="admin-view" id="tab-produtos" data-admin-panel="produtos">

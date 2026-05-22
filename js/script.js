@@ -3042,7 +3042,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'beforeend',
         `
         <a class="hidden nav-admin-link" href="${adminPanelHref()}" data-admin-panel-link="nav">
-          Painel Admin
+          <span class="nav-admin-label">Admin</span>
           <span class="admin-order-badge is-empty" data-admin-order-count aria-label="0 pedidos pendentes">0</span>
         </a>
       `,
@@ -3492,7 +3492,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!(link instanceof HTMLAnchorElement)) return;
       link.href = ordersHref();
       link.innerHTML = admin
-        ? `Controlar pedidos <span class="admin-order-badge ${count ? '' : 'is-empty'}" data-client-order-count>${count}</span>`
+        ? `<span class="nav-orders-label">Controle</span><span class="admin-order-badge ${count ? '' : 'is-empty'}" data-client-order-count>${count}</span>`
         : 'Pedidos';
       link.classList.toggle('nav-orders-link', admin);
       link.classList.toggle('has-pending-orders', admin && count > 0);
@@ -9168,7 +9168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function subscribeCustomerOrdersRealtime() {
     const client = ordersClient();
-    if (!client?.channel || customerOrdersRealtimeChannel || currentPage() !== 'pedidos.html') return;
+    if (!client?.channel || customerOrdersRealtimeChannel || !['pedidos.html', 'perfil.html'].includes(currentPage())) return;
     try {
       customerOrdersRealtimeChannel = client
         .channel('monte-sinai-customer-orders')
@@ -9191,6 +9191,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return Boolean(
       (userEmail && orderEmail && userEmail === orderEmail) || (userPhone && orderPhone && userPhone === orderPhone),
     );
+  }
+
+  function hasCurrentCustomerIdentity() {
+    return Boolean(currentUser?.email || currentUser?.phone);
   }
 
   async function loadCustomerOrderNotifications({ force = false } = {}) {
@@ -9286,10 +9290,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderOrdersEverywhere(options = {}) {
     let orders = dedupeOrders(await loadOrdersFromSupabase(options));
-    if (!currentUser?.email && ['pedidos.html', 'perfil.html'].includes(currentPage())) {
+    if (!hasCurrentCustomerIdentity() && ['pedidos.html', 'perfil.html'].includes(currentPage())) {
       orders = await refreshLocalOrdersFromSupabase();
     }
-    const customerOrders = currentUser?.email ? orders.filter(orderBelongsToCurrentUser) : loadLocalOrders();
+    const customerOrders = hasCurrentCustomerIdentity() ? orders.filter(orderBelongsToCurrentUser) : loadLocalOrders();
 
     setText('#dash-orders-count', String(orders.length));
     setText('#dash-orders-total', formatMoney(orders.reduce((sum, order) => sum + Number(order.total || 0), 0)));
@@ -9439,7 +9443,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let visibleOrders = orders;
     if ((isProfileHistory || isCustomerOrdersPage) && !isAdminOrders) {
-      if (!currentUser?.email) {
+      if (!hasCurrentCustomerIdentity()) {
         if (isProfileHistory)
           container.insertAdjacentHTML(
             'beforeend',
