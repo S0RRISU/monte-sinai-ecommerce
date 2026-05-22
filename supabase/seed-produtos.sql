@@ -1,6 +1,6 @@
 -- Popula a tabela de produtos da Monte Sinai.
 -- Execute este arquivo no SQL Editor do Supabase.
--- Ele usa public.produtos se existir; se nao existir, usa public.produto.
+-- Usa somente public.produtos. public.produto e legado e nao deve ser usado pelo site.
 -- Para evitar duplicados, substitui somente produtos com os mesmos nomes desta lista.
 
 begin;
@@ -62,11 +62,7 @@ begin
   target_table := to_regclass('public.produtos');
 
   if target_table is null then
-    target_table := to_regclass('public.produto');
-  end if;
-
-  if target_table is null then
-    raise exception 'Nao encontrei public.produtos nem public.produto. Crie a tabela antes de executar este seed.';
+    raise exception 'Nao encontrei public.produtos. Crie a tabela oficial antes de executar este seed.';
   end if;
 
   execute format(
