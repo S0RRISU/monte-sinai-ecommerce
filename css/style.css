@@ -26581,3 +26581,281 @@ body {
     max-height: 180px;
   }
 }
+
+/* Etapa 5 hotfix: navbar publica simplificada e sem sobreposicao. */
+.navbar,
+body.light-mode .navbar {
+  overflow: visible !important;
+}
+
+.navbar .nav-inner {
+  display: grid !important;
+  width: min(var(--container), calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.navbar .brand,
+.navbar .nav-menu,
+.navbar .nav-search,
+.navbar .nav-actions {
+  min-width: 0 !important;
+}
+
+.navbar .brand {
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.navbar .brand-logo {
+  display: block !important;
+  width: auto !important;
+  max-width: 138px !important;
+  height: 54px !important;
+  object-fit: contain !important;
+}
+
+.navbar .brand-text {
+  display: none !important;
+}
+
+.navbar .nav-menu {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+  padding: 4px !important;
+}
+
+.navbar .nav-menu a {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  max-width: 118px !important;
+  min-height: 38px !important;
+  padding: 8px 9px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: clamp(0.74rem, 0.78vw, 0.88rem) !important;
+}
+
+.navbar .nav-menu .nav-admin-link {
+  max-width: 112px !important;
+}
+
+.navbar .nav-search {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) 40px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.navbar .nav-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.navbar .nav-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+}
+
+.navbar .nav-icon,
+.navbar .nav-pill,
+.navbar .nav-cart-link,
+.navbar .nav-whatsapp-link {
+  flex: 0 0 auto !important;
+}
+
+.navbar .nav-whatsapp-link {
+  min-width: 46px !important;
+  width: 46px !important;
+  height: 46px !important;
+  padding: 0 !important;
+}
+
+.navbar .nav-whatsapp-link span,
+.navbar .nav-account-label {
+  display: none !important;
+}
+
+.navbar .nav-pill {
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.navbar .nav-cart-link {
+  width: 46px !important;
+  height: 46px !important;
+}
+
+.navbar .nav-search-trigger,
+.navbar .mobile-menu-toggle {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  padding: 0 !important;
+}
+
+@media (min-width: 1201px) {
+  .navbar .nav-inner,
+  body:has(.products-page) .navbar .nav-inner {
+    grid-template-columns: minmax(118px, 150px) minmax(0, 1fr) minmax(220px, 300px) max-content !important;
+  }
+
+  .navbar .nav-search-trigger,
+  .navbar .mobile-menu-toggle {
+    display: none !important;
+  }
+
+  .navbar .nav-menu a[href$='sobre.html'],
+  .navbar .nav-menu a[href$='contato.html'] {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) {
+  .navbar .nav-inner,
+  body:has(.products-page) .navbar .nav-inner {
+    grid-template-columns: minmax(104px, 136px) minmax(0, 1fr) max-content 44px !important;
+  }
+
+  .navbar .nav-search {
+    display: none !important;
+  }
+
+  .navbar .nav-search-trigger {
+    display: inline-grid !important;
+    justify-self: end !important;
+  }
+
+  .navbar .mobile-menu-toggle {
+    display: none !important;
+  }
+
+  .navbar .nav-menu {
+    justify-content: flex-start !important;
+  }
+
+  .navbar .nav-menu .nav-admin-link,
+  .navbar .nav-menu a[href$='sobre.html'],
+  .navbar .nav-menu a[href$='contato.html'] {
+    display: none !important;
+  }
+
+  .navbar .nav-menu a {
+    max-width: 104px !important;
+  }
+
+  .navbar .nav-actions .nav-whatsapp-link {
+    display: none !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .navbar .nav-inner,
+  body:has(.products-page) .navbar .nav-inner {
+    grid-template-columns: minmax(100px, 132px) minmax(0, 1fr) 46px 44px !important;
+  }
+
+  .navbar .nav-search,
+  .navbar .nav-whatsapp-link,
+  .navbar .nav-account-link,
+  .navbar .nav-menu .nav-admin-link,
+  .navbar .nav-menu a[href$='sobre.html'],
+  .navbar .nav-menu a[href$='contato.html'],
+  .navbar .nav-menu a[href$='catalogo.html'] {
+    display: none !important;
+  }
+
+  .navbar .nav-menu {
+    justify-content: flex-start !important;
+  }
+
+  .navbar .nav-menu a {
+    max-width: 96px !important;
+    padding-inline: 7px !important;
+  }
+
+  .navbar .nav-actions {
+    grid-column: 3 !important;
+  }
+
+  .navbar .nav-search-trigger,
+  .navbar .mobile-menu-toggle {
+    display: inline-grid !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .navbar .nav-inner,
+  body:has(.products-page) .navbar .nav-inner {
+    grid-template-columns: minmax(0, 1fr) 46px 44px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    padding-inline: 0 !important;
+  }
+
+  .navbar .brand {
+    grid-column: 1 !important;
+  }
+
+  .navbar .brand-logo {
+    max-width: 112px !important;
+    height: 48px !important;
+  }
+
+  .navbar .nav-menu,
+  .navbar .nav-search,
+  .navbar .nav-search-trigger,
+  .navbar .nav-whatsapp-link,
+  .navbar .nav-account-link {
+    display: none !important;
+  }
+
+  .navbar .nav-actions {
+    grid-column: 2 !important;
+    display: inline-flex !important;
+    justify-content: center !important;
+    width: 46px !important;
+  }
+
+  .navbar .nav-cart-link {
+    display: inline-grid !important;
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  .navbar .mobile-menu-toggle {
+    grid-column: 3 !important;
+    display: inline-grid !important;
+    justify-self: end !important;
+  }
+
+  .mobile-menu,
+  body.light-mode .mobile-menu {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: calc(100vw - 20px) !important;
+    overflow-x: hidden !important;
+  }
+
+  .mobile-menu a,
+  .mobile-menu .mobile-only-link {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
