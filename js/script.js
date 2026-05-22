@@ -5475,11 +5475,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('[Supabase] Nao foi possivel conferir usuario autenticado.', error);
     }
 
-    if (!client) {
-      showToast('Nao consegui conectar ao Supabase agora. Tente novamente em instantes.');
-      return;
-    }
-
     const customer = collectCheckoutCustomer();
     if (!customer) return;
 
@@ -5511,16 +5506,20 @@ document.addEventListener('DOMContentLoaded', () => {
       confirm.classList.add('is-loading');
     }
 
+    let savedInSupabase = false;
+    let checkoutWarning = '';
     try {
+      if (!client) throw new Error('Cliente Supabase indisponivel.');
       await saveOrder(order, authUser);
+      savedInSupabase = true;
     } catch (error) {
       console.error('[Supabase] Erro ao salvar pedido:', error);
-      showToast(checkoutFriendlyError(error));
-      if (confirm) {
-        confirm.disabled = false;
-        confirm.classList.remove('is-loading');
-      }
-      return;
+      checkoutWarning = checkoutFriendlyError(error);
+      saveOrderLocally(order);
+      showToast('O Supabase falhou, mas seu pedido sera enviado pelo WhatsApp.', {
+        type: 'warning',
+        title: 'Pedido por WhatsApp'
+      });
     }
 
     openWhatsAppOrder(order);
@@ -5536,7 +5535,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="checkout-success">
           <span class="eyebrow">Pedido enviado</span>
           <h3>${escapeHTML(order.id)}</h3>
-          <p>Seu pedido foi salvo e enviado para atendimento no WhatsApp. ${authUser?.id ? 'Ele tambem ficou vinculado ao seu perfil.' : 'Voce finalizou como visitante, sem precisar fazer login.'}</p>
+          <p>${savedInSupabase
+            ? `Seu pedido foi salvo e enviado para atendimento no WhatsApp. ${authUser?.id ? 'Ele tambem ficou vinculado ao seu perfil.' : 'Voce finalizou como visitante, sem precisar fazer login.'}`
+            : `Seu pedido foi enviado pelo WhatsApp. ${checkoutWarning || 'O Supabase nao salvou agora, entao confirme o pedido pela conversa.'}`}</p>
           <a class="btn btn-primary" href="https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}" target="_blank" rel="noreferrer">
             <i class="fa-brands fa-whatsapp"></i>
             Reenviar WhatsApp

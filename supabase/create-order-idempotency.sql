@@ -4,11 +4,15 @@
 -- Se o mesmo codigo voltar com o mesmo telefone, retorna o pedido existente sem inserir itens nem baixar estoque de novo.
 
 begin;
+
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   caller_id uuid := auth.uid();

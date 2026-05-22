@@ -3,7 +3,8 @@
 
 begin;
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -245,7 +246,7 @@ create or replace function public.decrement_product_stock()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if current_setting('monte_sinai.skip_stock_trigger', true) = 'true' then
@@ -291,7 +292,7 @@ create or replace function public.create_order(order_payload jsonb, items_payloa
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   caller_id uuid := auth.uid();

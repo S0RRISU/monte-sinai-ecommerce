@@ -4,7 +4,8 @@
 
 begin;
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 alter table public.profiles
   add column if not exists is_admin boolean not null default false,
@@ -48,7 +49,7 @@ create or replace function public.is_admin()
 returns boolean
 language sql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select coalesce(
     (
@@ -185,7 +186,7 @@ create or replace function public.create_order(order_payload jsonb, items_payloa
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   caller_id uuid := auth.uid();
