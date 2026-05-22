@@ -150,4 +150,21 @@ begin
     );
 end $$;
 
+-- Reativa somente os produtos principais quando ja houver variacoes ativas.
+-- Mantem os produtos antigos com marca/fragrancia no nome desativados.
+update public.produtos p
+set ativo = true,
+    updated_at = now()
+where lower(p.nome) in (
+    lower('Gas de cozinha P13'),
+    lower('Gás de cozinha P13'),
+    lower('Desinfetante 2L')
+  )
+  and exists (
+    select 1
+    from public.produto_variacoes pv
+    where pv.produto_id = p.id
+      and pv.ativo = true
+  );
+
 commit;
