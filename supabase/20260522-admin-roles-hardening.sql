@@ -59,23 +59,31 @@ begin
     check (admin_role in ('developer', 'owner', 'staff', 'customer', 'client'));
 end $$;
 
-create table if not exists public.perfis_usuarios (
-  id uuid primary key default extensions.gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade,
-  role text not null default 'customer',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+do $$
+begin
+  create table if not exists public.perfis_usuarios (
+    id uuid primary key default extensions.gen_random_uuid(),
+    email text,
+    user_id uuid references auth.users(id) on delete cascade,
+    role text not null default 'customer',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
 
-alter table public.perfis_usuarios
-  add column if not exists id uuid default extensions.gen_random_uuid(),
-  add column if not exists user_id uuid references auth.users(id) on delete cascade,
-  add column if not exists role text not null default 'customer',
-  add column if not exists created_at timestamptz not null default now(),
-  add column if not exists updated_at timestamptz not null default now();
+  alter table public.perfis_usuarios
+    add column if not exists id uuid default extensions.gen_random_uuid(),
+    add column if not exists email text,
+    add column if not exists user_id uuid references auth.users(id) on delete cascade,
+    add column if not exists role text not null default 'customer',
+    add column if not exists created_at timestamptz not null default now(),
+    add column if not exists updated_at timestamptz not null default now();
 
-create index if not exists idx_perfis_usuarios_user_id
-  on public.perfis_usuarios (user_id);
+  create index if not exists idx_perfis_usuarios_user_id
+    on public.perfis_usuarios (user_id);
+exception
+  when others then
+    raise notice 'Compatibilidade da tabela legada perfis_usuarios ignorada: %', sqlerrm;
+end $$;
 
 create table if not exists public.admin_audit_logs (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -92,8 +100,15 @@ create index if not exists idx_admin_audit_logs_created_at
   on public.admin_audit_logs (created_at desc);
 
 alter table public.profiles enable row level security;
-alter table public.perfis_usuarios enable row level security;
 alter table public.admin_audit_logs enable row level security;
+
+do $$
+begin
+  alter table public.perfis_usuarios enable row level security;
+exception
+  when others then
+    raise notice 'RLS da tabela legada perfis_usuarios ignorado: %', sqlerrm;
+end $$;
 
 create or replace function public.is_admin()
 returns boolean
@@ -208,22 +223,33 @@ begin
       role = excluded.admin_role,
       updated_at = now();
 
-  update public.perfis_usuarios
-  set role = target_role,
-      updated_at = now()
-  where user_id = p_user_id;
+  begin
+    update public.perfis_usuarios
+    set id = p_user_id,
+        email = target_email,
+        user_id = p_user_id,
+        role = target_role,
+        updated_at = now()
+    where id = p_user_id
+       or user_id = p_user_id;
 
-  if not found then
-    insert into public.perfis_usuarios (user_id, role)
-    values (p_user_id, target_role);
-  end if;
+    if not found then
+      insert into public.perfis_usuarios (id, email, user_id, role, updated_at)
+      values (p_user_id, target_email, p_user_id, target_role, now());
+    end if;
 
-  select role
-    into legacy_value
-  from public.perfis_usuarios
-  where user_id = p_user_id
-  order by updated_at desc nulls last
-  limit 1;
+    select role
+      into legacy_value
+    from public.perfis_usuarios
+    where id = p_user_id
+       or user_id = p_user_id
+    order by updated_at desc nulls last
+    limit 1;
+  exception
+    when others then
+      legacy_value := null;
+      raise notice 'Sincronizacao legada perfis_usuarios ignorada para %: %', p_user_id, sqlerrm;
+  end;
 
   insert into public.admin_audit_logs (
     actor_id,
@@ -287,26 +313,39 @@ on public.admin_audit_logs for insert
 to authenticated
 with check (public.is_admin());
 
-drop policy if exists perfis_select_for_admins on public.perfis_usuarios;
-create policy perfis_select_for_admins
-on public.perfis_usuarios for select
-to authenticated
-using (public.is_admin() or auth.uid() = user_id);
+do $$
+begin
+  drop policy if exists perfis_select_for_admins on public.perfis_usuarios;
+  create policy perfis_select_for_admins
+  on public.perfis_usuarios for select
+  to authenticated
+  using (public.is_admin() or auth.uid() = user_id);
 
-drop policy if exists perfis_no_client_write on public.perfis_usuarios;
-create policy perfis_no_client_write
-on public.perfis_usuarios for all
-to authenticated
-using (false)
-with check (false);
+  drop policy if exists perfis_no_client_write on public.perfis_usuarios;
+  create policy perfis_no_client_write
+  on public.perfis_usuarios for all
+  to authenticated
+  using (false)
+  with check (false);
+exception
+  when others then
+    raise notice 'Policies da tabela legada perfis_usuarios ignoradas: %', sqlerrm;
+end $$;
 
 revoke insert, update on public.profiles from authenticated;
 grant select on public.profiles to authenticated;
 grant insert (id, email, nome, apelido, telefone, endereco, foto) on public.profiles to authenticated;
 grant update (id, email, nome, apelido, telefone, endereco, foto, updated_at) on public.profiles to authenticated;
 
-grant select on public.perfis_usuarios to authenticated;
 grant select, insert on public.admin_audit_logs to authenticated;
+
+do $$
+begin
+  grant select on public.perfis_usuarios to authenticated;
+exception
+  when others then
+    raise notice 'Grant da tabela legada perfis_usuarios ignorado: %', sqlerrm;
+end $$;
 
 insert into public.profiles (id, email, nome, is_admin, admin_role, role)
 select
@@ -339,29 +378,59 @@ set email = excluded.email,
     role = excluded.admin_role,
     updated_at = now();
 
-update public.perfis_usuarios pu
-set role = p.admin_role,
-    updated_at = now()
-from public.profiles p
-where pu.user_id = p.id
-  and lower(p.email) in (
+do $$
+begin
+  update public.perfis_usuarios pu
+  set id = p.id,
+      email = p.email,
+      user_id = p.id,
+      role = p.admin_role,
+      updated_at = now()
+  from public.profiles p
+  where (pu.id = p.id or pu.user_id = p.id)
+    and lower(p.email) in (
+      'marcelol527319@gmail.com',
+      'marcelo52731@gmail.com',
+      'patriciapaula01234@gmail.com'
+    );
+
+  insert into public.perfis_usuarios (id, email, user_id, role, updated_at)
+  select p.id, p.email, p.id, p.admin_role, now()
+  from public.profiles p
+  where lower(p.email) in (
     'marcelol527319@gmail.com',
     'marcelo52731@gmail.com',
     'patriciapaula01234@gmail.com'
-  );
+  )
+    and not exists (
+      select 1
+      from public.perfis_usuarios pu
+      where pu.id = p.id
+         or pu.user_id = p.id
+    );
+exception
+  when others then
+    raise notice 'Sincronizacao legada perfis_usuarios ignorada: %', sqlerrm;
+end $$;
 
-insert into public.perfis_usuarios (user_id, role)
-select p.id, p.admin_role
-from public.profiles p
-where lower(p.email) in (
-  'marcelol527319@gmail.com',
-  'marcelo52731@gmail.com',
-  'patriciapaula01234@gmail.com'
-)
-  and not exists (
-    select 1
-    from public.perfis_usuarios pu
-    where pu.user_id = p.id
-  );
+do $$
+begin
+  update public.perfis_usuarios pu
+  set email = p.email,
+      user_id = coalesce(pu.user_id, p.id),
+      role = p.admin_role,
+      updated_at = now()
+  from public.profiles p
+  where pu.id = p.id
+    and pu.id is not null
+    and (
+      pu.email is distinct from p.email
+      or pu.user_id is distinct from p.id
+      or pu.role is distinct from p.admin_role
+    );
+exception
+  when others then
+    raise notice 'Atualizacao best-effort de perfis_usuarios ignorada: %', sqlerrm;
+end $$;
 
 commit;
