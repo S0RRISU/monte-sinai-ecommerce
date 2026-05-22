@@ -77,6 +77,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let productCreateSaving = false;
   const productSaveLocks = new Set();
   const variationSaveLocks = new Set();
+  const ADMIN_CATEGORY_FILTERS = [
+    ['agua', 'Água'],
+    ['gas', 'Gás'],
+    ['limpeza', 'Limpeza'],
+    ['lavanderia', 'Lavanderia'],
+    ['higiene', 'Higiene'],
+    ['banheiro', 'Banheiro'],
+    ['cozinha', 'Cozinha'],
+    ['utensilios', 'Utensílios'],
+    ['organizacao', 'Organização'],
+    ['limpeza-pesada', 'Limpeza pesada'],
+  ];
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -202,6 +214,28 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/(^-|-$)/g, '')
         .slice(0, 70) || 'opcao'
     );
+  }
+
+  function categorySlug(value = '') {
+    const normalized = normalize(value || 'produtos');
+    if (!normalized) return 'produtos';
+    if (/\bagua\b|aguas|agua-mineral|galao|mineral/.test(normalized)) return 'agua';
+    if (/\bgas\b|gases|botijao|p13|supergas|ultragas/.test(normalized)) return 'gas';
+    if (/limpeza-pesada|uso-pesado|pesada|limpa-pedra|cloro|candida/.test(normalized)) return 'limpeza-pesada';
+    if (/\blimpeza\b|desinfetante|alcool|multiuso/.test(normalized)) return 'limpeza';
+    if (/lavanderia|roupa|amaciante|sabao|lava-roupas|omo|coco/.test(normalized)) return 'lavanderia';
+    if (/higiene|sabonete|banho|pessoal/.test(normalized)) return 'higiene';
+    if (/banheiro|vaso|sanitario|pedra-de-vaso/.test(normalized)) return 'banheiro';
+    if (/cozinha|pia|detergente|louca|fogao|aluminio/.test(normalized)) return 'cozinha';
+    if (/organizacao|organizador|cesto|balde/.test(normalized)) return 'organizacao';
+    if (normalized.includes('utens')) return 'utensilios';
+    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function productCategorySlug(product = {}) {
+    const category = categorySlug(product.categoria || '');
+    if (category && category !== 'produtos') return category;
+    return categorySlug(`${product.nome || ''} ${product.descricao || ''}`);
   }
 
   function productPlaceholderTone(product = {}) {
@@ -567,6 +601,54 @@ document.addEventListener('DOMContentLoaded', () => {
       [product.nome, product.categoria, product.descricao, product.tipo, stock, offer, active, product.preco].join(' '),
     );
     return haystack.includes(query);
+  }
+
+  function currentAdminProductCategoryFilter() {
+    return qs('[data-admin-product-category].active')?.dataset.adminProductCategory || 'all';
+  }
+
+  function renderAdminProductCategoryFilters(produtos = state.produtos) {
+    const search = qs('#admin-product-search');
+    if (!search) return;
+
+    let bar = qs('#admin-product-category-filters');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'admin-product-category-filters';
+      bar.className = 'admin-product-category-filters';
+      bar.setAttribute('role', 'group');
+      bar.setAttribute('aria-label', 'Filtrar produtos por categoria');
+      search.closest('.admin-search-field')?.insertAdjacentElement('afterend', bar);
+    }
+
+    const activeFilter = currentAdminProductCategoryFilter();
+    const counts = produtos.reduce(
+      (map, product) => {
+        const slug = productCategorySlug(product);
+        map.set(slug, (map.get(slug) || 0) + 1);
+        return map;
+      },
+      new Map([['all', produtos.length]]),
+    );
+    const known = new Set(ADMIN_CATEGORY_FILTERS.map(([slug]) => slug));
+    const extra = [...counts.keys()]
+      .filter((slug) => slug !== 'all' && !known.has(slug))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map((slug) => [slug, slug.replace(/-/g, ' ')]);
+    const filters = [['all', 'Todos'], ...ADMIN_CATEGORY_FILTERS, ...extra];
+
+    bar.innerHTML = filters
+      .map(([slug, label]) => {
+        const count = counts.get(slug) || 0;
+        const active = activeFilter === slug || (!filters.some(([item]) => item === activeFilter) && slug === 'all');
+        return `
+          <button class="admin-category-chip ${active ? 'active' : ''}" type="button" data-admin-product-category="${escapeHTML(slug)}" aria-pressed="${active ? 'true' : 'false'}">
+            <span>${escapeHTML(label)}</span>
+            <strong>${count}</strong>
+          </button>
+        `;
+      })
+      .join('');
   }
 
   function isMissingVariationTableError(error) {
@@ -1080,8 +1162,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = qs('#lista-produtos-admin');
     const count = qs('#admin-products-count');
     const query = adminSearchQuery('#admin-product-search');
-    const visibleProdutos = query ? produtos.filter((product) => productMatchesSearch(product, query)) : produtos;
-    if (count) count.textContent = query ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
+    renderAdminProductCategoryFilters(produtos);
+    const categoryFilter = currentAdminProductCategoryFilter();
+    const visibleProdutos = produtos.filter((product) => {
+      const matchesSearch = productMatchesSearch(product, query);
+      const matchesCategory = categoryFilter === 'all' || productCategorySlug(product) === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+    if (count) count.textContent = query || categoryFilter !== 'all' ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
     if (!list) return;
     if (state.selectedProductId && !produtos.some((product) => product.id === state.selectedProductId)) {
       state.selectedProductId = '';
@@ -1089,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!visibleProdutos.length) {
-      list.innerHTML = `<p class="admin-empty-state">${query ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum produto cadastrado ainda.'}</p>`;
+      list.innerHTML = `<p class="admin-empty-state">${query || categoryFilter !== 'all' ? 'Nenhum produto encontrado para esta busca e categoria.' : 'Nenhum produto cadastrado ainda.'}</p>`;
       return;
     }
 
@@ -1118,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
           .filter(Boolean)
           .join('');
         return `
-        <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''} ${product.id === state.selectedProductId ? 'is-selected' : ''}" role="button" tabindex="0" data-admin-product-open="${escapeHTML(product.id)}">
+        <article class="admin-product-simple-card admin-product-manage-card ${offer ? 'is-offer' : ''}" data-admin-product-card="${escapeHTML(product.id)}">
           <span class="admin-product-thumb">
             ${productImageHTML(product)}
           </span>
@@ -1130,6 +1218,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="admin-product-badges">${statusBadges}</span>
             </div>
             <div class="admin-product-quick-actions">
+              <button class="btn btn-secondary" type="button" data-admin-product-detail="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-circle-info"></i>
+                Ver detalhes
+              </button>
               <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-pen"></i>
                 Editar
@@ -1160,6 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const active = product.ativo !== false;
     const stock = product.estoque ?? '';
     const lowStock = productStockLow(product);
+    const variations = productVariations(product.id);
     const stockLabel =
       stock === '' || stock === null
         ? 'Sem estoque cadastrado'
@@ -1171,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <header>
           <div>
             <span class="eyebrow">Detalhes do produto</span>
-            <h2>${escapeHTML(product.nome || 'Produto')}</h2>
+            <h2 id="admin-product-detail-title">${escapeHTML(product.nome || 'Produto')}</h2>
           </div>
           <button class="icon-button" type="button" data-admin-product-detail-close aria-label="Fechar detalhes">
             <i class="fa-solid fa-xmark"></i>
@@ -1192,20 +1285,33 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="is-wide"><dt>Descricao</dt><dd>${escapeHTML(product.descricao || 'Sem descricao')}</dd></div>
           </dl>
         </div>
-        <div class="admin-product-detail-actions">
-          <button class="btn btn-primary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
-            <i class="fa-solid fa-pen"></i>
-            Editar produto
-          </button>
-          <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
-            <i class="fa-solid fa-ban"></i>
-            Esgotar
-          </button>
-          <button class="btn btn-secondary" type="button" data-admin-product-offer-24="${escapeHTML(product.id)}">
-            <i class="fa-solid fa-bolt"></i>
-            Oferta 24h
-          </button>
-        </div>
+        <section class="admin-product-detail-variations">
+          <h3>Variacoes</h3>
+          ${
+            variations.length
+              ? `<div class="admin-product-detail-variation-list">
+                ${variations
+                  .map((variation) => {
+                    const variationStock =
+                      variation.estoque === null || variation.estoque === undefined || variation.estoque === ''
+                        ? 'Livre'
+                        : Number(variation.estoque) <= 0
+                          ? 'Esgotada'
+                          : `${variation.estoque} em estoque`;
+                    return `
+                      <div class="admin-product-detail-variation">
+                        <span>${variationImageHTML(variation, product)}</span>
+                        <strong>${escapeHTML(variation.nome || 'Opcao')}</strong>
+                        <small>${formatMoney(variation.preco || product.preco)} - ${escapeHTML(variationStock)}</small>
+                        <em>${variation.ativo === false ? 'Desativada' : 'Ativa'}</em>
+                      </div>
+                    `;
+                  })
+                  .join('')}
+              </div>`
+              : '<p class="admin-empty-state">Este produto nao tem variacoes cadastradas.</p>'
+          }
+        </section>
       </article>
     `;
   }
@@ -1218,13 +1324,35 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.innerHTML = product ? productDetailsPanelHTML(product) : '';
   }
 
+  function ensureProductDetailsModal() {
+    let modal = qs('#admin-product-detail-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'admin-product-detail-modal';
+    modal.className = 'admin-product-detail-modal hidden';
+    modal.innerHTML = `
+      <button class="admin-product-detail-backdrop" type="button" data-admin-product-detail-close aria-label="Fechar detalhes"></button>
+      <section class="admin-product-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-product-detail-title">
+        <div data-admin-product-detail-body></div>
+      </section>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function closeProductDetails() {
+    qs('#admin-product-detail-modal')?.classList.add('hidden');
+    document.body.classList.remove('admin-product-detail-open');
+  }
+
   function openProductDetails(productId) {
     const product = state.produtos.find((item) => item.id === productId);
     if (!product) return;
-    state.selectedProductId = productId;
-    renderProductDetailsPanel();
-    renderizarProdutosAdmin(state.produtos);
-    qs('#admin-product-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const modal = ensureProductDetailsModal();
+    const body = qs('[data-admin-product-detail-body]', modal);
+    if (body) body.innerHTML = productDetailsPanelHTML(product);
+    modal.classList.remove('hidden');
+    document.body.classList.add('admin-product-detail-open');
   }
 
   function productVariations(productId) {
@@ -2408,9 +2536,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const detailClose = event.target.closest('[data-admin-product-detail-close]');
       if (detailClose) {
+        closeProductDetails();
         state.selectedProductId = '';
         renderProductDetailsPanel();
+        return;
+      }
+
+      const category = event.target.closest('[data-admin-product-category]');
+      if (category) {
+        qsa('[data-admin-product-category]').forEach((button) => {
+          const active = button === category;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
         renderizarProdutosAdmin(state.produtos);
+        return;
+      }
+
+      const detail = event.target.closest('[data-admin-product-detail]');
+      if (detail) {
+        openProductDetails(detail.dataset.adminProductDetail);
         return;
       }
 
@@ -2496,10 +2641,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const productOpen = event.target.closest('[data-admin-product-open]');
-      if (productOpen && !event.target.closest('button, a, input, select, textarea, label')) {
-        openProductDetails(productOpen.dataset.adminProductOpen);
-      }
       const teamSave = event.target.closest('[data-admin-team-save]');
       if (teamSave) {
         const userId = teamSave.dataset.adminTeamSave;
@@ -2510,10 +2651,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.body.addEventListener('keydown', (event) => {
-      const productOpen = event.target.closest?.('[data-admin-product-open]');
-      if (!productOpen || !['Enter', ' '].includes(event.key)) return;
-      event.preventDefault();
-      openProductDetails(productOpen.dataset.adminProductOpen);
+      if (event.key !== 'Escape') return;
+      if (!qs('#admin-product-detail-modal')?.classList.contains('hidden')) closeProductDetails();
     });
   }
 

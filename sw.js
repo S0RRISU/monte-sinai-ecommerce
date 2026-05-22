@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260522-9';
+const CACHE_VERSION = 'monte-sinai-20260522-10';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_MANIFEST_URL = '/assets/generated/v2/manifest.json';
@@ -11,8 +11,8 @@ const STATIC_ASSETS = [
   '/promocoes',
   '/sobre',
   '/contato',
-  '/css/style.css?v=20260522-6',
-  '/js/script.js?v=20260522-7',
+  '/css/style.css?v=20260522-8',
+  '/js/script.js?v=20260522-8',
   '/js/supabase.js?v=20260520-4',
   '/site.webmanifest',
   ASSET_MANIFEST_URL,

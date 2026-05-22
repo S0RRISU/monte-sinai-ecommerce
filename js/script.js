@@ -68,6 +68,19 @@ document.addEventListener('DOMContentLoaded', () => {
     'cozinha',
     'utensilios',
     'organizacao',
+    'limpeza-pesada',
+  ];
+  const CATALOG_FILTER_CATEGORIES = [
+    ['agua', 'Água'],
+    ['gas', 'Gás'],
+    ['limpeza', 'Limpeza'],
+    ['lavanderia', 'Lavanderia'],
+    ['higiene', 'Higiene'],
+    ['banheiro', 'Banheiro'],
+    ['cozinha', 'Cozinha'],
+    ['utensilios', 'Utensílios'],
+    ['organizacao', 'Organização'],
+    ['limpeza-pesada', 'Limpeza pesada'],
   ];
   const CATALOG_SECTION_META = {
     recommended: {
@@ -109,6 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
     organizacao: {
       eyebrow: 'Organização',
       title: 'Apoio para o dia a dia',
+    },
+    'limpeza-pesada': {
+      eyebrow: 'Uso pesado',
+      title: 'Limpeza pesada',
     },
   };
   const CATALOG_VARIANT_ORDER = {
@@ -1221,8 +1238,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function categorySlug(value) {
     const normalized = normalizeText(value || 'produtos');
+    if (!normalized) return 'produtos';
+    if (/\bagua\b|aguas|agua-mineral|galao|mineral/.test(normalized)) return 'agua';
+    if (/\bgas\b|gases|botijao|p13|supergas|ultragas/.test(normalized)) return 'gas';
+    if (/limpeza-pesada|uso-pesado|pesada|limpa-pedra|cloro|candida/.test(normalized)) return 'limpeza-pesada';
+    if (/\blimpeza\b|desinfetante|alcool|multiuso/.test(normalized)) return 'limpeza';
+    if (/lavanderia|roupa|amaciante|sabao|lava-roupas|omo|coco/.test(normalized)) return 'lavanderia';
+    if (/higiene|sabonete|banho|pessoal/.test(normalized)) return 'higiene';
+    if (/banheiro|vaso|sanitario|pedra-de-vaso/.test(normalized)) return 'banheiro';
+    if (/cozinha|pia|detergente|louca|fogao|aluminio/.test(normalized)) return 'cozinha';
+    if (/organizacao|organizador|cesto|balde/.test(normalized)) return 'organizacao';
     if (normalized.includes('utens')) return 'utensilios';
     return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function cardCategorySlug(card) {
+    const explicit = categorySlug(card?.dataset?.category || '');
+    if (explicit && explicit !== 'produtos' && explicit !== 'recommended') return explicit;
+    const text = `${card?.dataset?.name || ''} ${card?.querySelector?.('h3')?.textContent || ''} ${card?.querySelector?.('p')?.textContent || ''}`;
+    return categorySlug(text);
   }
 
   function categoryOrderIndex(slug) {
@@ -4441,7 +4475,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterBar = qs('.filter-chips');
     if (!filterBar || !productIndex.length) return;
 
-    const categories = orderedCategoryEntries(storeProducts());
+    const availableCategories = new Map(orderedCategoryEntries(storeProducts()));
+    const categories = CATALOG_FILTER_CATEGORIES.map(([slug, label]) => [slug, availableCategories.get(slug) || label]);
 
     filterBar.innerHTML = [
       '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
@@ -4925,7 +4960,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let visible = 0;
 
     products.forEach((card) => {
-      const category = card.dataset.category || '';
+      const category = cardCategorySlug(card);
       const recommended = card.dataset.recommended === 'true' || card.classList.contains('is-recommended');
       const matchesProduct = searchProducts.some((product) => cardMatchesCatalogProduct(card, product));
       const matchesCardText = !searchProducts.length && cardMatchesCatalogQuery(card, rawTerm, true);
