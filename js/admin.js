@@ -3,12 +3,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-  const KNOWN_ADMIN_EMAILS = new Map([
-    ['marcelol527319@gmail.com', 'developer'],
-    ['marcelol527319@gmail.co', 'developer'],
-    ['patriciapaula01234@gmail.com', 'owner'],
-    ['marcelo52731@gmail.com', 'owner'],
-  ]);
+  // Fallback mapping for admin emails — should NOT be relied on in production.
+  // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
+  const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
+  function getFallbackRoleForEmail(email) {
+    try {
+      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
   const ORDER_STATUS = {
     pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
     preparo: { label: 'Em Preparo', db: 'Preparando', column: 'lista-preparo' },
@@ -315,14 +319,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentAdminRole() {
-    const fallbackRole = KNOWN_ADMIN_EMAILS.get(normalize(state.user?.email));
+    // Prefer explicit role from `profiles.admin_role`; `profile.role` is only a compatibility fallback.
     const profileRole = normalize(state.profile?.admin_role || state.profile?.role || '');
-    return profileRole && profileRole !== 'customer' ? profileRole : normalize(fallbackRole || profileRole || '');
+    if (profileRole && profileRole !== 'customer') return profileRole;
+    // Only use fallback email mapping when profile is not available (emergency).
+    if (!state.profile) return normalize(getFallbackRoleForEmail(state.user?.email) || '');
+    return '';
   }
 
   function isDeveloperAdmin() {
-    const email = normalize(state.user?.email || state.profile?.email || '');
-    return currentAdminRole() === 'developer' || KNOWN_ADMIN_EMAILS.get(email) === 'developer';
+    // Primary check: profile role
+    if (currentAdminRole() === 'developer') return true;
+    // Emergency fallback: use injected email map only if profile not loaded
+    if (!state.profile) return getFallbackRoleForEmail(state.user?.email) === 'developer';
+    return false;
   }
 
   function applyDeveloperAccessUI() {
@@ -354,7 +364,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     state.user = user;
-    const fallbackRole = KNOWN_ADMIN_EMAILS.get(normalize(user.email));
 
     const { data: profile, error } = await api
       .from('profiles')
@@ -363,13 +372,12 @@ document.addEventListener('DOMContentLoaded', () => {
       .maybeSingle();
 
     if (error) console.warn('[Admin] Perfil admin nao foi lido.', error);
-    state.profile = profile || {
-      id: user.id,
-      email: user.email,
-      nome: user.user_metadata?.name || user.email,
-      is_admin: Boolean(fallbackRole),
-      admin_role: fallbackRole || 'customer',
-    };
+    // If profile exists use it; otherwise leave profile empty and allow fallback only in emergency
+    if (profile) {
+      state.profile = profile;
+    } else {
+      state.profile = null;
+    }
     // Tenta ler a role na tabela `perfis_usuarios` (tenta user_id então id)
     try {
       let perfisRow = null;
@@ -380,18 +388,56 @@ document.addEventListener('DOMContentLoaded', () => {
         if (byId?.data) perfisRow = byId.data;
       }
       if (perfisRow) {
-        state.profile.perfis = perfisRow;
-        state.profile.role = perfisRow.role || state.profile.admin_role || fallbackRole || '';
+        if (state.profile) {
+          state.profile.perfis = perfisRow;
+          state.profile.role = state.profile.admin_role || '';
+        } else {
+          const fb = getFallbackRoleForEmail(user.email);
+          state.profile = {
+            id: user.id,
+            email: user.email,
+            nome: user.user_metadata?.name || user.email,
+            is_admin: Boolean(fb),
+            admin_role: fb || 'customer',
+            role: fb || 'customer',
+            perfis: perfisRow,
+          };
+        }
       } else {
-        state.profile.role = state.profile.admin_role || fallbackRole || '';
+        if (!state.profile) {
+          // emergency fallback when no profile row exists
+          const fb = getFallbackRoleForEmail(user.email);
+          state.profile = {
+            id: user.id,
+            email: user.email,
+            nome: user.user_metadata?.name || user.email,
+            is_admin: Boolean(fb),
+            admin_role: fb || 'customer',
+            role: fb || 'customer',
+          };
+        } else {
+          state.profile.role = state.profile.admin_role || '';
+        }
       }
     } catch (err) {
       console.warn('[Admin] falha ao ler perfis_usuarios', err);
-      state.profile.role = state.profile.admin_role || fallbackRole || '';
+      if (!state.profile) {
+        const fb = getFallbackRoleForEmail(user.email);
+        state.profile = {
+          id: user.id,
+          email: user.email,
+          nome: user.user_metadata?.name || user.email,
+          is_admin: Boolean(fb),
+          admin_role: fb || 'customer',
+          role: fb || 'customer',
+        };
+      } else {
+        state.profile.role = state.profile.admin_role || '';
+      }
     }
 
     const role = currentAdminRole();
-    const validAdminRoles = ['developer', 'owner', 'manager', 'admin', 'staff'];
+    const validAdminRoles = ['developer', 'owner', 'staff'];
     const isAdminRole = validAdminRoles.includes(role);
     const admin = Boolean(state.profile.is_admin || isAdminRole);
     if (!admin) {
@@ -405,7 +451,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('admin-ready');
     document.body.classList.toggle('admin-owner', role === 'owner');
     applyDeveloperAccessUI();
+    applyTeamAccessUI();
     return true;
+  }
+
+  function canManageTeam() {
+    return ['developer', 'owner'].includes(currentAdminRole());
+  }
+
+  function applyTeamAccessUI() {
+    const allowed = canManageTeam();
+    qsa('[data-admin-tab="equipe"]').forEach((element) => {
+      element.classList.toggle('hidden', !allowed);
+      element.hidden = !allowed;
+      element.setAttribute('aria-hidden', String(!allowed));
+    });
   }
 
   function renderAdminTab(tab = 'pedidos') {
@@ -413,6 +473,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((nextTab === 'developer' || nextTab === 'dev-console') && !isDeveloperAdmin()) {
       nextTab = 'pedidos';
       showToast('Área exclusiva do desenvolvedor.', 'error');
+    }
+    if (nextTab === 'equipe' && !canManageTeam()) {
+      nextTab = 'pedidos';
+      showToast('Área exclusiva para desenvolvedor e proprietários.', 'error');
     }
     state.activeTab = nextTab;
 
@@ -1769,6 +1833,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     const container = qs('#admin-team-list');
     if (!api || !container) return;
+    if (!canManageTeam()) {
+      container.innerHTML =
+        container.tagName && container.tagName.toLowerCase() === 'tbody'
+          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</td></tr>'
+          : '<p class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</p>';
+      return;
+    }
     container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuários...</p>';
 
     const { data: profiles, error: profilesErr } = await api
@@ -1812,29 +1883,33 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const currentRole = currentAdminRole();
-    const canEditAll = ['developer', 'owner'].includes(currentRole);
-    const canEditSome = ['developer', 'owner', 'manager', 'admin'].includes(currentRole);
+    const isDeveloper = currentRole === 'developer';
+    const isOwner = currentRole === 'owner';
+    const canEditRoles = ['developer', 'owner'].includes(currentRole);
     const rolesOptions = [
-      { value: 'owner', label: 'Dono' },
-      { value: 'developer', label: 'Desenvolvedor' },
-      { value: 'manager', label: 'Gerente' },
-      { value: 'admin', label: 'Administrador' },
-      { value: 'staff', label: 'Staff' },
+      { value: 'developer', label: 'Desenvolvedor / Presidente' },
+      { value: 'owner', label: 'Proprietário' },
+      { value: 'staff', label: 'Equipe' },
       { value: 'customer', label: 'Cliente' },
     ];
 
     const html = rows
       .map((row) => {
         const perf = perfisMap[row.id] || row._perfisRow || null;
-        const userRole = perf?.role || row.admin_role || (row.is_admin ? 'admin' : 'customer');
+        const userRole = row.admin_role || perf?.role || (row.is_admin ? 'owner' : 'customer');
         const perfisId = perf?.id || '';
 
-        let selectDisabled = false;
-        if (['owner', 'developer'].includes(userRole) && !canEditAll) selectDisabled = true;
+        let selectDisabled = !canEditRoles;
+        // Do not allow non-developers to change a developer's role
+        if (userRole === 'developer' && !isDeveloper) selectDisabled = true;
 
         const optionsHtml = rolesOptions
           .map((opt) => {
-            const disableOpt = ['owner', 'developer'].includes(opt.value) && !canEditAll ? 'disabled' : '';
+            let disableOpt = '';
+            // Only developer can assign another developer
+            if (opt.value === 'developer' && !isDeveloper) disableOpt = 'disabled';
+            // Owner cannot create developers
+            if (isOwner && opt.value === 'developer') disableOpt = 'disabled';
             return `<option value="${escapeHTML(opt.value)}" ${opt.value === userRole ? 'selected' : ''} ${disableOpt}>${escapeHTML(opt.label)}</option>`;
           })
           .join('');
@@ -1879,6 +1954,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     if (!api || !userId) return false;
     try {
+      // Prefer RPC admin_set_user_role (secure, server-side).
+      if (api.rpc) {
+        const { data, error } = await api.rpc('admin_set_user_role', { p_user_id: userId, p_role: newRole });
+        if (error) {
+          console.warn('[Admin] RPC admin_set_user_role erro', error);
+          showToast(friendlyDbError(error, 'Falha ao alterar cargo via RPC.'), 'error');
+          return false;
+        }
+        showToast('Cargo atualizado.', 'success');
+        await carregarEquipeAdmin();
+        // RPC já deve registrar auditoria server-side
+        try {
+          await logAdminAction('role_updated_rpc', 'user', userId, { role: newRole });
+        } catch (_) {}
+        return true;
+      }
+
+      // Fallback (antigo fluxo direto em perfis_usuarios) — usado apenas se RPC indisponível.
       // tenta atualizar por user_id
       let res = await api.from('perfis_usuarios').update({ role: newRole }).eq('user_id', userId).select();
       if (res.error) {
