@@ -185,6 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let remoteOrdersLoaded = false;
   let adminProductsCache = [];
   let adminProductsSource = 'supabase';
+  let adminProductSaving = false;
+  const adminProductActionLocks = new Set();
   let localCatalogProductsCache = null;
   let adminProfileCache = null;
   let productExtendedColumnsReady = true;
@@ -7402,19 +7404,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const price = event.target.closest('[data-admin-product-price-save]');
     if (price) {
-      await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+      const key = `price:${price.dataset.adminProductPriceSave}`;
+      if (!lockAdminProductAction(key, price)) return;
+      try {
+        await saveAdminProductPrice(price.dataset.adminProductPriceSave);
+      } finally {
+        unlockAdminProductAction(key, price);
+      }
       return;
     }
 
     const stock = event.target.closest('[data-admin-product-stock-save]');
     if (stock) {
-      await saveAdminProductStock(stock.dataset.adminProductStockSave);
+      const key = `stock:${stock.dataset.adminProductStockSave}`;
+      if (!lockAdminProductAction(key, stock)) return;
+      try {
+        await saveAdminProductStock(stock.dataset.adminProductStockSave);
+      } finally {
+        unlockAdminProductAction(key, stock);
+      }
       return;
     }
 
     const stockSet = event.target.closest('[data-admin-product-stock-set]');
     if (stockSet) {
-      await setAdminProductStock(stockSet.dataset.adminProductStockSet, stockSet.dataset.stockValue);
+      const key = `stock-set:${stockSet.dataset.adminProductStockSet}`;
+      if (!lockAdminProductAction(key, stockSet)) return;
+      try {
+        await setAdminProductStock(stockSet.dataset.adminProductStockSet, stockSet.dataset.stockValue);
+      } finally {
+        unlockAdminProductAction(key, stockSet);
+      }
     }
   }
 
@@ -7964,11 +7984,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
 
+    const imagem = safeAdminProductImageValue(qs('#admin-product-image')?.value || '');
+    if (imagem === null) return null;
+
     const payload = {
       nome,
       preco,
       categoria: tipo === 'kit' && !normalizeText(categoria).includes('kit') ? 'Kits' : categoria,
-      imagem: qs('#admin-product-image')?.value.trim() || '',
+      imagem,
       descricao: qs('#admin-product-description')?.value.trim() || '',
       ativo: qs('#admin-product-active')?.value !== 'false',
     };
@@ -8007,6 +8030,40 @@ document.addEventListener('DOMContentLoaded', () => {
   function productImageUploadStatus(message = '') {
     const status = qs('#admin-product-upload-status');
     if (status) status.textContent = message;
+  }
+
+  function safeAdminProductImageValue(value = '') {
+    const image = String(value || '').trim();
+    if (/^data:/i.test(image)) {
+      showToast('Imagem em base64/DataURL nao pode ser salva. Envie pelo Storage ou use uma URL.');
+      return null;
+    }
+    return image;
+  }
+
+  function setAdminProductFormBusy(form, busy) {
+    qsa('button[type="submit"]', form || qs('#admin-product-form') || document).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
+  }
+
+  function lockAdminProductAction(key, button = null) {
+    if (adminProductActionLocks.has(key)) return false;
+    adminProductActionLocks.add(key);
+    if (button) {
+      button.disabled = true;
+      button.classList.add('is-loading');
+    }
+    return true;
+  }
+
+  function unlockAdminProductAction(key, button = null) {
+    adminProductActionLocks.delete(key);
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-loading');
+    }
   }
 
   function updateAdminProductPreview(src = '') {
@@ -8132,57 +8189,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveAdminProduct(event) {
     event.preventDefault();
-    const uploadedUrl = await ensureAdminProductImageUploaded();
-    if (selectedAdminProductImageFile() && !uploadedUrl) return;
-
-    const payload = adminProductPayload();
-    if (!payload) return;
-
+    if (adminProductSaving) return;
+    adminProductSaving = true;
+    setAdminProductFormBusy(event.currentTarget, true);
     const id = qs('#admin-product-id')?.value || '';
-    const client = ordersClient();
-    if (!client) {
-      showToast('Supabase indisponivel para salvar o produto.');
-      return;
-    }
+    try {
+      const hasSelectedFile = Boolean(selectedAdminProductImageFile());
+      const uploadedUrl = await ensureAdminProductImageUploaded();
+      if (hasSelectedFile && !uploadedUrl) {
+        showToast('Upload da imagem falhou. Tente novamente antes de salvar.');
+        return;
+      }
 
-    const request = id
-      ? client.from('produtos').update(payload).eq('id', id).select('id').maybeSingle()
-      : client.from('produtos').insert(payload).select('id').maybeSingle();
+      const payload = adminProductPayload();
+      if (!payload) return;
 
-    let { data, error } = await request;
-    if (id && (error || !data)) {
-      const rpc = await rpcAdminUpdateProduct(id, payload);
-      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-      error = rpc.error;
-    }
-    if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
-      productExtendedColumnsReady = false;
-      const basePayload = {
-        nome: payload.nome,
-        preco: payload.preco,
-        categoria: payload.categoria,
-        imagem: payload.imagem,
-        descricao: payload.descricao,
-        ativo: payload.ativo,
-      };
-      const fallback = id
-        ? await client.from('produtos').update(basePayload).eq('id', id).select('id').maybeSingle()
-        : await client.from('produtos').insert(basePayload).select('id').maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-      showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
-    }
+      const client = ordersClient();
+      if (!client) {
+        showToast('Supabase indisponivel para salvar o produto.');
+        return;
+      }
 
-    if (error || !data) {
-      showToast('Nao consegui salvar o produto. Execute o SQL de reparo no Supabase.');
+      const request = id
+        ? client.from('produtos').update(payload).eq('id', id).select('id').maybeSingle()
+        : client.from('produtos').insert(payload).select('id').maybeSingle();
+
+      let { data, error } = await request;
+      if (id && (error || !data)) {
+        const rpc = await rpcAdminUpdateProduct(id, payload);
+        data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+        error = rpc.error;
+      }
+      if (error && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
+        productExtendedColumnsReady = false;
+        const basePayload = {
+          nome: payload.nome,
+          preco: payload.preco,
+          categoria: payload.categoria,
+          imagem: payload.imagem,
+          descricao: payload.descricao,
+          ativo: payload.ativo,
+        };
+        const fallback = id
+          ? await client.from('produtos').update(basePayload).eq('id', id).select('id').maybeSingle()
+          : await client.from('produtos').insert(basePayload).select('id').maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+        showToast('Produto salvo. Execute o SQL novo para salvar kit/oferta.');
+      }
+
+      if (error || !data) {
+        showToast('Nao consegui salvar o produto. Execute o SQL de reparo no Supabase.');
+        console.warn('[Supabase] Erro ao salvar produto.', error);
+        return;
+      }
+
+      resetAdminProductForm();
+      closeAdminModal('product');
+      await refreshAdminProducts({ force: true });
+      showToast(id ? 'Produto atualizado.' : 'Produto criado.');
+    } catch (error) {
+      showToast('Nao consegui salvar o produto. Tente novamente.');
       console.warn('[Supabase] Erro ao salvar produto.', error);
-      return;
+    } finally {
+      adminProductSaving = false;
+      setAdminProductFormBusy(event.currentTarget, false);
     }
-
-    resetAdminProductForm();
-    closeAdminModal('product');
-    await refreshAdminProducts({ force: true });
-    showToast(id ? 'Produto atualizado.' : 'Produto criado.');
   }
 
   function fillAdminProductForm(product) {
