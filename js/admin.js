@@ -32,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'kit_itens',
     'estoque_minimo',
   ].join(', ');
+  const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
   const ADMIN_THEME_KEY = 'ms_admin_theme';
 
@@ -60,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     client: null,
     pedidos: [],
     produtos: [],
+    variacoes: [],
     realtimeChannel: null,
     activeTab: 'pedidos',
     activeOrderStatus: 'pendente',
@@ -73,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ordersExtendedReady = true;
   let productCreateSaving = false;
   const productSaveLocks = new Set();
+  const variationSaveLocks = new Set();
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -187,6 +191,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return qs(`[data-admin-product-field="${field}"][data-product-id="${escapeSelector(id)}"]`);
   }
 
+  function variationField(id, field) {
+    return qs(`[data-admin-variation-field="${field}"][data-variation-id="${escapeSelector(id)}"]`);
+  }
+
+  function safeSlug(value = 'opcao') {
+    return (
+      normalize(value)
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 70) || 'opcao'
+    );
+  }
+
   function productPlaceholderTone(product = {}) {
     const blob = normalize(`${product.nome || ''} ${product.categoria || ''} ${product.descricao || ''}`);
     if (blob.includes('gas')) return 'gas';
@@ -296,6 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function friendlyDbError(error, fallback) {
     const message = normalize(error?.message || error?.details || '');
+    if (message.includes('produto_variacoes')) {
+      return 'Execute supabase/20260522-produto-variacoes.sql para liberar variacoes.';
+    }
     if (message.includes('does not exist') || message.includes('column')) {
       return 'Banco do Supabase incompleto. Execute supabase/reparar-painel-admin.sql no SQL Editor.';
     }
@@ -547,6 +567,17 @@ document.addEventListener('DOMContentLoaded', () => {
       [product.nome, product.categoria, product.descricao, product.tipo, stock, offer, active, product.preco].join(' '),
     );
     return haystack.includes(query);
+  }
+
+  function isMissingVariationTableError(error) {
+    const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return (
+      message.includes('produto_variacoes') ||
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('pgrst205') ||
+      message.includes('pgrst204')
+    );
   }
 
   function productAuditActions(previous = {}, payload = {}, fallbackAction = 'produto_atualizado') {
@@ -1012,8 +1043,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     state.produtos = data || [];
+    await carregarVariacoesAdmin(state.produtos);
     renderizarProdutosAdmin(state.produtos);
     return state.produtos;
+  }
+
+  async function carregarVariacoesAdmin(produtos = state.produtos) {
+    const api = client();
+    const ids = produtos.map((product) => product.id).filter(Boolean);
+    state.variacoes = [];
+    if (!api || !ids.length) return [];
+
+    const { data, error } = await api
+      .from('produto_variacoes')
+      .select(PRODUCT_VARIATION_SELECT)
+      .in('produto_id', ids)
+      .order('ordem', { ascending: true })
+      .order('nome', { ascending: true });
+
+    if (error) {
+      if (isMissingVariationTableError(error)) {
+        setDatabaseAlert(
+          'Execute supabase/20260522-produto-variacoes.sql para gerenciar variacoes no painel.',
+        );
+        return [];
+      }
+      showToast(friendlyDbError(error, 'Nao consegui carregar as variacoes.'), 'error');
+      return [];
+    }
+
+    state.variacoes = Array.isArray(data) ? data : [];
+    return state.variacoes;
   }
 
   function renderizarProdutosAdmin(produtos = state.produtos) {
@@ -1167,6 +1227,104 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('#admin-product-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  function productVariations(productId) {
+    return state.variacoes
+      .filter((variation) => variation.produto_id === productId)
+      .sort((a, b) => Number(a.ordem || 0) - Number(b.ordem || 0) || text(a.nome).localeCompare(text(b.nome), 'pt-BR'));
+  }
+
+  function variationImageHTML(variation = {}, product = {}) {
+    const image = variation.imagem || product.imagem || '';
+    if (!image) return '<i class="fa-solid fa-box-open"></i>';
+    return `<img src="${escapeHTML(image)}" alt="" loading="lazy" decoding="async">`;
+  }
+
+  function productVariationsEditorHTML(product = {}) {
+    const variations = productVariations(product.id);
+    return `
+      <section class="admin-product-variations">
+        <header>
+          <div>
+            <span class="eyebrow">Variacoes</span>
+            <h3>Opcoes deste produto</h3>
+          </div>
+          <small>${variations.length ? `${variations.length} cadastrada${variations.length === 1 ? '' : 's'}` : 'Nenhuma variacao cadastrada'}</small>
+        </header>
+        <div class="admin-variation-list">
+          ${
+            variations.length
+              ? variations
+                  .map((variation) => {
+                    const active = variation.ativo !== false;
+                    const stock = variation.estoque ?? '';
+                    return `
+                    <article class="admin-variation-row ${active ? '' : 'is-inactive'}">
+                      <span class="admin-product-thumb">${variationImageHTML(variation, product)}</span>
+                      <div class="admin-variation-fields">
+                        <label>Nome
+                          <input type="text" value="${escapeHTML(variation.nome || '')}" data-admin-variation-field="nome" data-variation-id="${escapeHTML(variation.id)}">
+                        </label>
+                        <label>Preco
+                          <input type="number" min="0" step="0.01" value="${Number(variation.preco || 0).toFixed(2)}" data-admin-variation-field="preco" data-variation-id="${escapeHTML(variation.id)}">
+                        </label>
+                        <label>Estoque
+                          <input type="number" min="0" step="1" value="${escapeHTML(stock)}" placeholder="Livre" data-admin-variation-field="estoque" data-variation-id="${escapeHTML(variation.id)}">
+                        </label>
+                        <label>Status
+                          <select data-admin-variation-field="ativo" data-variation-id="${escapeHTML(variation.id)}">
+                            <option value="true" ${active ? 'selected' : ''}>Ativa</option>
+                            <option value="false" ${!active ? 'selected' : ''}>Desativada</option>
+                          </select>
+                        </label>
+                        <label class="admin-variation-wide">Imagem
+                          <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
+                        </label>
+                        <label class="admin-variation-wide">Enviar imagem
+                          <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-image-file="${escapeHTML(variation.id)}">
+                        </label>
+                      </div>
+                      <div class="admin-variation-actions">
+                        <button class="btn btn-primary" type="button" data-admin-variation-save="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}">
+                          <i class="fa-solid fa-floppy-disk"></i>
+                          Salvar
+                        </button>
+                        <button class="btn btn-secondary" type="button" data-admin-variation-disable="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}">
+                          <i class="fa-solid fa-eye-slash"></i>
+                          Desativar
+                        </button>
+                      </div>
+                    </article>
+                  `;
+                  })
+                  .join('')
+              : '<p class="admin-empty-state">Cadastre uma opcao para este produto aparecer com seletor na loja.</p>'
+          }
+        </div>
+        <div class="admin-variation-create" data-admin-variation-create="${escapeHTML(product.id)}">
+          <label>Nome
+            <input type="text" data-admin-variation-new="nome" placeholder="Supergas, Pinho, Talco">
+          </label>
+          <label>Preco
+            <input type="number" min="0" step="0.01" data-admin-variation-new="preco" value="${Number(product.preco || 0).toFixed(2)}">
+          </label>
+          <label>Estoque
+            <input type="number" min="0" step="1" data-admin-variation-new="estoque" placeholder="Livre">
+          </label>
+          <label>Imagem
+            <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
+          </label>
+          <label class="admin-variation-wide">Enviar imagem
+            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-new-file>
+          </label>
+          <button class="btn btn-primary" type="button" data-admin-variation-add="${escapeHTML(product.id)}">
+            <i class="fa-solid fa-plus"></i>
+            Adicionar variacao
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
   function productEditFormHTML(product = {}) {
     const stock = product.estoque ?? '';
     const active = product.ativo !== false;
@@ -1231,6 +1389,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <textarea rows="3" data-admin-product-field="descricao" data-product-id="${escapeHTML(product.id)}">${escapeHTML(product.descricao || '')}</textarea>
         </label>
       </div>
+      ${productVariationsEditorHTML(product)}
       <div class="settings-actions">
         <button class="btn btn-primary" type="button" data-admin-product-save="${escapeHTML(product.id)}">
           <i class="fa-solid fa-floppy-disk"></i>
@@ -1313,6 +1472,134 @@ document.addEventListener('DOMContentLoaded', () => {
       oferta_inicio: offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null,
       oferta_fim: offerActive ? isoFromLocal(field('oferta_fim')?.value) : null,
     };
+  }
+
+  function variationPayloadFromEditor(variationId) {
+    const field = (name) => variationField(variationId, name);
+    const name = field('nome')?.value.trim() || '';
+    return {
+      nome: name,
+      slug: safeSlug(name),
+      preco: parsePrice(field('preco')?.value || 0),
+      estoque:
+        field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
+      ativo: field('ativo')?.value !== 'false',
+      imagem: ensureSafeProductImageValue(field('imagem')?.value || ''),
+    };
+  }
+
+  function setVariationBusy(variationId, busy) {
+    qsa(`[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-disable="${escapeSelector(variationId)}"]`).forEach(
+      (button) => {
+        button.disabled = busy;
+        button.classList.toggle('is-loading', busy);
+      },
+    );
+  }
+
+  function setVariationAddBusy(productId, busy) {
+    qsa(`[data-admin-variation-add="${escapeSelector(productId)}"]`).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
+  }
+
+  async function refreshProductEditor(productId) {
+    await carregarProdutosAdmin();
+    if (!qs('#admin-product-editor-modal')?.classList.contains('hidden')) openProductEditor(productId);
+  }
+
+  async function salvarVariacaoAdmin(variationId, productId, override = null) {
+    const api = client();
+    if (!api || !variationId || variationSaveLocks.has(variationId)) return false;
+    variationSaveLocks.add(variationId);
+    setVariationBusy(variationId, true);
+
+    let payload;
+    try {
+      payload = override || variationPayloadFromEditor(variationId);
+      if (!override) {
+        const file = qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] || null;
+        if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId);
+      }
+      if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
+      if (payload.imagem) payload.imagem = ensureSafeProductImageValue(payload.imagem);
+    } catch (error) {
+      variationSaveLocks.delete(variationId);
+      setVariationBusy(variationId, false);
+      showToast(friendlyDbError(error, error.message || 'Nao consegui preparar a variacao.'), 'error');
+      return false;
+    }
+
+    const { error } = await api.from('produto_variacoes').update(payload).eq('id', variationId);
+    variationSaveLocks.delete(variationId);
+    setVariationBusy(variationId, false);
+
+    if (error) {
+      showToast(friendlyDbError(error, 'Nao consegui salvar a variacao.'), 'error');
+      return false;
+    }
+
+    await logAdminAction(override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada', 'produto_variacao', variationId, {
+      produto_id: productId,
+      nome: payload.nome,
+    });
+    showToast(override?.ativo === false ? 'Variacao desativada.' : 'Variacao salva.', 'success');
+    await refreshProductEditor(productId);
+    return true;
+  }
+
+  async function adicionarVariacaoAdmin(productId) {
+    const api = client();
+    const box = qs(`[data-admin-variation-create="${escapeSelector(productId)}"]`);
+    if (!api || !box || variationSaveLocks.has(`new-${productId}`)) return false;
+    variationSaveLocks.add(`new-${productId}`);
+    setVariationAddBusy(productId, true);
+
+    const field = (name) => qs(`[data-admin-variation-new="${name}"]`, box);
+    const product = state.produtos.find((item) => item.id === productId) || {};
+    let payload;
+    try {
+      const name = field('nome')?.value.trim() || '';
+      payload = {
+        produto_id: productId,
+        nome: name,
+        slug: safeSlug(name),
+        sku: '',
+        preco: parsePrice(field('preco')?.value || product.preco || 0),
+        estoque:
+          field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
+        ativo: true,
+        imagem: ensureSafeProductImageValue(field('imagem')?.value || product.imagem || ''),
+        atributos: {},
+        ordem: productVariations(productId).length * 10 + 10,
+      };
+      const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
+      if (file) payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId);
+      if (!payload.nome) throw new Error('Informe o nome da variacao.');
+    } catch (error) {
+      variationSaveLocks.delete(`new-${productId}`);
+      setVariationAddBusy(productId, false);
+      showToast(friendlyDbError(error, error.message || 'Nao consegui preparar a variacao.'), 'error');
+      return false;
+    }
+
+    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id').maybeSingle();
+    variationSaveLocks.delete(`new-${productId}`);
+    setVariationAddBusy(productId, false);
+
+    if (error) {
+      showToast(friendlyDbError(error, 'Nao consegui adicionar a variacao.'), 'error');
+      return false;
+    }
+
+    await logAdminAction('variacao_criada', 'produto_variacao', data?.id || payload.nome, {
+      produto_id: productId,
+      nome: payload.nome,
+    });
+    showToast('Variacao adicionada.', 'success');
+    await refreshProductEditor(productId);
+    return true;
   }
 
   function setProductSaveBusy(productId, busy) {
@@ -2126,6 +2413,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (save) {
         salvarEdicaoProduto(save.dataset.adminProductSave).then((saved) => {
           if (saved) closeProductEditor();
+        });
+        return;
+      }
+
+      const variationAdd = event.target.closest('[data-admin-variation-add]');
+      if (variationAdd) {
+        adicionarVariacaoAdmin(variationAdd.dataset.adminVariationAdd);
+        return;
+      }
+
+      const variationSave = event.target.closest('[data-admin-variation-save]');
+      if (variationSave) {
+        salvarVariacaoAdmin(variationSave.dataset.adminVariationSave, variationSave.dataset.productId);
+        return;
+      }
+
+      const variationDisable = event.target.closest('[data-admin-variation-disable]');
+      if (variationDisable) {
+        salvarVariacaoAdmin(variationDisable.dataset.adminVariationDisable, variationDisable.dataset.productId, {
+          ativo: false,
         });
         return;
       }

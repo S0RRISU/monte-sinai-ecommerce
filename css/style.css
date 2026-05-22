@@ -25920,3 +25920,78 @@ body.light-mode .products-page .catalog-tools .search-suggestion-item small {
     grid-template-columns: 52px minmax(32px, 1fr) 52px !important;
   }
 }
+/* Etapa 4: editor simples de variacoes no painel admin. */
+.admin-product-variations {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-product-variations > header,
+.admin-variation-row,
+.admin-variation-create {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-product-variations > header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.admin-variation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-variation-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-variation-row.is-inactive {
+  opacity: 0.62;
+}
+
+.admin-variation-fields,
+.admin-variation-create {
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.admin-variation-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-variation-wide {
+  grid-column: span 2;
+}
+
+.admin-variation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .admin-variation-row,
+  .admin-variation-fields,
+  .admin-variation-create {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-variation-wide {
+    grid-column: auto;
+  }
+
+  .admin-variation-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
