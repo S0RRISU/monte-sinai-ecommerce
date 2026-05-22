@@ -1,7 +1,7 @@
 -- Popula a tabela de produtos da Monte Sinai.
 -- Execute este arquivo no SQL Editor do Supabase.
 -- Usa somente public.produtos. public.produto e legado e nao deve ser usado pelo site.
--- Para evitar duplicados, substitui somente produtos com os mesmos nomes desta lista.
+-- Nao apaga produtos existentes. Atualiza produtos com o mesmo nome e insere os ausentes.
 
 begin;
 
@@ -65,19 +65,19 @@ begin
     raise exception 'Nao encontrei public.produtos. Crie a tabela oficial antes de executar este seed.';
   end if;
 
-  execute format(
-    'delete from %s where nome in (select nome from seed_produtos)',
-    target_table
-  );
+  create unique index if not exists produtos_nome_unique
+    on public.produtos (nome);
 
-  execute format(
-    'insert into %s (nome, preco, imagem, categoria, descricao)
-     select nome, preco, imagem, categoria, descricao
-     from seed_produtos',
-    target_table
-  );
+  insert into public.produtos (nome, preco, imagem, categoria, descricao)
+  select nome, preco, imagem, categoria, descricao
+  from seed_produtos
+  on conflict (nome) do update
+  set preco = excluded.preco,
+      imagem = coalesce(nullif(excluded.imagem, ''), public.produtos.imagem),
+      categoria = coalesce(nullif(excluded.categoria, ''), public.produtos.categoria),
+      descricao = coalesce(nullif(excluded.descricao, ''), public.produtos.descricao);
 
-  raise notice 'Produtos inseridos/atualizados em %.', target_table;
+  raise notice 'Produtos inseridos/atualizados em public.produtos sem apagar registros existentes.';
 end $$;
 
 commit;

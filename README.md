@@ -17,12 +17,14 @@ O arquivo `netlify.toml` tambem configura rotas bonitas, headers de seguranca, c
 ## Configurar Supabase
 
 1. No SQL Editor do Supabase, execute `supabase/schema-pedidos.sql`.
-2. Execute `supabase/seed-produtos.sql` para popular os produtos iniciais.
+2. Execute `supabase/seed-produtos.sql` para popular ou atualizar os produtos iniciais quando necessario.
 3. Execute `supabase/admin-acesso.sql` para liberar o painel administrativo.
 4. Execute `supabase/storage-produtos.sql` para criar o bucket publico `produtos` e permitir upload somente para administradores.
 5. Confirme se `js/supabase.js` esta com a URL do projeto e a chave publica anon/publishable corretas.
 
 Se o banco ja existia antes desta versao, execute tambem as migracoes idempotentes `ofertas-kits-produtos.sql`, `promocoes-estoque-cupons.sql`, `site-configuracoes.sql` e `checkout-visitante-admin-roles.sql`.
+
+`supabase/seed-produtos.sql` deve ser usado somente quando for necessario repor ou atualizar o catalogo inicial. Ele usa `public.produtos`, atualiza produtos existentes pelo campo `nome` e nao apaga produtos ja cadastrados.
 
 ### Autenticacao e email
 
