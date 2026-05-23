@@ -3670,8 +3670,11 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-client-orders-link]').forEach((link) => {
       if (!(link instanceof HTMLAnchorElement)) return;
       link.href = ordersHref();
+      const badge = count > 0
+        ? `<span class="admin-order-badge" data-client-order-count>${count}</span>`
+        : '<span class="admin-order-badge is-empty" data-client-order-count hidden aria-hidden="true"></span>';
       link.innerHTML = admin
-        ? `<span class="nav-orders-label">Controle</span><span class="admin-order-badge ${count ? '' : 'is-empty'}" data-client-order-count>${count}</span>`
+        ? `<span class="nav-orders-label">Controle</span>${badge}`
         : 'Pedidos';
       link.classList.toggle('nav-orders-link', admin);
       link.classList.toggle('has-pending-orders', admin && count > 0);
@@ -3700,9 +3703,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const shouldShow = visible ?? anyVisible;
     setAdminOrderLinksVisible(Boolean(shouldShow));
     qsa('[data-client-order-count]').forEach((badge) => {
-      badge.textContent = String(count);
-      badge.classList.toggle('is-empty', count === 0);
-      badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
+      const empty = count === 0;
+      badge.textContent = empty ? '' : String(count);
+      badge.classList.toggle('is-empty', empty);
+      badge.hidden = empty;
+      badge.setAttribute('aria-hidden', String(empty));
+      if (empty) {
+        badge.style.setProperty('display', 'none', 'important');
+        badge.removeAttribute('aria-label');
+      } else {
+        badge.style.removeProperty('display');
+        badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
+      }
     });
     qsa('[data-admin-orders-link]').forEach((link) => {
       link.classList.toggle('has-pending-orders', count > 0);

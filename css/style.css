@@ -32420,7 +32420,7 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   }
 }
 
-/* Absolute last mobile cart rule: must stay at the end of the file. */
+/* Absolute last mobile cart rule. */
 @media (max-width: 760px) {
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
@@ -32472,5 +32472,67 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i {
     color: #0b3b86 !important;
+  }
+}
+
+/* Absolute last mobile notification/float rules. */
+@media (max-width: 760px) {
+  body:not(.admin-shell-body):not(.auth-body) [data-client-order-count][hidden],
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) [data-client-order-count][hidden],
+  body:not(.admin-shell-body):not(.auth-body) [data-client-order-count].is-empty,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) [data-client-order-count].is-empty {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .whatsapp-float {
+    right: max(14px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 92px + env(safe-area-inset-bottom)) !important;
+    width: 56px !important;
+    height: 56px !important;
+    z-index: 1190 !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .toast-stack {
+    right: 12px !important;
+    left: auto !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 158px + env(safe-area-inset-bottom)) !important;
+    width: min(286px, calc(100vw - 24px)) !important;
+    max-width: min(286px, calc(100vw - 24px)) !important;
+    gap: 8px !important;
+    z-index: 2500 !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .toast-modern,
+  body:not(.admin-shell-body):not(.auth-body) .toast {
+    grid-template-columns: 32px minmax(0, 1fr) 28px !important;
+    gap: 9px !important;
+    max-width: 286px !important;
+    min-height: 54px !important;
+    padding: 9px !important;
+    border-radius: 14px !important;
+    transform: translate3d(0, 18px, 0) scale(0.98) !important;
+    opacity: 0 !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .toast-modern.show,
+  body:not(.admin-shell-body):not(.auth-body) .toast.show {
+    transform: translate3d(0, 0, 0) scale(1) !important;
+    opacity: 1 !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .toast-icon {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 10px !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .toast-copy {
+    min-width: 0 !important;
+    font-size: 0.86rem !important;
+    line-height: 1.25 !important;
   }
 }
