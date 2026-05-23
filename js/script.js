@@ -3033,7 +3033,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeMode = THEME_MODES.includes(mode) ? mode : 'system';
     const resolvedTheme = resolveThemeMode(themeMode);
     const isLight = resolvedTheme !== 'dark';
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.dataset.themeMode = themeMode;
     document.body.classList.toggle('light-mode', isLight);
+    document.body.dataset.theme = resolvedTheme;
     document.body.dataset.themeMode = themeMode;
     document.body.dataset.themeResolved = resolvedTheme;
     qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#f4f9ff' : '#00061f');
