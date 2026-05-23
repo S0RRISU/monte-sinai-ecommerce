@@ -5041,6 +5041,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = qs('[data-full-catalog-search]');
     const term = normalizeText(input?.value || '');
     const activeFilter = qs('[data-full-catalog-filter].active')?.dataset.fullCatalogFilter || 'all';
+    const storePage = Boolean(qs('.products-store-page'));
     const products = catalogProducts().sort((a, b) => {
       const productA = normalizeProduct(a);
       const productB = normalizeProduct(b);
@@ -5055,6 +5056,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
+    const recommended = storePage && activeFilter === 'all' && !term ? visible.filter((product) => isRecommendedProduct(product)) : [];
+    const recommendedSection = recommended.length
+      ? `
+        <section class="full-catalog-category full-catalog-category--recommended" data-full-catalog-category="recommended">
+          <div class="full-catalog-category-head">
+            <span class="eyebrow">Destaques</span>
+            <h2>Recomendados</h2>
+          </div>
+          <div class="full-catalog-category-grid">
+            ${recommended.map(fullCatalogCardHTML).join('')}
+          </div>
+        </section>
+      `
+      : '';
     const grouped = orderedCategoryEntries(visible)
       .map(([slug, label]) => {
         const meta = catalogSectionMeta(slug, label);
@@ -5075,7 +5090,7 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = grouped;
+    list.innerHTML = recommendedSection + grouped;
     qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
@@ -5092,6 +5107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const outOfStock = normalized.stockState === 'out';
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const imageSrc = assetHref(image);
     const detailKey = normalized.id || normalized.name;
     const selectHTML = hasOptions
       ? `
@@ -5099,15 +5115,22 @@ document.addEventListener('DOMContentLoaded', () => {
           ${productOptionsHTML(options, normalized)}
         </select>
       `
-      : '<span class="simple-catalog-option">Padrão</span>';
+      : '';
 
     return `
       <article class="simple-catalog-row catalog-product ${selectedOutOfStock ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        <div class="simple-catalog-thumb" aria-hidden="true">
+          ${
+            imageSrc
+              ? `<img src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+              : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
+          }
+        </div>
         <div class="simple-catalog-main">
           <strong>${escapeHTML(normalized.name)}</strong>
           <span>${escapeHTML(normalized.category)}</span>
         </div>
-        <div class="simple-catalog-choice">
+        <div class="simple-catalog-choice ${hasOptions ? '' : 'is-empty'}">
           ${selectHTML}
         </div>
         <strong class="simple-catalog-price" data-product-price-display>${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
