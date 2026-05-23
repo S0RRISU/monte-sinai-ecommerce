@@ -29,11 +29,11 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
-    <link rel="stylesheet" href="../css/style.css?v=20260522-6" />
+    <link rel="stylesheet" href="../css/style.css?v=20260522-9" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../js/supabase.js?v=20260520-4"></script>
-    <script defer src="../js/admin.js?v=20260522-6"></script>
+    <script defer src="../js/admin.js?v=20260522-9"></script>
   </head>
   <body class="admin-shell-body">
     <div class="admin-app-shell" data-admin-app>
@@ -60,6 +60,10 @@
             <i class="fa-solid fa-truck-fast"></i>
             <span>Entregas</span>
           </button>
+          <button class="admin-menu-btn" type="button" data-admin-tab="perfil">
+            <i class="fa-solid fa-user-gear"></i>
+            <span>Perfil</span>
+          </button>
           <button class="admin-menu-btn" type="button" data-admin-tab="financeiro">
             <i class="fa-solid fa-chart-line"></i>
             <span>Financeiro</span>
@@ -79,8 +83,8 @@
             data-developer-only
             hidden
           >
-            <i class="fa-solid fa-terminal"></i>
-            <span>Console do Desenvolvedor</span>
+            <i class="fa-solid fa-heart-pulse"></i>
+            <span>Central do sistema</span>
           </button>
           <button
             class="admin-menu-btn admin-developer-menu"
@@ -105,6 +109,26 @@
           </button>
         </div>
       </aside>
+
+      <nav class="admin-mobile-bottom-nav" aria-label="Navegação principal do painel">
+        <button class="active" type="button" data-admin-tab="pedidos">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <span>Pedidos</span>
+          <strong class="admin-mobile-badge" data-admin-mobile-orders>0</strong>
+        </button>
+        <button type="button" data-admin-tab="produtos">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <span>Produtos</span>
+        </button>
+        <button type="button" data-admin-tab="entregas">
+          <i class="fa-solid fa-truck-fast"></i>
+          <span>Entregas</span>
+        </button>
+        <button type="button" data-admin-tab="perfil">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Perfil</span>
+        </button>
+      </nav>
 
       <main class="admin-main">
         <section class="admin-access-card" id="admin-access-state">
@@ -220,46 +244,81 @@
           >
             <header class="admin-view-header">
               <div>
-                <span class="eyebrow">Ferramentas</span>
-                <h1>Console do Desenvolvedor</h1>
-                <p>Terminal SQL embutido e Feed de logs em tempo real.</p>
+                <span class="eyebrow">Sistema</span>
+                <h1>Central do sistema</h1>
+                <p>Acompanhe a saúde da loja, atualizações recentes e integrações em uma visão simples.</p>
               </div>
               <div class="settings-actions">
                 <button class="btn btn-secondary" type="button" data-admin-refresh-console>
                   <i class="fa-solid fa-rotate"></i>
-                  Atualizar logs
+                  Atualizar central
                 </button>
               </div>
             </header>
 
-            <div class="admin-console-grid">
+            <div class="admin-system-grid">
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-heart-pulse"></i></span>
+                <div>
+                  <strong>Status do sistema</strong>
+                  <p id="admin-system-status">Sistema carregado.</p>
+                </div>
+              </article>
+              <article class="admin-system-card admin-system-card-wide">
+                <span class="admin-system-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                <div>
+                  <strong>Logs recentes</strong>
+                  <div id="admin-console-logs" class="admin-console-logs">
+                    <p class="admin-empty-state">Carregando logs...</p>
+                  </div>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-bag-shopping"></i></span>
+                <div>
+                  <strong>Pedidos atualizados</strong>
+                  <p id="admin-system-orders">Nenhum pedido carregado ainda.</p>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-credit-card"></i></span>
+                <div>
+                  <strong>Pagamentos atualizados</strong>
+                  <p id="admin-system-payments">Aguardando dados de pagamento.</p>
+                </div>
+              </article>
+              <article class="admin-system-card">
+                <span class="admin-system-icon"><i class="fa-solid fa-boxes-stacked"></i></span>
+                <div>
+                  <strong>Produtos e variações</strong>
+                  <p id="admin-system-products">Aguardando catálogo.</p>
+                </div>
+              </article>
+            </div>
+
+            <details class="admin-advanced-tools">
+              <summary>
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+                Mostrar ferramentas avançadas
+              </summary>
               <div class="admin-console-card">
                 <label for="admin-sql-console" class="eyebrow">Terminal SQL</label>
+                <p class="form-help-text">Use apenas com orientação técnica.</p>
                 <textarea
                   id="admin-sql-console"
                   class="sql-console"
-                  placeholder="Digite script SQL para execução (ex.: ALTER TABLE ...);"
+                  placeholder="Digite script SQL apenas quando houver orientação técnica."
                 ></textarea>
-                <div style="display: flex; gap: 12px; margin-top: 10px; align-items: center">
+                <div class="admin-advanced-actions">
                   <button class="btn btn-primary" id="admin-sql-execute">
-                    <i class="fa-solid fa-play"></i> Executar Script SQL
+                    <i class="fa-solid fa-play"></i> Executar script
                   </button>
                   <button class="btn btn-secondary" id="admin-sql-clear">
                     <i class="fa-solid fa-trash"></i> Limpar
                   </button>
-                  <small class="form-help-text"
-                    >A execução de SQL é poderosa. Verifique permissões e políticas RLS.</small
-                  >
                 </div>
               </div>
-
-              <div class="admin-console-card">
-                <label class="eyebrow">Feed de Logs</label>
-                <div id="admin-console-logs" class="admin-console-logs">
-                  <p class="admin-empty-state">Carregando logs...</p>
-                </div>
-              </div>
-            </div>
+            </details>
           </section>
 
           <section class="admin-view" id="tab-produtos" data-admin-panel="produtos">
@@ -363,6 +422,22 @@
                     placeholder="Pesquisar produto, categoria, estoque"
                   />
                 </label>
+                <label class="admin-filter-field" for="admin-product-category-filter">
+                  <span>Categoria</span>
+                  <select id="admin-product-category-filter">
+                    <option value="all">Todas</option>
+                    <option value="agua">Água</option>
+                    <option value="gas">Gás</option>
+                    <option value="limpeza">Limpeza</option>
+                    <option value="lavanderia">Lavanderia</option>
+                    <option value="higiene">Higiene</option>
+                    <option value="banheiro">Banheiro</option>
+                    <option value="cozinha">Cozinha</option>
+                    <option value="utensilios">Utensílios</option>
+                    <option value="organizacao">Organização</option>
+                    <option value="limpeza-pesada">Limpeza pesada</option>
+                  </select>
+                </label>
                 <div id="admin-product-detail-panel" class="admin-product-detail-panel hidden"></div>
                 <div id="lista-produtos-admin" class="admin-products-simple-list"></div>
               </section>
@@ -377,6 +452,77 @@
               </div>
             </header>
             <div class="admin-placeholder-grid" id="admin-delivery-metrics"></div>
+          </section>
+
+          <section class="admin-view admin-profile-view" id="tab-perfil" data-admin-panel="perfil">
+            <header class="admin-view-header">
+              <div>
+                <span class="eyebrow">Administrador</span>
+                <h1>Perfil do painel</h1>
+                <p>Centralize configurações, relatórios e ferramentas administrativas em um só lugar.</p>
+              </div>
+              <span class="admin-live-pill" id="admin-profile-role">Painel Admin</span>
+            </header>
+
+            <div class="admin-profile-summary">
+              <span class="admin-profile-avatar"><i class="fa-solid fa-user-shield"></i></span>
+              <div>
+                <strong id="admin-profile-name">Administrador Monte Sinai</strong>
+                <p id="admin-profile-email">Conta administrativa</p>
+              </div>
+            </div>
+
+            <div class="admin-profile-grid" aria-label="Opções administrativas">
+              <button class="admin-profile-action" type="button" data-admin-tab="config">
+                <i class="fa-solid fa-sliders"></i>
+                <span>
+                  <strong>Configurações da loja</strong>
+                  <small>WhatsApp, Pix e preferências do site</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="financeiro">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>
+                  <strong>Financeiro</strong>
+                  <small>Resumo, pagamentos e indicadores</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="equipe">
+                <i class="fa-solid fa-users"></i>
+                <span>
+                  <strong>Gerenciar equipe</strong>
+                  <small>Acessos administrativos e funções</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="dev-console" data-developer-only hidden>
+                <i class="fa-solid fa-heart-pulse"></i>
+                <span>
+                  <strong>Central do sistema</strong>
+                  <small>Status, logs e ferramentas avançadas</small>
+                </span>
+              </button>
+              <button class="admin-profile-action" type="button" data-admin-tab="developer" data-developer-only hidden>
+                <i class="fa-solid fa-code"></i>
+                <span>
+                  <strong>Desenvolvedor</strong>
+                  <small>Diagnósticos técnicos do ambiente</small>
+                </span>
+              </button>
+              <a class="admin-profile-action" href="produtos.html#todos-produtos">
+                <i class="fa-solid fa-store"></i>
+                <span>
+                  <strong>Ver loja</strong>
+                  <small>Abrir a experiência pública</small>
+                </span>
+              </a>
+              <button class="admin-profile-action is-danger" type="button" data-admin-logout>
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>
+                  <strong>Sair</strong>
+                  <small>Encerrar sessão administrativa</small>
+                </span>
+              </button>
+            </div>
           </section>
 
           <section class="admin-view" id="tab-financeiro" data-admin-panel="financeiro">

@@ -491,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState(null, '', `#${nextTab}`);
     if (nextTab === 'financeiro') renderFinanceiro();
     if (nextTab === 'entregas') renderEntregas();
+    if (nextTab === 'perfil') renderAdminProfile();
     if (nextTab === 'equipe') carregarEquipeAdmin();
     if (nextTab === 'developer') renderDeveloperAdmin();
     if (nextTab === 'dev-console') renderDevConsole();
@@ -567,6 +568,25 @@ document.addEventListener('DOMContentLoaded', () => {
       [product.nome, product.categoria, product.descricao, product.tipo, stock, offer, active, product.preco].join(' '),
     );
     return haystack.includes(query);
+  }
+
+  function adminCategorySlug(value = '') {
+    const normalized = normalize(value || 'produtos');
+    if (normalized.includes('limpeza pesada')) return 'limpeza-pesada';
+    if (normalized.includes('agua')) return 'agua';
+    if (normalized.includes('gas')) return 'gas';
+    if (normalized.includes('lavanderia')) return 'lavanderia';
+    if (normalized.includes('higiene')) return 'higiene';
+    if (normalized.includes('banheiro')) return 'banheiro';
+    if (normalized.includes('cozinha')) return 'cozinha';
+    if (normalized.includes('organiz')) return 'organizacao';
+    if (normalized.includes('utens')) return 'utensilios';
+    if (normalized.includes('limpeza')) return 'limpeza';
+    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+  }
+
+  function productMatchesCategory(product = {}, filter = 'all') {
+    return !filter || filter === 'all' || adminCategorySlug(product.categoria) === filter;
   }
 
   function isMissingVariationTableError(error) {
@@ -816,6 +836,14 @@ document.addEventListener('DOMContentLoaded', () => {
         `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`,
       );
     }
+    qsa('[data-admin-mobile-orders]').forEach((mobileBadge) => {
+      mobileBadge.textContent = String(openCount);
+      mobileBadge.classList.toggle('is-empty', openCount === 0);
+      mobileBadge.setAttribute(
+        'aria-label',
+        `${openCount} pedido${openCount === 1 ? '' : 's'} nao lido${openCount === 1 ? '' : 's'}`,
+      );
+    });
 
     if (options.announce) {
       const alert = qs('#admin-new-order-alert');
@@ -825,6 +853,21 @@ document.addEventListener('DOMContentLoaded', () => {
         window.setTimeout(() => alert.classList.add('hidden'), 5000);
       }
     }
+    renderSystemConsoleSummary();
+  }
+
+  function renderAdminProfile() {
+    const name =
+      state.profile?.nome ||
+      state.profile?.name ||
+      state.user?.user_metadata?.nome ||
+      state.user?.email?.split('@')[0] ||
+      'Administrador Monte Sinai';
+    const email = state.profile?.email || state.user?.email || 'Conta administrativa';
+    const role = currentAdminRole() || 'admin';
+    setText('#admin-profile-name', name);
+    setText('#admin-profile-email', email);
+    setText('#admin-profile-role', role === 'developer' ? 'Desenvolvedor' : role === 'owner' ? 'Proprietário' : 'Equipe');
   }
 
   function assinarPedidosRealtime() {
@@ -1080,8 +1123,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = qs('#lista-produtos-admin');
     const count = qs('#admin-products-count');
     const query = adminSearchQuery('#admin-product-search');
-    const visibleProdutos = query ? produtos.filter((product) => productMatchesSearch(product, query)) : produtos;
-    if (count) count.textContent = query ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
+    const categoryFilter = qs('#admin-product-category-filter')?.value || 'all';
+    const visibleProdutos = produtos.filter(
+      (product) => productMatchesSearch(product, query) && productMatchesCategory(product, categoryFilter),
+    );
+    if (count)
+      count.textContent =
+        query || categoryFilter !== 'all' ? `${visibleProdutos.length}/${produtos.length}` : String(produtos.length);
     if (!list) return;
     if (state.selectedProductId && !produtos.some((product) => product.id === state.selectedProductId)) {
       state.selectedProductId = '';
@@ -1089,7 +1137,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!visibleProdutos.length) {
-      list.innerHTML = `<p class="admin-empty-state">${query ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum produto cadastrado ainda.'}</p>`;
+      list.innerHTML = `<p class="admin-empty-state">${
+        query || categoryFilter !== 'all'
+          ? 'Nenhum produto encontrado para esta busca e categoria.'
+          : 'Nenhum produto cadastrado ainda.'
+      }</p>`;
       return;
     }
 
@@ -1130,6 +1182,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="admin-product-badges">${statusBadges}</span>
             </div>
             <div class="admin-product-quick-actions">
+              <button class="btn btn-secondary" type="button" data-admin-product-details="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-eye"></i>
+                Ver detalhes
+              </button>
               <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-pen"></i>
                 Editar
@@ -1153,11 +1209,13 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
     renderProductDetailsPanel();
+    renderSystemConsoleSummary();
   }
 
   function productDetailsPanelHTML(product = {}) {
     const offer = productOfferActive(product);
     const active = product.ativo !== false;
+    const variations = productVariations(product.id);
     const stock = product.estoque ?? '';
     const lowStock = productStockLow(product);
     const stockLabel =
@@ -1190,6 +1248,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><dt>ID</dt><dd>${escapeHTML(product.id || '')}</dd></div>
             <div class="is-wide"><dt>Imagem</dt><dd>${escapeHTML(product.imagem || 'Sem URL')}</dd></div>
             <div class="is-wide"><dt>Descricao</dt><dd>${escapeHTML(product.descricao || 'Sem descricao')}</dd></div>
+            <div class="is-wide"><dt>Variacoes</dt><dd>${
+              variations.length
+                ? variations
+                    .map(
+                      (variation) =>
+                        `${escapeHTML(variation.nome || 'Variacao')} - ${formatMoney(variation.preco || product.preco)} - ${
+                          variation.ativo === false ? 'Inativa' : 'Ativa'
+                        } - estoque ${escapeHTML(variation.estoque ?? 'livre')}`,
+                    )
+                    .join('<br>')
+                : 'Sem variacoes cadastradas'
+            }</dd></div>
           </dl>
         </div>
         <div class="admin-product-detail-actions">
@@ -1210,12 +1280,38 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function ensureProductDetailModal() {
+    let modal = qs('#admin-product-detail-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'admin-product-detail-modal';
+    modal.className = 'admin-product-detail-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Detalhes do produto');
+    modal.innerHTML = '<div class="admin-product-detail-modal-panel" data-admin-product-detail-modal-panel></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (event) => {
+      if (event.target !== modal) return;
+      state.selectedProductId = '';
+      renderProductDetailsPanel();
+      renderizarProdutosAdmin(state.produtos);
+    });
+    return modal;
+  }
+
   function renderProductDetailsPanel() {
     const panel = qs('#admin-product-detail-panel');
-    if (!panel) return;
+    const modal = ensureProductDetailModal();
+    const modalPanel = qs('[data-admin-product-detail-modal-panel]', modal);
     const product = state.produtos.find((item) => item.id === state.selectedProductId);
-    panel.classList.toggle('hidden', !product);
-    panel.innerHTML = product ? productDetailsPanelHTML(product) : '';
+    if (panel) {
+      panel.classList.add('hidden');
+      panel.innerHTML = '';
+    }
+    modal.classList.toggle('hidden', !product);
+    document.body.classList.toggle('admin-detail-modal-open', Boolean(product));
+    if (modalPanel) modalPanel.innerHTML = product ? productDetailsPanelHTML(product) : '';
   }
 
   function openProductDetails(productId) {
@@ -1224,7 +1320,6 @@ document.addEventListener('DOMContentLoaded', () => {
     state.selectedProductId = productId;
     renderProductDetailsPanel();
     renderizarProdutosAdmin(state.produtos);
-    qs('#admin-product-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function productVariations(productId) {
@@ -2059,6 +2154,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* === Developer Console (SQL + Logs) === */
+  function renderSystemConsoleSummary() {
+    const realtime = text(qs('#admin-realtime-status')?.textContent || '');
+    const orders = state.pedidos || [];
+    const products = state.produtos || [];
+    const variations = state.variacoes || [];
+    const paidCount = orders.filter((order) => normalize(order.pagamento_status) === 'pago').length;
+    const pendingPayment = orders.filter((order) => normalize(order.pagamento_status) === 'pendente').length;
+    const openOrders = orders.filter((order) => normalize(order.status || order.statusUi) !== 'entregue').length;
+    const activeProducts = products.filter((product) => product.ativo !== false).length;
+    const lastOrder = orders[0]?.created_at ? ` Último pedido: ${formatDateTime(orders[0].created_at)}.` : '';
+
+    const statusEl = qs('#admin-system-status');
+    if (statusEl) statusEl.textContent = realtime || 'Sistema carregado.';
+
+    const ordersEl = qs('#admin-system-orders');
+    if (ordersEl)
+      ordersEl.textContent = orders.length
+        ? `${orders.length} pedido${orders.length === 1 ? '' : 's'} carregado${orders.length === 1 ? '' : 's'}, ${openOrders} em andamento.${lastOrder}`
+        : 'Nenhum pedido carregado ainda.';
+
+    const paymentsEl = qs('#admin-system-payments');
+    if (paymentsEl)
+      paymentsEl.textContent = orders.length
+        ? `${paidCount} pago${paidCount === 1 ? '' : 's'} e ${pendingPayment} pendente${pendingPayment === 1 ? '' : 's'}.`
+        : 'Aguardando dados de pagamento.';
+
+    const productsEl = qs('#admin-system-products');
+    if (productsEl)
+      productsEl.textContent = products.length
+        ? `${activeProducts} produto${activeProducts === 1 ? '' : 's'} ativo${activeProducts === 1 ? '' : 's'} de ${products.length} cadastrados, ${variations.length} variacao${variations.length === 1 ? '' : 'es'}.`
+        : 'Aguardando catálogo.';
+  }
+
   async function carregarLogsConsole() {
     const api = client();
     const container = qs('#admin-console-logs');
@@ -2134,6 +2262,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // status is 'SUBSCRIBED' or other lifecycle events
           const realtime = qs('#admin-realtime-status');
           if (realtime) realtime.textContent = status === 'SUBSCRIBED' ? 'Realtime ativo' : 'Reconectando...';
+          renderSystemConsoleSummary();
         });
     } catch (err) {
       console.warn('[Admin] Falha ao inscrever realtime de logs', err);
@@ -2179,7 +2308,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDevConsole() {
     if (!isDeveloperAdmin()) return;
-    // garante carregar os logs e conectar realtime
+    renderSystemConsoleSummary();
     carregarLogsConsole();
   }
 
@@ -2346,13 +2475,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (qs('#admin-sql-console')) qs('#admin-sql-console').value = '';
     });
     qs('[data-admin-refresh-equipe]')?.addEventListener('click', () => carregarEquipeAdmin());
-    qs('[data-admin-logout]')?.addEventListener('click', logoutAdmin);
+    qsa('[data-admin-logout]').forEach((button) => {
+      button.addEventListener('click', logoutAdmin);
+    });
     qsa('[data-admin-theme-toggle]').forEach((button) => {
       button.addEventListener('click', toggleAdminTheme);
     });
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
     qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
     qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));
+    qs('#admin-product-category-filter')?.addEventListener('change', () => renderizarProdutosAdmin(state.produtos));
     qs('#admin-team-search')?.addEventListener('input', (event) => {
       const query = normalize(event.target.value || '');
       qsa('#admin-team-list tr[data-team-row]').forEach((tr) => {
@@ -2411,6 +2543,12 @@ document.addEventListener('DOMContentLoaded', () => {
         state.selectedProductId = '';
         renderProductDetailsPanel();
         renderizarProdutosAdmin(state.produtos);
+        return;
+      }
+
+      const detailOpen = event.target.closest('[data-admin-product-details]');
+      if (detailOpen) {
+        openProductDetails(detailOpen.dataset.adminProductDetails);
         return;
       }
 
