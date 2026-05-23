@@ -29252,3 +29252,186 @@ body.admin-shell-body.light-mode .admin-system-card p,
 body.admin-shell-body.light-mode .admin-view-header p {
   color: #42556f !important;
 }
+/* Etapa 7: ajustes de painel, estoque publico e financeiro */
+.product-stock-line.is-empty {
+  display: none;
+}
+
+.product-stock-line.is-unavailable {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: #8a1f11;
+  font-weight: 850;
+}
+
+.admin-orders-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-orders-view-tab {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.admin-orders-view-tab strong {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #141000;
+  font-size: 0.78rem;
+}
+
+.admin-orders-view-tab.active {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-soft));
+}
+
+.admin-image-mobile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-image-preview {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
+  padding: 10px;
+}
+
+.admin-image-preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.admin-image-preview span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.admin-finance-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.75fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.admin-finance-panel {
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 88%, transparent);
+  padding: 16px;
+}
+
+.admin-finance-panel h2 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.admin-finance-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-finance-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.admin-finance-table th,
+.admin-finance-table td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  padding: 10px;
+  text-align: left;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.admin-finance-table th {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.admin-finance-summary {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-finance-summary div {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  padding-bottom: 10px;
+}
+
+.admin-finance-summary dt {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-finance-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 900;
+}
+
+body.admin-shell-body.light-mode .admin-orders-view-tab,
+body.admin-shell-body.light-mode .admin-image-preview,
+body.admin-shell-body.light-mode .admin-finance-panel {
+  background: #ffffff;
+  border-color: #d8e2f0;
+}
+
+body.admin-shell-body.light-mode .admin-orders-view-tab.active {
+  background: #fff7d1;
+  border-color: #e4b500;
+}
+
+body.admin-shell-body.light-mode .admin-finance-table th,
+body.admin-shell-body.light-mode .admin-finance-summary dt,
+body.admin-shell-body.light-mode .admin-image-preview span {
+  color: #52627a;
+}
+
+body.admin-shell-body.light-mode .admin-finance-table td,
+body.admin-shell-body.light-mode .admin-finance-panel h2,
+body.admin-shell-body.light-mode .admin-finance-summary dd {
+  color: #17223a;
+}
+
+@media (max-width: 900px) {
+  .admin-image-mobile-actions,
+  .admin-orders-view-tabs,
+  .admin-finance-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-finance-table {
+    min-width: 560px;
+  }
+}

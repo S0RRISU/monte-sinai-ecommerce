@@ -173,6 +173,19 @@
             <div class="admin-alert hidden" id="admin-new-order-alert" role="status"></div>
             <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
 
+            <div class="admin-orders-view-tabs" role="group" aria-label="Tela de pedidos">
+              <button class="admin-orders-view-tab active" type="button" data-admin-orders-view="active" aria-pressed="true">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Pedidos ativos</span>
+                <strong data-admin-orders-view-count>0</strong>
+              </button>
+              <button class="admin-orders-view-tab" type="button" data-admin-orders-view="history" aria-pressed="false">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Historico</span>
+                <strong data-admin-orders-view-count>0</strong>
+              </button>
+            </div>
+
             <div class="admin-order-status-tabs" role="tablist" aria-label="Filtrar pedidos por status">
               <button
                 class="admin-order-status-tab active"
@@ -363,8 +376,13 @@
                   <option value="Água">Água</option>
                   <option value="Gás">Gás</option>
                   <option value="Limpeza">Produtos de Limpeza</option>
-                  <option value="Utensílios">Utensílios</option>
+                  <option value="Lavanderia">Lavanderia</option>
                   <option value="Higiene">Higiene</option>
+                  <option value="Banheiro">Banheiro</option>
+                  <option value="Cozinha">Cozinha</option>
+                  <option value="Utensílios">Utensílios</option>
+                  <option value="Organização">Organização</option>
+                  <option value="Limpeza pesada">Limpeza pesada</option>
                 </select>
                 <label for="prod-desc">Descrição</label>
                 <textarea id="prod-desc" rows="3" placeholder="Descrição curta do produto"></textarea>
@@ -395,11 +413,19 @@
                 <input id="prod-oferta-inicio" type="datetime-local" />
                 <label for="prod-oferta-fim">Oferta termina</label>
                 <input id="prod-oferta-fim" type="datetime-local" />
-                <label class="admin-upload-label" for="prod-foto">
-                  <i class="fa-solid fa-image"></i>
-                  Escolher imagem
-                  <input id="prod-foto" type="file" accept="image/png,image/jpeg,image/webp" required />
-                </label>
+                <div class="admin-image-mobile-actions" data-admin-create-image-actions>
+                  <label class="admin-upload-label" for="prod-foto-camera">
+                    <i class="fa-solid fa-camera"></i>
+                    Tirar foto
+                    <input id="prod-foto-camera" type="file" accept="image/*" capture="environment" />
+                  </label>
+                  <label class="admin-upload-label" for="prod-foto">
+                    <i class="fa-solid fa-image"></i>
+                    Escolher da galeria
+                    <input id="prod-foto" type="file" accept="image/*" />
+                  </label>
+                </div>
+                <div class="admin-image-preview hidden" id="admin-product-image-preview" aria-live="polite"></div>
                 <small id="admin-product-upload-feedback"></small>
                 <button class="btn btn-primary" type="submit">
                   <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -531,8 +557,19 @@
                 <span class="eyebrow">Resumo</span>
                 <h1>Financeiro</h1>
               </div>
+              <label class="admin-filter-field" for="admin-finance-period">
+                <span>Periodo</span>
+                <select id="admin-finance-period">
+                  <option value="today">Hoje</option>
+                  <option value="yesterday">Ontem</option>
+                  <option value="7d" selected>Ultimos 7 dias</option>
+                  <option value="month">Mes atual</option>
+                  <option value="all">Tudo</option>
+                </select>
+              </label>
             </header>
             <div class="admin-placeholder-grid" id="admin-finance-metrics"></div>
+            <div class="admin-finance-detail-grid" id="admin-finance-details"></div>
           </section>
 
           <section class="admin-view" id="tab-config" data-admin-panel="config">
