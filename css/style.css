@@ -33275,6 +33275,27 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-pag
   grid-template-columns: 1fr !important;
 }
 
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .full-catalog-category-head {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 2px !important;
+  text-align: left !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .full-catalog-category-head h2 {
+  order: 1 !important;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .full-catalog-category-head .eyebrow {
+  order: 2 !important;
+  color: var(--primary) !important;
+  text-align: left !important;
+}
+
 html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .full-catalog-action {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
