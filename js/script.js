@@ -5104,21 +5104,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = productOptions(normalized);
     const hasOptions = normalized.hasVariations && options.length > 0;
     const firstOption = options[0] || { price: normalized.price };
-    const outOfStock = normalized.stockState === 'out';
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
     const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
     const imageSrc = assetHref(image);
-    const detailKey = normalized.id || normalized.name;
-    const selectHTML = hasOptions
-      ? `
-        <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
-          ${productOptionsHTML(options, normalized)}
-        </select>
-      `
-      : '';
 
     return `
-      <article class="simple-catalog-row catalog-product ${selectedOutOfStock ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="simple-catalog-row catalog-product ${unavailable ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}">
         <div class="simple-catalog-thumb" aria-hidden="true">
           ${
             imageSrc
@@ -5128,21 +5119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="simple-catalog-main">
           <strong>${escapeHTML(normalized.name)}</strong>
-          <span>${escapeHTML(normalized.category)}</span>
-        </div>
-        <div class="simple-catalog-choice ${hasOptions ? '' : 'is-empty'}">
-          ${selectHTML}
-        </div>
-        <strong class="simple-catalog-price" data-product-price-display>${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-        <div class="simple-catalog-actions">
-          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
-            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
-            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
-          </button>
-          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
-            <i class="fa-solid fa-circle-info"></i>
-            Detalhes
-          </button>
         </div>
       </article>
     `;

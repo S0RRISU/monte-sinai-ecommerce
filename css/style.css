@@ -33241,6 +33241,26 @@ body:not(.admin-shell-body) .simple-catalog-actions .btn {
 }
 
 /* Ajustes finais publicos acima das regras legadas com !important. */
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-row {
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-main strong {
+  font-size: 1rem !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-main span,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-choice,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-price,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions {
+  display: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-row.is-out-of-stock {
+  opacity: 0.44 !important;
+  filter: grayscale(0.35) !important;
+}
+
 html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .full-catalog-toolbar {
   grid-template-columns: 1fr !important;
 }
@@ -33336,50 +33356,49 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-pag
   }
 
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-row {
-    grid-template-columns: 34px minmax(0, 1fr) auto !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
     gap: 7px !important;
     min-height: 0 !important;
-    padding: 7px !important;
+    padding: 8px !important;
     border-radius: 9px !important;
   }
 
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-thumb {
-    width: 34px !important;
-    height: 34px !important;
+    width: 32px !important;
+    height: 32px !important;
     border-radius: 8px !important;
   }
 
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-choice,
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions {
-    grid-column: 2 / -1 !important;
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-main strong {
+    font-size: 0.9rem !important;
+    line-height: 1.15 !important;
   }
 
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-choice.is-empty,
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-choice:empty {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .catalog-hero {
+    padding: 12px !important;
+    margin-bottom: 8px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .catalog-hero .eyebrow {
+    margin-bottom: 4px !important;
+    font-size: 0.72rem !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .catalog-hero h1 {
+    font-size: 1.22rem !important;
+    line-height: 1.12 !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .catalog-hero p {
     display: none !important;
   }
 
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions {
-    grid-template-columns: minmax(0, 1fr) 34px !important;
-    gap: 6px !important;
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .hero-actions {
+    margin-top: 10px !important;
   }
 
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions .btn {
-    grid-column: auto !important;
-    min-height: 30px !important;
-    padding: 6px !important;
-    font-size: 0.74rem !important;
-  }
-
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions .btn-secondary {
-    min-width: 34px !important;
-    width: 34px !important;
-    padding: 0 !important;
-    font-size: 0 !important;
-  }
-
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .simple-catalog-actions .btn-secondary i {
-    margin: 0 !important;
-    font-size: 0.78rem !important;
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-store-page .hero-actions .btn {
+    min-height: 38px !important;
+    padding: 8px 10px !important;
   }
 }
