@@ -30804,3 +30804,172 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-ca
     min-height: 44px !important;
   }
 }
+
+/* Etapa 8.6 - ajustes pontuais de contraste, busca e navbar desktop. */
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools {
+  border-color: rgba(226, 232, 240, 0.18) !important;
+  background: #111c2f !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  background: #f8fafc !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools .filter-chips,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools .filter-chips {
+  scrollbar-width: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools .filter-chips::-webkit-scrollbar,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools .filter-chips::-webkit-scrollbar {
+  display: none !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools .filter-chip,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools .filter-chip {
+  border-color: rgba(226, 232, 240, 0.22) !important;
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .products-page .catalog-tools .filter-chip.active,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body):has(.products-page) .catalog-tools .filter-chip.active {
+  border-color: #facc15 !important;
+  background: #facc15 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-panel {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-panel {
+  border-color: rgba(226, 232, 240, 0.22) !important;
+  background: #111c2f !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-info,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-info h2,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-info strong,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-info label,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-more > span strong {
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-info,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-info h2,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-info strong,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-info label,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-more > span strong {
+  color: #f8fafc !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-info p,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-more > span small {
+  color: #475569 !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-info p,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-more > span small {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-more {
+  background: #f8fafc !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-more {
+  border-color: rgba(226, 232, 240, 0.18) !important;
+  background: #162033 !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .product-search-more button {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-search-more button {
+  border-color: rgba(226, 232, 240, 0.16) !important;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-search .search-suggestions.is-positioned {
+  top: calc(var(--suggestions-top) + 12px) !important;
+  max-height: min(var(--suggestions-max-height), 360px) !important;
+}
+
+body:not(.light-mode).auth-body .auth-actions .btn-primary,
+html[data-theme='dark'] body.auth-body .auth-actions .btn-primary {
+  border-color: #facc15 !important;
+  background: #facc15 !important;
+  color: #0f172a !important;
+}
+
+body:not(.light-mode).auth-body .auth-actions .btn-primary:hover,
+html[data-theme='dark'] body.auth-body .auth-actions .btn-primary:hover {
+  background: #fde047 !important;
+  color: #0f172a !important;
+}
+
+@media (min-width: 1180px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-inner {
+    grid-template-columns: 190px minmax(440px, 1fr) minmax(320px, 400px) minmax(178px, auto) !important;
+    gap: 18px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions {
+    display: flex !important;
+    width: auto !important;
+    min-width: 178px !important;
+    gap: 14px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions > a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions > button,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions .nav-icon,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions .nav-pill {
+    flex: 0 0 50px !important;
+    width: 50px !important;
+    max-width: 50px !important;
+    min-width: 50px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    border-radius: 999px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-whatsapp-link {
+    border-color: #25d366 !important;
+    background: #25d366 !important;
+    color: #ffffff !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-whatsapp-link i {
+    color: #ffffff !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-cart-link {
+    border-color: #facc15 !important;
+    background: #facc15 !important;
+    color: #0f172a !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-cart-link i {
+    color: #0f172a !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-account-link {
+    border-color: color-mix(in srgb, var(--accent) 70%, var(--line-strong)) !important;
+    background: var(--surface) !important;
+  }
+}
