@@ -21024,6 +21024,16 @@ body.light-mode .full-catalog-search {
   color: var(--success);
 }
 
+.catalog-offer-timer {
+  gap: 5px;
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+}
+
+.catalog-offer-timer i {
+  font-size: 0.74rem;
+}
+
 .full-catalog-copy h3 {
   min-width: 0;
   color: var(--text);

@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initInstallPrompt();
   initAdminOrderAlerts();
   registerServiceWorker();
+  window.setInterval(refreshOfferCountdowns, 60000);
 
   function qs(selector, scope = document) {
     return scope.querySelector(selector);
@@ -1212,6 +1213,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (days > 0) return `Termina em ${days}d ${hours}h`;
     if (hours > 0) return `Termina em ${hours}h ${mins}min`;
     return `Termina em ${mins}min`;
+  }
+
+  function productOfferTimerHTML(product = {}, option = null, keepPlaceholder = false) {
+    const active = Boolean(option?.offerActive ?? product.offerActive);
+    if (!active && !keepPlaceholder) return '';
+    const end = option?.offerEndsAt || product.offerEndsAt || product.oferta_fim || '';
+    return `<span class="catalog-status-badge catalog-offer-timer ${active ? '' : 'hidden'}" data-offer-countdown data-offer-ends-at="${escapeHTML(end)}"><i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(end))}</span>`;
+  }
+
+  function refreshOfferCountdowns(scope = document) {
+    qsa('[data-offer-countdown]', scope).forEach((timer) => {
+      const end = timer.dataset.offerEndsAt || '';
+      timer.innerHTML = `<i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(end))}`;
+    });
   }
 
   function isMissingProductExtensionError(error) {
@@ -4518,7 +4533,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4551,6 +4566,7 @@ document.addEventListener('DOMContentLoaded', () => {
       price: Number.isFinite(price) ? price : 0,
       originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
       offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
+      offerEndsAt: current?.offerEndsAt || option?.dataset.offerEndsAt || '',
       stock: null,
       image,
       out,
@@ -4574,6 +4590,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productCard = card.classList.contains('product-card') ? card : card.closest('.product-card');
     const fullCatalogItem = card.classList.contains('full-catalog-item') ? card : card.closest('.full-catalog-item');
     const stockBadge = productCard?.querySelector('.stock-badge');
+    const offerLabel = card.querySelector('[data-offer-label]');
+    const offerTimer = card.querySelector('[data-offer-countdown]');
 
     if (priceEl) {
       priceEl.innerHTML = productPriceHTML(
@@ -4609,6 +4627,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stockBadge) {
       stockBadge.textContent = state.out ? 'Indisponivel' : '';
       stockBadge.classList.toggle('hidden', !state.out);
+    }
+    if (offerTimer) {
+      offerTimer.dataset.offerEndsAt = state.offerEndsAt || '';
+      offerTimer.innerHTML = `<i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(state.offerEndsAt))}`;
+      offerTimer.classList.toggle('hidden', !state.offerActive);
+    }
+    if (offerLabel) {
+      offerLabel.classList.toggle('hidden', !state.offerActive);
     }
     if (button) {
       button.dataset.price = String(state.price);
@@ -4667,6 +4693,8 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
         `
       : '';
+    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const hasAnyOffer = selectedOfferActive || productOptionsList.some((option) => option.offerActive);
     const priceHTML = `<strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>`;
     const addButtonHTML = `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${rail ? '' : `<i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>`}${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`;
     const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
@@ -4680,9 +4708,10 @@ document.addEventListener('DOMContentLoaded', () => {
           ${productMediaHTML(normalized, image)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
-        <h3>${escapeHTML(normalized.name)}</h3>
-        <span class="product-category-label">${escapeHTML(normalized.category)}</span>
-        <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <span class="product-category-label">${escapeHTML(normalized.category)}</span>
+          ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
         ${normalized.kitItems ? `<p class="kit-items">${escapeHTML(normalized.kitItems)}</p>` : ''}
         ${selectHTML}
         ${priceHTML}
@@ -4703,7 +4732,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
             <span class="catalog-status-badge is-category">${escapeHTML(normalized.category)}</span>
-            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${hasAnyOffer ? `<span class="catalog-status-badge is-offer ${selectedOfferActive ? '' : 'hidden'}" data-offer-label>Oferta</span>` : ''}
+            ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
             ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
           </div>
@@ -5091,6 +5121,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('');
 
     list.innerHTML = recommendedSection + grouped;
+    refreshOfferCountdowns(list);
     qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
@@ -5220,6 +5251,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const displayImage = (hasOptions && firstOption.image) || image;
+    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const hasAnyOffer = selectedOfferActive || options.some((option) => option.offerActive);
 
     if (body) {
       body.innerHTML = `
@@ -5229,7 +5262,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
             ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
-            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${hasAnyOffer ? `<span class="catalog-status-badge is-offer ${selectedOfferActive ? '' : 'hidden'}" data-offer-label>Oferta</span>` : ''}
+            ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
           <span class="eyebrow">${escapeHTML(normalized.category)}</span>
@@ -5271,6 +5305,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
+      refreshOfferCountdowns(body);
     }
 
     modal.classList.remove('hidden');
