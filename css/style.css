@@ -30448,3 +30448,164 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .search-suggestion-
     height: 58px !important;
   }
 }
+
+/* Etapa 8.3 - legibilidade publica e topo fixo mobile. */
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) {
+  --bg: #f1f5f9;
+  --background: #f1f5f9;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --text: #0f172a;
+  --text-soft: #334155;
+  --muted: #475569;
+  --line: rgba(15, 23, 42, 0.16);
+  --line-strong: rgba(15, 23, 42, 0.26);
+  --primary: #0f3b73;
+  --primary-strong: #082854;
+  --primary-soft: #e2ecf8;
+  --accent: #d8a80f;
+  --accent-soft: #fff4bf;
+  --danger: #b91c1c;
+  background: #f1f5f9 !important;
+  color: var(--text) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) {
+  --bg: #0b1220;
+  --background: #0b1220;
+  --surface: #162033;
+  --surface-soft: #1d2a3f;
+  --text: #f8fafc;
+  --text-soft: #d5deea;
+  --muted: #b6c2d2;
+  --line: rgba(226, 232, 240, 0.2);
+  --line-strong: rgba(226, 232, 240, 0.32);
+  --primary: #93c5fd;
+  --primary-strong: #bfdbfe;
+  --primary-soft: #203653;
+  --accent: #facc15;
+  --accent-soft: #3f3210;
+  --danger: #fca5a5;
+  background: #0b1220 !important;
+  color: var(--text) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) small,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .text-muted,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-category,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-meta,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .full-catalog-copy p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .search-suggestion-item small {
+  color: var(--text-soft) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) h1,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) h2,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) h3,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) strong,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) label {
+  color: var(--text) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .full-catalog-item,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-panel,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .modal-content,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .search-suggestions {
+  border-color: var(--line-strong) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .navbar,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-menu,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .full-catalog-item,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-panel,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .modal-content,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .search-suggestions {
+  background: var(--surface) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) input,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) select,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) textarea,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-search {
+  border-color: var(--line-strong) !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) input::placeholder,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) textarea::placeholder {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .btn-primary,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link {
+  background: #0f3b73 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .btn-primary,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link {
+  background: #93c5fd !important;
+  color: #08111f !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .btn-secondary,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-chip,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .filter-chip {
+  border-color: var(--line-strong) !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+}
+
+@media (max-width: 760px) {
+  body:not(.admin-shell-body):not(.auth-body) {
+    padding-top: calc(66px + env(safe-area-inset-top)) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .navbar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 1200 !important;
+    min-height: calc(64px + env(safe-area-inset-top)) !important;
+    padding-top: env(safe-area-inset-top) !important;
+    border-radius: 0 0 18px 18px !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-inner {
+    min-height: 64px !important;
+  }
+
+  body.admin-shell-body .admin-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 930 !important;
+    height: calc(70px + env(safe-area-inset-top)) !important;
+    min-height: calc(70px + env(safe-area-inset-top)) !important;
+    padding-top: calc(8px + env(safe-area-inset-top)) !important;
+    overflow: hidden !important;
+  }
+
+  body.admin-shell-body .admin-sidebar-brand {
+    min-height: 54px !important;
+  }
+
+  body.admin-shell-body .admin-main {
+    padding-top: calc(82px + env(safe-area-inset-top)) !important;
+  }
+}
