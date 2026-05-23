@@ -30609,3 +30609,121 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .filter-chip {
     padding-top: calc(82px + env(safe-area-inset-top)) !important;
   }
 }
+
+/* Etapa 8.4 - contraste real em banners e cards publicos. */
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home {
+  background:
+    linear-gradient(90deg, rgba(7, 18, 38, 0.9), rgba(7, 18, 38, 0.74)),
+    url("../assets/hero/v2/hero-site-3d-v2.png") center/cover no-repeat !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home .eyebrow,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home h1,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .trust-item,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .trust-item span {
+  color: #f8fafc !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.32) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home .eyebrow,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .trust-item i {
+  color: #facc15 !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .trust-item {
+  border-color: rgba(248, 250, 252, 0.18) !important;
+  background: rgba(8, 24, 51, 0.58) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-small,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .page-hero,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-hero {
+  border: 1px solid var(--line-strong) !important;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 12%, transparent), transparent 42%),
+    var(--surface) !important;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12) !important;
+  color: var(--text) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .hero-small,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .page-hero,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .catalog-hero {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.22), transparent 44%),
+    linear-gradient(135deg, #132039, #0f172a) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-small h1,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .page-hero h1,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-hero h1,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-small p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .page-hero p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-hero p {
+  color: var(--text) !important;
+  text-shadow: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-small p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .page-hero p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-hero p {
+  color: var(--text-soft) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product.product-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card {
+  border-color: var(--line-strong) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.1) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .category-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .catalog-product,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .catalog-product.product-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .promo-card {
+  background: #162033 !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card h3,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product h3,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card h3,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card strong,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product strong,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card strong {
+  color: var(--text) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card p,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-card .product-category,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product .product-category {
+  color: var(--text-soft) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-icon,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card i {
+  background: #eab308 !important;
+  color: #0f172a !important;
+}
+
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-home {
+    background:
+      linear-gradient(180deg, rgba(7, 18, 38, 0.88), rgba(7, 18, 38, 0.78)),
+      url("../assets/hero/v2/mobile-hero-showcase-3d-v2.png") center/cover no-repeat !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-small,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .page-hero,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-hero {
+    margin-top: 16px !important;
+  }
+}
