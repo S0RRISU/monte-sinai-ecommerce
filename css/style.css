@@ -29852,6 +29852,63 @@ html[data-theme] body.admin-shell-body textarea {
   }
 }
 
+/* Cart badge and active fill correction: blue cart, yellow ring, red counter. */
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    border-color: #facc15 !important;
+    outline-color: rgba(250, 204, 21, 0.32) !important;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.22), transparent 34%),
+      linear-gradient(145deg, #126fd0 0%, #0a4fa6 52%, #063276 100%) !important;
+    color: #ffffff !important;
+    box-shadow:
+      inset 0 6px 12px rgba(255, 255, 255, 0.22),
+      inset 0 -12px 18px rgba(0, 18, 66, 0.34),
+      0 8px 0 rgba(154, 124, 12, 0.84),
+      0 18px 28px rgba(0, 0, 0, 0.32),
+      0 0 0 8px rgba(250, 204, 21, 0.18) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart,
+  body.light-mode.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.5), transparent 34%),
+      linear-gradient(145deg, #1a86e8 0%, #0e61bf 52%, #073d8a 100%) !important;
+    color: #ffffff !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart i,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart i {
+    color: #30c4ff !important;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.28)) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart span,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span {
+    color: #ffffff !important;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.36) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count],
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count] {
+    border-color: #ffffff !important;
+    background: linear-gradient(180deg, #ff4f7d 0%, #e11d48 100%) !important;
+    color: #ffffff !important;
+    box-shadow:
+      0 3px 0 rgba(127, 29, 29, 0.42),
+      0 8px 14px rgba(225, 29, 72, 0.34) !important;
+  }
+}
+
 /* Etapa 8.1 - refinamento visual dos temas claro/noturno. */
 html[data-theme='light'],
 body.light-mode {
