@@ -728,6 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return [];
     }
 
+    // Pedidos ativos e arquivados vêm do Supabase. Nao usar localStorage
+    // para arquivamento administrativo, historico real ou financeiro.
     state.pedidos = (data || []).map(mapOrder);
     renderizarPedidosAdmin(state.pedidos, options);
     renderFinanceiro();
@@ -1105,32 +1107,40 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const archivedAt = new Date().toISOString();
-    const { error } = await api
-      .from('pedidos')
-      .update({
-        archived_at: archivedAt,
-        archived_by: state.user?.id || null,
-        archived_reason: 'Arquivado no painel administrativo',
-      })
-      .eq('id', pedidoId);
+    const button = qs(`[data-admin-order-archive="${escapeSelector(pedidoId)}"]`);
+    if (button) button.disabled = true;
+
+    const reason = 'Arquivado no painel administrativo';
+    const { data, error } = await api.rpc('archive_order', {
+      pedido_id: pedidoId,
+      reason,
+    });
+
+    if (button) button.disabled = false;
 
     if (error) {
       ordersArchiveReady = false;
-      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos no Supabase.');
-      showToast(friendlyDbError(error, 'Nao consegui arquivar o pedido.'), 'error');
+      setDatabaseAlert('A RPC public.archive_order não respondeu. Confira as funções da etapa 7 no Supabase.');
+      showToast(friendlyDbError(error, 'Nao consegui guardar o pedido no historico.'), 'error');
       await carregarPedidosAdmin();
       return false;
     }
 
-    await registrarPedidoEvento(pedidoId, 'pedido_arquivado', { archived_at: archivedAt });
+    const archivedOrder = Array.isArray(data) ? data[0] : data;
+    const archivedAt = archivedOrder?.archived_at || new Date().toISOString();
     state.pedidos = state.pedidos.map((order) =>
       String(order.id) === String(pedidoId)
-        ? { ...order, archivedAt, archivedBy: state.user?.id || null, archivedReason: 'Arquivado no painel administrativo' }
+        ? {
+            ...order,
+            archivedAt,
+            archivedBy: archivedOrder?.archived_by || state.user?.id || null,
+            archivedReason: archivedOrder?.archived_reason || reason,
+          }
         : order,
     );
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
+    await carregarPedidosAdmin();
     showToast('Pedido guardado no historico.', 'success');
     return true;
   }
@@ -1144,25 +1154,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { error } = await api
-      .from('pedidos')
-      .update({ archived_at: null, archived_by: null, archived_reason: null })
-      .eq('id', pedidoId);
+    const button = qs(`[data-admin-order-restore="${escapeSelector(pedidoId)}"]`);
+    if (button) button.disabled = true;
+
+    const { error } = await api.rpc('restore_order', {
+      pedido_id: pedidoId,
+    });
+
+    if (button) button.disabled = false;
 
     if (error) {
       ordersArchiveReady = false;
-      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para restaurar pedidos no Supabase.');
+      setDatabaseAlert('A RPC public.restore_order não respondeu. Confira as funções da etapa 7 no Supabase.');
       showToast(friendlyDbError(error, 'Nao consegui restaurar o pedido.'), 'error');
       await carregarPedidosAdmin();
       return false;
     }
 
-    await registrarPedidoEvento(pedidoId, 'pedido_restaurado', {});
     state.pedidos = state.pedidos.map((order) =>
       String(order.id) === String(pedidoId) ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' } : order,
     );
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
+    await carregarPedidosAdmin();
     showToast('Pedido voltou para a tela principal.', 'success');
     return true;
   }
@@ -3030,15 +3044,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function initAdminPanel() {
-    loadArchivedOrders();
-    bindAdminEvents();
-    const canAccess = await verificarAcessoAdmin();
-    if (!canAccess) return;
+    try {
+      bindAdminEvents();
+      const canAccess = await verificarAcessoAdmin();
+      if (!canAccess) return;
 
-    const initialTab = text(location.hash).replace('#', '') || 'pedidos';
-    renderAdminTab(initialTab);
-    await Promise.all([carregarPedidosAdmin(), carregarProdutosAdmin()]);
-    assinarPedidosRealtime();
+      const initialTab = text(location.hash).replace('#', '') || 'pedidos';
+      renderAdminTab(initialTab);
+      const results = await Promise.allSettled([carregarPedidosAdmin(), carregarProdutosAdmin()]);
+      const failed = results.find((result) => result.status === 'rejected');
+      if (failed) {
+        console.warn('[Admin] Uma parte do painel nao carregou.', failed.reason);
+        setDatabaseAlert('Uma parte do painel não carregou. Atualize a página ou confira as permissões no Supabase.');
+        showToast('Painel aberto, mas uma parte não carregou.', 'error');
+      }
+      assinarPedidosRealtime();
+    } catch (error) {
+      console.error('[Admin] Falha ao iniciar painel.', error);
+      setAccessState('Painel indisponível', 'Não consegui iniciar o painel agora. Atualize a página e tente novamente.', {
+        icon: 'triangle-exclamation',
+      });
+      showToast('Nao consegui iniciar o painel.', 'error');
+    }
   }
 
   window.initAdminPanel = initAdminPanel;
