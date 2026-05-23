@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingProfile: 'ms_pending_profile_email_v1',
     pendingProfileSavePassword: 'ms_pending_profile_save_password_v1',
     authSessions: 'ms_saved_auth_sessions_v1',
+    siteRemoteStatus: 'ms_site_config_remote_status_v1',
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
   const SITE_CONFIG_TABLE = 'site_configuracoes';
+  const SITE_CONFIG_MISSING_TTL = 6 * 60 * 60 * 1000;
   let productIndex = [];
   const CATALOG_CATEGORY_ORDER = [
     'agua',
@@ -230,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
   let ordersPageAdminMode = false;
+  const publicProductsState = {
+    allProducts: [],
+    selectedCategory: 'all',
+    searchTerm: '',
+  };
 
   applySavedTheme();
   applySiteConfig();
@@ -245,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSiteSearch();
   bindCatalog();
   bindFullCatalogPage();
+  bindSimpleCatalogPage();
   bindProductCards();
   bindProductRail();
   ensureCartShell();
@@ -267,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initInstallPrompt();
   initAdminOrderAlerts();
   registerServiceWorker();
+  window.setInterval(refreshOfferCountdowns, 60000);
 
   function qs(selector, scope = document) {
     return scope.querySelector(selector);
@@ -444,22 +453,54 @@ document.addEventListener('DOMContentLoaded', () => {
   function missingSiteConfigTable(error) {
     const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
     return (
-      text.includes('site_configuracoes') || text.includes('pgrst205') || text.includes('could not find the table')
+      text.includes('site_configuracoes') ||
+      text.includes('pgrst205') ||
+      text.includes('404') ||
+      text.includes('not found') ||
+      text.includes('could not find the table')
     );
+  }
+
+  function siteConfigTableMarkedMissing() {
+    const status = loadJSON(STORAGE.siteRemoteStatus, null);
+    return Boolean(status?.missing && Date.now() - Number(status.checkedAt || 0) < SITE_CONFIG_MISSING_TTL);
+  }
+
+  function markSiteConfigTableMissing() {
+    saveJSON(STORAGE.siteRemoteStatus, { missing: true, checkedAt: Date.now() });
+  }
+
+  function clearSiteConfigTableMissing() {
+    try {
+      localStorage.removeItem(STORAGE.siteRemoteStatus);
+    } catch (_error) {
+      // localStorage may be blocked; defaults still keep public pages usable.
+    }
+  }
+
+  function shouldLoadRemoteSiteConfig() {
+    if (siteConfigTableMarkedMissing()) return false;
+    return currentPage() === 'configuracoes.html';
   }
 
   async function loadRemoteSiteConfig() {
     const client = supabaseProductClient();
     if (!client) return null;
+    if (!shouldLoadRemoteSiteConfig()) return null;
 
     try {
       const { data, error } = await client.from(SITE_CONFIG_TABLE).select('config').eq('id', 'site').maybeSingle();
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return data?.config || null;
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Usando padrao local.');
+      } else {
         console.warn('[Supabase] Nao foi possivel carregar configuracoes do site.', error);
+      }
       return null;
     }
   }
@@ -467,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveRemoteSiteConfig() {
     const client = ordersClient();
     if (!client) return { saved: false, reason: 'no-client' };
+    if (siteConfigTableMarkedMissing()) return { saved: false, reason: 'missing-optional-table' };
 
     const config = {
       owner: normalizedOwnerConfig(ownerConfig),
@@ -484,10 +526,15 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return { saved: true };
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Salvamento remoto ignorado.');
+      } else {
         console.warn('[Supabase] Nao foi possivel salvar configuracoes do site.', error);
+      }
       return { saved: false, error };
     }
   }
@@ -958,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Finalize a atualizacao do SQL no Supabase antes de vender. O carrinho foi mantido.';
     }
     if (message.includes('estoque insuficiente') || message.includes('produto do pedido nao esta disponivel')) {
-      return 'Um produto ficou sem estoque ou indisponivel. Confira o carrinho e tente novamente.';
+      return 'Um produto ficou indisponivel. Confira o carrinho e tente novamente.';
     }
     if (message.includes('telefone')) return 'Confira o WhatsApp informado antes de finalizar.';
     return fallback;
@@ -1166,6 +1213,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (days > 0) return `Termina em ${days}d ${hours}h`;
     if (hours > 0) return `Termina em ${hours}h ${mins}min`;
     return `Termina em ${mins}min`;
+  }
+
+  function productOfferTimerHTML(product = {}, option = null, keepPlaceholder = false) {
+    const active = Boolean(option?.offerActive ?? product.offerActive);
+    if (!active && !keepPlaceholder) return '';
+    const end = option?.offerEndsAt || product.offerEndsAt || product.oferta_fim || '';
+    return `<span class="catalog-status-badge catalog-offer-timer ${active ? '' : 'hidden'}" data-offer-countdown data-offer-ends-at="${escapeHTML(end)}"><i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(end))}</span>`;
+  }
+
+  function refreshOfferCountdowns(scope = document) {
+    qsa('[data-offer-countdown]', scope).forEach((timer) => {
+      const end = timer.dataset.offerEndsAt || '';
+      timer.innerHTML = `<i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(end))}`;
+    });
   }
 
   function isMissingProductExtensionError(error) {
@@ -1599,7 +1660,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setProductIndex(products) {
-    productIndex = uniqueProductList(products);
+    productIndex = uniqueProductList(groupProductVariants(products));
   }
 
   function clearPublicProductShell() {
@@ -1895,6 +1956,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSupabaseProducts() {
     renderDynamicCatalog();
     renderFullCatalogPage();
+    renderSimpleCatalogPage();
     renderPromotionsPage();
     renderDynamicProductRail();
     injectProductJsonLd();
@@ -2477,25 +2539,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (['produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) {
-      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]');
-      if (catalogInput) {
-        catalogInput.value = term;
-        if (catalogInput.matches('[data-catalog-search]')) {
-          activateCatalogFilter('all');
-          applyCatalogFilters();
-          scrollCatalogToTop('smooth');
-        } else {
-          qsa('[data-full-catalog-filter]').forEach((button) =>
-            button.classList.toggle('active', button.dataset.fullCatalogFilter === 'all'),
-          );
-          renderFullCatalogPage();
-          qs('[data-full-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        return;
-      }
-    }
-
     openProductSearchModal(matches[0], matches, term);
   }
 
@@ -2561,6 +2604,12 @@ document.addEventListener('DOMContentLoaded', () => {
     productSearchResults = uniqueProducts(results.length ? results : [resolved]);
     if (!productSearchResults.some((item) => normalizeText(item.name) === normalizeText(resolved.name))) {
       productSearchResults.unshift(resolved);
+    }
+
+    const detailKey = resolved.id || resolved.name;
+    if (catalogProductByKey(detailKey)) {
+      openCatalogDetailModal(detailKey);
+      return;
     }
 
     const modal = qs('.product-search-modal');
@@ -3934,18 +3983,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const page = currentPage();
     const activeSection = (() => {
       if (page === 'index.html') return 'home';
-      if (page === 'produtos.html' || page === 'catalogo.html') return 'store';
+      if (page === 'produtos.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
-      if (
-        [
-          'login.html',
-          'perfil.html',
-          'pedidos.html',
-          'editar-perfil.html',
-          'configuracoes.html',
-          'criar.html',
-        ].includes(page)
-      )
+      if (['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(page))
         return 'account';
       return '';
     })();
@@ -4033,6 +4073,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const trigger = event.target.closest('[data-nav-search-toggle]');
       if (trigger) {
         event.preventDefault();
+        if (isMobileSearchViewport()) {
+          closeNavSearch();
+          qsa('.search-suggestions').forEach(hideSearchSuggestions);
+          const seed = qs('.navbar .nav-search [data-site-search-input]')?.value || '';
+          openSmartSearch(seed);
+          return;
+        }
         const willOpen = !document.body.classList.contains('header-search-open');
         document.body.classList.toggle('header-search-open', willOpen);
         trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
@@ -4246,15 +4293,15 @@ document.addEventListener('DOMContentLoaded', () => {
     shell.className = 'smart-search';
     shell.setAttribute('role', 'dialog');
     shell.setAttribute('aria-modal', 'true');
-    shell.setAttribute('aria-label', 'Busca inteligente de produtos');
+    shell.setAttribute('aria-label', 'Busca global de produtos');
     shell.innerHTML = `
       <div class="smart-search-backdrop" data-close-search></div>
       <div class="smart-search-panel">
         <header class="smart-search-head">
           <div>
-            <span class="eyebrow">Busca inteligente</span>
-            <h2>O que você precisa hoje?</h2>
-            <p>Digite do seu jeito: banheiro, lavar roupa, tirar gordura, gás ou água.</p>
+            <span class="eyebrow">Busca</span>
+            <h2>Buscar produtos</h2>
+            <p>Digite o nome, categoria ou op&ccedil;&atilde;o do produto.</p>
           </div>
           <button class="smart-search-close" type="button" data-close-search aria-label="Fechar busca">
             <i class="fa-solid fa-xmark"></i>
@@ -4325,6 +4372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSmartSearchResults(seed);
     shell.classList.add('open');
     document.body.classList.add('smart-search-open');
+    qs('[data-nav-search-toggle]')?.setAttribute('aria-expanded', 'true');
     setDockSectionActive('search');
     setTimeout(() => input?.focus(), 80);
   }
@@ -4332,6 +4380,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeSmartSearch() {
     qs('.smart-search')?.classList.remove('open');
     document.body.classList.remove('smart-search-open');
+    qs('[data-nav-search-toggle]')?.setAttribute('aria-expanded', 'false');
     updateDockActive();
   }
 
@@ -4346,11 +4395,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!results) return;
 
     const term = query.trim();
-    const matches = smartSearchMatches(term);
-    const heading = term ? 'Produtos encontrados' : 'Mais procurados agora';
-    const subtitle = term
-      ? `${matches.length} sugestao${matches.length === 1 ? '' : 'es'} para "${escapeHTML(term)}"`
-      : 'Atalhos para os pedidos mais comuns no celular';
+    if (term.length < 2) {
+      results.innerHTML = `
+        <div class="smart-search-empty">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <strong>Digite pelo menos 2 letras</strong>
+          <span>As sugest&otilde;es aparecem automaticamente.</span>
+        </div>
+      `;
+      return;
+    }
+
+    const entries = searchSuggestionEntries(term, 6);
+    const heading = 'Produtos encontrados';
+    const subtitle = `${entries.length} ${entries.length === 1 ? 'sugest&atilde;o' : 'sugest&otilde;es'} para "${escapeHTML(term)}"`;
 
     results.innerHTML = `
       <div class="smart-search-result-head">
@@ -4360,14 +4418,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       ${
-        matches.length
+        entries.length
           ? `
         <div class="smart-search-result-grid">
-          ${matches
-            .map((product) => {
+          ${entries
+            .map(({ product, option }) => {
               const imageSrc = assetHref(productAssetPath(product));
+              const label = option ? `${product.name} ${option.name}` : product.name;
               return `
-              <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(product.name)}">
+              <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(label)}">
                 <span class="smart-search-product-icon">
                   ${
                     imageSrc
@@ -4377,7 +4436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
                 <span class="smart-search-product-copy">
                   <strong>${escapeHTML(product.name)}</strong>
-                  <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>
+                  <small>${escapeHTML(product.category)}${option ? ` - ${escapeHTML(option.name)}` : ''} - ${formatMoney(option?.price || product.price)}</small>
                 </span>
                 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
               </button>
@@ -4477,7 +4536,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4510,6 +4569,7 @@ document.addEventListener('DOMContentLoaded', () => {
       price: Number.isFinite(price) ? price : 0,
       originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
       offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
+      offerEndsAt: current?.offerEndsAt || option?.dataset.offerEndsAt || '',
       stock: null,
       image,
       out,
@@ -4533,6 +4593,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productCard = card.classList.contains('product-card') ? card : card.closest('.product-card');
     const fullCatalogItem = card.classList.contains('full-catalog-item') ? card : card.closest('.full-catalog-item');
     const stockBadge = productCard?.querySelector('.stock-badge');
+    const offerLabel = card.querySelector('[data-offer-label]');
+    const offerTimer = card.querySelector('[data-offer-countdown]');
 
     if (priceEl) {
       priceEl.innerHTML = productPriceHTML(
@@ -4569,6 +4631,14 @@ document.addEventListener('DOMContentLoaded', () => {
       stockBadge.textContent = state.out ? 'Indisponivel' : '';
       stockBadge.classList.toggle('hidden', !state.out);
     }
+    if (offerTimer) {
+      offerTimer.dataset.offerEndsAt = state.offerEndsAt || '';
+      offerTimer.innerHTML = `<i class="fa-solid fa-clock"></i>${escapeHTML(offerCountdownText(state.offerEndsAt))}`;
+      offerTimer.classList.toggle('hidden', !state.offerActive);
+    }
+    if (offerLabel) {
+      offerLabel.classList.toggle('hidden', !state.offerActive);
+    }
     if (button) {
       button.dataset.price = String(state.price);
       button.dataset.stock = '';
@@ -4584,82 +4654,121 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function productCardHTML(product, mode = 'catalog') {
+  function publicProductCardHTML(product, options = {}) {
+    const { layout = 'store', rail = false } = options;
     const normalized = normalizeProduct(product);
-    const recommended = isRecommendedProduct(normalized);
-    const options = productOptions(normalized);
-    const hasOptions = normalized.hasVariations && options.length > 0;
-    const firstOption = options[0] || { price: normalized.price };
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : normalized.stockState === 'out';
+    const productOptionsList = productOptions(normalized);
+    const hasOptions = normalized.hasVariations && productOptionsList.length > 0;
+    const firstOption = productOptionsList[0] || { price: normalized.price };
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
-    const cardClass = [
-      'product-card',
-      mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
-      recommended ? 'is-recommended' : '',
-      normalized.offerActive ? 'is-offer-product' : '',
-      normalized.isKit ? 'is-kit-product' : '',
-      outOfStock ? 'is-out-of-stock' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const cardClass = rail
+      ? [
+          'product-card',
+          'catalog-product',
+          'rail-product',
+          'tilt-3d',
+          recommended ? 'is-recommended' : '',
+          normalized.offerActive ? 'is-offer-product' : '',
+          normalized.isKit ? 'is-kit-product' : '',
+          outOfStock ? 'is-out-of-stock' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : [
+          'full-catalog-item',
+          'public-product-card',
+          `public-product-card--${layout}`,
+          'catalog-product',
+          outOfStock ? 'is-out-of-stock' : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+    const selectHTML = hasOptions
+      ? `
+          <select class="product-option ${rail ? '' : 'product-option-compact'}" aria-label="${escapeHTML(
+            normalized.name.includes('Desinfetante') ? 'Escolher fragrancia do desinfetante' : 'Escolher opcao do produto',
+          )}">
+            ${productOptionsHTML(productOptionsList, normalized)}
+          </select>
+        `
+      : '';
+    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const hasAnyOffer = selectedOfferActive || productOptionsList.some((option) => option.offerActive);
+    const priceHTML = `<strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>`;
+    const addButtonHTML = `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${rail ? '' : `<i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>`}${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`;
+    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
 
-    return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
-        ${
-          outOfStock
-            ? '<span class="recommended-badge stock-badge">Indisponivel</span>'
-            : normalized.offerActive
-                ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
-                : normalized.isKit
-                  ? '<span class="recommended-badge kit-badge">Kit especial</span>'
-                  : recommended
-                    ? '<span class="recommended-badge">Recomendado</span>'
-                    : ''
-        }
+    if (rail) {
+      return `
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
+        ${selectedOutOfStock ? '<span class="recommended-badge stock-badge">Indisponivel</span>' : ''}
         <div class="product-media">
           ${productMediaHTML(normalized, image)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
-        <h3>${escapeHTML(normalized.name)}</h3>
-        <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <span class="product-category-label">${escapeHTML(normalized.category)}</span>
+          ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
         ${normalized.kitItems ? `<p class="kit-items">${escapeHTML(normalized.kitItems)}</p>` : ''}
-        ${
-          hasOptions
-            ? `
-          <select class="product-option" aria-label="${escapeHTML(normalized.name.includes('Desinfetante') ? 'Escolher fragrância do desinfetante' : 'Escolher tipo do produto')}">
-            ${productOptionsHTML(options, normalized)}
-          </select>
-        `
-            : ''
-        }
-        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-        <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-          customerAvailabilityText(normalized, hasOptions ? firstOption : null),
-        )}</small>
+        ${selectHTML}
+        ${priceHTML}
+        ${selectedOutOfStock ? '<small class="product-stock-line is-unavailable">Indisponivel no momento</small>' : ''}
         <div class="product-card-actions">
-          ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`
-          }
-          <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
-            Ver detalhes
-          </button>
+          ${addButtonHTML}
+          ${detailButtonHTML}
         </div>
       </article>
     `;
+    }
+
+    return `
+      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        <div class="full-catalog-media">
+          ${productMediaHTML(normalized, image)}
+        </div>
+        <div class="full-catalog-copy">
+          <div class="full-catalog-badges">
+            <span class="catalog-status-badge is-category">${escapeHTML(normalized.category)}</span>
+            ${hasAnyOffer ? `<span class="catalog-status-badge is-offer ${selectedOfferActive ? '' : 'hidden'}" data-offer-label>Oferta</span>` : ''}
+            ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
+            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+            ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
+          </div>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
+          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
+        </div>
+        <div class="full-catalog-action">
+          ${selectHTML}
+          ${priceHTML}
+          ${addButtonHTML}
+          ${detailButtonHTML}
+        </div>
+      </article>
+    `;
+  }
+
+  function productCardHTML(product, mode = 'catalog') {
+    return publicProductCardHTML(product, { layout: mode === 'rail' ? 'rail' : 'store', rail: mode === 'rail' });
   }
 
   function renderDynamicFilters() {
     const filterBar = qs('.filter-chips');
     if (!filterBar) return;
 
+    const current = qs('[data-filter].active', filterBar)?.dataset.filter || 'all';
+    const activeFilter = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === current) ? current : 'all';
     filterBar.innerHTML = [
-      '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
+      `<button class="filter-chip ${activeFilter === 'all' ? 'active' : ''}" type="button" data-filter="all">Todos</button>`,
       ...PUBLIC_CATEGORY_FILTERS.map(
         ([slug, label]) =>
-          `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
+          `<button class="filter-chip ${activeFilter === slug ? 'active' : ''}" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
       ),
     ].join('');
   }
@@ -4695,10 +4804,138 @@ document.addEventListener('DOMContentLoaded', () => {
     return groups;
   }
 
+  function publicProductsRoot() {
+    return qs('.products-page #todos-produtos');
+  }
+
+  function isPublicProductsPage() {
+    return Boolean(publicProductsRoot());
+  }
+
+  function publicProductsContainer() {
+    const root = publicProductsRoot();
+    return root?.querySelector(':scope > div') || root;
+  }
+
+  function publicStoreProducts() {
+    return storeProducts().sort(compareCatalogProducts);
+  }
+
+  function syncPublicProductsStateFromUI() {
+    const root = publicProductsRoot();
+    const activeFilter = qs('.filter-chips [data-filter].active', root || document)?.dataset.filter || 'all';
+    publicProductsState.selectedCategory = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === activeFilter)
+      ? activeFilter
+      : 'all';
+    publicProductsState.searchTerm = qs('[data-catalog-search]', root || document)?.value || '';
+  }
+
+  function publicProductMatchesSearch(product, rawTerm = '') {
+    const term = normalizeText(rawTerm);
+    if (!term) return true;
+
+    const normalized = normalizeProduct(product);
+    const options = productOptions(normalized);
+    const optionTerms = options
+      .map((option) => [option.name, option.label, option.sabor, option.marca].filter(Boolean).join(' '))
+      .join(' ');
+    const searchable = normalizeText(
+      [
+        normalized.name,
+        normalized.category,
+        normalized.description,
+        normalized.terms,
+        normalized.kitItems,
+        optionTerms,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+
+    return searchable.includes(term);
+  }
+
+  function getFilteredPublicProducts() {
+    const products = publicProductsState.allProducts.length
+      ? publicProductsState.allProducts
+      : publicStoreProducts();
+    const selectedCategory = publicProductsState.selectedCategory || 'all';
+    const searchTerm = publicProductsState.searchTerm || '';
+
+    return products.filter((product) => {
+      const normalized = normalizeProduct(product);
+      const matchesCategory = selectedCategory === 'all' || normalized.categorySlug === selectedCategory;
+      return matchesCategory && publicProductMatchesSearch(normalized, searchTerm);
+    });
+  }
+
+  function ensurePublicProductsGrid() {
+    const container = publicProductsContainer();
+    if (!container) return null;
+
+    qsa('.section-head, .grid-produtos:not([data-public-products-grid])', container).forEach((node) => node.remove());
+    let grid = qs('[data-public-products-grid]', container);
+    if (!grid) {
+      const empty = qs('#catalog-empty', container);
+      grid = document.createElement('div');
+      grid.className = 'grid-produtos public-products-grid';
+      grid.dataset.publicProductsGrid = '';
+      if (empty) container.insertBefore(grid, empty);
+      else container.appendChild(grid);
+    }
+    return grid;
+  }
+
+  function renderFilteredPublicProducts() {
+    const grid = ensurePublicProductsGrid();
+    if (!grid) return false;
+
+    syncPublicProductsStateFromUI();
+    const products = getFilteredPublicProducts();
+    grid.replaceChildren();
+    grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+
+    const container = publicProductsContainer();
+    const empty = qs('#catalog-empty', container || document);
+    if (empty) {
+      empty.textContent =
+        publicProductsState.selectedCategory !== 'all' && !normalizeText(publicProductsState.searchTerm)
+          ? 'Nenhum produto encontrado nesta categoria'
+          : 'Nenhum produto encontrado com esse filtro.';
+      empty.classList.toggle('hidden', products.length > 0);
+    }
+
+    const result = qs('[data-catalog-results]', container || document);
+    if (result) {
+      const rawTerm = String(publicProductsState.searchTerm || '').trim();
+      const suffix = rawTerm ? ` para "${rawTerm}"` : '';
+      const suggested = rawTerm && products.length ? (products.length === 1 ? ' sugerido' : ' sugeridos') : '';
+      result.textContent = `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
+    }
+
+    optimizeImageLoading();
+    return true;
+  }
+
+  function renderPublicProductsPage() {
+    if (!isPublicProductsPage()) return false;
+    qs('.products-page > .hero.hero-small')?.remove();
+    publicProductsRoot()?.classList.add('products-public-layout');
+    publicProductsContainer()?.classList.add('public-products-panel');
+    renderDynamicFilters();
+    publicProductsState.allProducts = publicStoreProducts();
+    publicProductsState.searchTerm = qs('[data-catalog-search]', publicProductsRoot())?.value || '';
+    publicProductsState.selectedCategory =
+      qs('.filter-chips [data-filter].active', publicProductsRoot())?.dataset.filter || 'all';
+    renderFilteredPublicProducts();
+    return true;
+  }
+
   function renderDynamicCatalog() {
+    if (renderPublicProductsPage()) return;
+
     const catalog = qs('#todos-produtos > div');
     if (!catalog) return;
-
     renderDynamicFilters();
 
     [...catalog.children].forEach((child) => {
@@ -4789,7 +5026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
       })
       .filter((product) => normalizeProduct(product).offerActive && normalizeProduct(product).stockState !== 'out');
-    grid.innerHTML = offers.map((product) => productCardHTML(product, 'catalog')).join('');
+    grid.innerHTML = offers.map((product) => publicProductCardHTML(product, { layout: 'offer' })).join('');
     qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
     qsa('[data-promotions-count]').forEach((el) => {
       el.textContent = String(offers.length);
@@ -4812,65 +5049,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (filter === 'low') return normalized.stockState === 'low';
     if (filter === 'offers') return normalized.offerActive;
     if (filter === 'kits') return normalized.isKit;
+    if (filter && filter !== 'all') return normalized.categorySlug === filter;
     return true;
   }
 
   function fullCatalogCardHTML(product) {
-    const normalized = normalizeProduct(product);
-    const image = productAssetPath(normalized);
-    const outOfStock = normalized.stockState === 'out';
-    const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
-    const key = normalized.id || normalized.name;
-    const options = productOptions(normalized);
-    const firstOption = options[0] || { price: normalized.price };
-    const hasOptions = normalized.hasVariations && options.length > 0;
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
-    const displayImage = (hasOptions && firstOption.image) || image;
+    return publicProductCardHTML(product, { layout: 'catalog' });
+  }
 
-    return `
-      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
-        <div class="full-catalog-media">
-          ${productMediaHTML(normalized, displayImage)}
-        </div>
-        <div class="full-catalog-copy">
-          <div class="full-catalog-badges">
-            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
-            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
-            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
-          </div>
-          <h3>${escapeHTML(normalized.name)}</h3>
-          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
-          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
-        </div>
-        <div class="full-catalog-stock">
-          <strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-            hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-          )}</strong>
-          <span>${escapeHTML(normalized.category)}</span>
-        </div>
-        <div class="full-catalog-action">
-          ${
-            hasOptions
-              ? `
-            <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
-              ${productOptionsHTML(options, normalized)}
-            </select>
-          `
-              : ''
-          }
-          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
-            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
-            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
-          </button>
-          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
-            <i class="fa-solid fa-circle-info"></i>
-            Ver detalhes
-          </button>
-        </div>
-      </article>
-    `;
+  function catalogProductSearchBlob(product) {
+    const normalized = normalizeProduct(product);
+    const optionTerms = (normalized.options || [])
+      .map((option) => [option.name, option.label, option.value].filter(Boolean).join(' '))
+      .join(' ');
+    return normalizeText(
+      `${normalized.name} ${normalized.category} ${normalized.description} ${normalized.kitItems} ${optionTerms}`,
+    );
   }
 
   function renderFullCatalogPage() {
@@ -4880,6 +5074,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = qs('[data-full-catalog-search]');
     const term = normalizeText(input?.value || '');
     const activeFilter = qs('[data-full-catalog-filter].active')?.dataset.fullCatalogFilter || 'all';
+    const storePage = Boolean(qs('.products-store-page'));
     const products = catalogProducts().sort((a, b) => {
       const productA = normalizeProduct(a);
       const productB = normalizeProduct(b);
@@ -4890,18 +5085,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const visible = products.filter((product) => {
       const normalized = normalizeProduct(product);
-      const blob = normalizeText(
-        `${normalized.name} ${normalized.category} ${normalized.description} ${normalized.kitItems}`,
-      );
+      const blob = catalogProductSearchBlob(normalized);
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
-    const categoryCount = new Set(products.map((product) => normalizeProduct(product).categorySlug)).size;
-    const outCount = products.filter((product) => normalizeProduct(product).stockState === 'out').length;
-    setText('[data-full-catalog-total]', String(products.length));
-    setText('[data-full-catalog-available]', String(categoryCount));
-    setText('[data-full-catalog-out]', String(outCount));
-
+    const recommended = storePage && activeFilter === 'all' && !term ? visible.filter((product) => isRecommendedProduct(product)) : [];
+    const recommendedSection = recommended.length
+      ? `
+        <section class="full-catalog-category full-catalog-category--recommended" data-full-catalog-category="recommended">
+          <div class="full-catalog-category-head">
+            <span class="eyebrow">Destaques</span>
+            <h2>Recomendados</h2>
+          </div>
+          <div class="full-catalog-category-grid">
+            ${recommended.map(fullCatalogCardHTML).join('')}
+          </div>
+        </section>
+      `
+      : '';
     const grouped = orderedCategoryEntries(visible)
       .map(([slug, label]) => {
         const meta = catalogSectionMeta(slug, label);
@@ -4913,7 +5114,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="full-catalog-category-head">
             <span class="eyebrow">${escapeHTML(meta.eyebrow)}</span>
             <h2>${escapeHTML(label)}</h2>
-            <small>${categoryProducts.length} item${categoryProducts.length === 1 ? '' : 's'}</small>
           </div>
           <div class="full-catalog-category-grid">
             ${categoryProducts.map(fullCatalogCardHTML).join('')}
@@ -4923,15 +5123,78 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = grouped;
+    list.innerHTML = recommendedSection + grouped;
+    refreshOfferCountdowns(list);
     qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
     if (result) {
-      result.textContent = products.length
-        ? `${visible.length} de ${products.length} produto${products.length === 1 ? '' : 's'} no catalogo`
-        : 'Carregando catalogo...';
+      result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
     }
+  }
+
+  function simpleCatalogRowHTML(product) {
+    const normalized = normalizeProduct(product);
+    const options = productOptions(normalized);
+    const hasOptions = normalized.hasVariations && options.length > 0;
+    const firstOption = options[0] || { price: normalized.price };
+    const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
+    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const imageSrc = assetHref(image);
+
+    return `
+      <article class="simple-catalog-row catalog-product ${unavailable ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}">
+        <div class="simple-catalog-thumb" aria-hidden="true">
+          ${
+            imageSrc
+              ? `<img src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+              : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
+          }
+        </div>
+        <div class="simple-catalog-main">
+          <strong>${escapeHTML(normalized.name)}</strong>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSimpleCatalogPage() {
+    const list = qs('[data-simple-catalog-list]');
+    if (!list) return;
+
+    const input = qs('[data-simple-catalog-search]');
+    const term = normalizeText(input?.value || '');
+    const products = catalogProducts().sort((a, b) => {
+      const productA = normalizeProduct(a);
+      const productB = normalizeProduct(b);
+      const categoryCompare = categoryOrderIndex(productA.categorySlug) - categoryOrderIndex(productB.categorySlug);
+      if (categoryCompare !== 0) return categoryCompare;
+      return compareCatalogProducts(a, b);
+    });
+    const visible = products.filter((product) => !term || catalogProductSearchBlob(product).includes(term));
+
+    const grouped = orderedCategoryEntries(visible)
+      .map(([slug, label]) => {
+        const categoryProducts = visible
+          .filter((product) => normalizeProduct(product).categorySlug === slug)
+          .sort(compareCatalogProducts);
+        if (!categoryProducts.length) return '';
+        return `
+          <section class="simple-catalog-group" data-simple-catalog-category="${escapeHTML(slug)}">
+            <h2>${escapeHTML(label)}</h2>
+            <div class="simple-catalog-rows">
+              ${categoryProducts.map(simpleCatalogRowHTML).join('')}
+            </div>
+          </section>
+        `;
+      })
+      .join('');
+
+    list.innerHTML = grouped;
+    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    const result = qs('[data-simple-catalog-results]');
+    if (result) result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+    optimizeImageLoading();
   }
 
   function ensureCatalogDetailModal() {
@@ -4984,13 +5247,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
     const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
+
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const displayImage = (hasOptions && firstOption.image) || image;
+    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const hasAnyOffer = selectedOfferActive || options.some((option) => option.offerActive);
 
     if (body) {
       body.innerHTML = `
@@ -5000,7 +5265,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
             ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
-            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${hasAnyOffer ? `<span class="catalog-status-badge is-offer ${selectedOfferActive ? '' : 'hidden'}" data-offer-label>Oferta</span>` : ''}
+            ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
           <span class="eyebrow">${escapeHTML(normalized.category)}</span>
@@ -5009,9 +5275,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
             <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
-            <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-              hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-            )}</strong></div>
+
             <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
           ${
@@ -5027,12 +5291,6 @@ document.addEventListener('DOMContentLoaded', () => {
               : ''
           }
           <div class="catalog-detail-actions">
-            ${
-              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
-              <i class="fa-solid fa-cart-plus"></i>
-              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
-            </button>`
-            }
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
               <i class="fa-solid fa-store"></i>
               Ver na loja
@@ -5041,9 +5299,16 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class="fa-solid fa-arrow-left"></i>
               Voltar ao catalogo
             </button>
+            ${
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              <i class="fa-solid fa-cart-plus"></i>
+              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
+            </button>`
+            }
           </div>
         </div>
       `;
+      refreshOfferCountdowns(body);
     }
 
     modal.classList.remove('hidden');
@@ -5087,6 +5352,21 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFullCatalogPage();
   }
 
+  function bindSimpleCatalogPage() {
+    const list = qs('[data-simple-catalog-list]');
+    if (!list) return;
+
+    qs('[data-simple-catalog-search]')?.addEventListener('input', renderSimpleCatalogPage);
+    list.addEventListener('click', (event) => {
+      const detailButton = event.target.closest('[data-catalog-detail]');
+      if (!detailButton) return;
+      event.preventDefault();
+      openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+    });
+
+    renderSimpleCatalogPage();
+  }
+
   function bindCatalog() {
     const input = qs('[data-catalog-search]');
     const filterBar = qs('.filter-chips');
@@ -5097,7 +5377,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else applyCatalogHashFilter(false);
 
     input?.addEventListener('input', () => {
-      if (input.value.trim()) activateCatalogFilter('all');
+      if (isPublicProductsPage()) {
+        publicProductsState.searchTerm = input.value || '';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     });
 
@@ -5108,6 +5392,11 @@ document.addEventListener('DOMContentLoaded', () => {
       qsa('[data-filter]', scopedFilterBar || document).forEach((item) =>
         item.classList.toggle('active', item === chip),
       );
+      if (isPublicProductsPage()) {
+        publicProductsState.selectedCategory = chip.dataset.filter || 'all';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     };
 
@@ -5125,6 +5414,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyCatalogFilters() {
+    if (isPublicProductsPage() && renderFilteredPublicProducts()) return;
+
     const catalogRoot = qs('.products-page #todos-produtos') || qs('#todos-produtos') || document;
     const products = qsa('.catalog-product', catalogRoot);
 
@@ -5343,16 +5634,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     rail.addEventListener('click', (event) => {
-      if (event.target.closest('button, select, input, textarea, label, a')) return;
-
       const card = event.target.closest('.rail-product');
       if (!card || !rail.contains(card)) return;
 
       const list = cards();
       const index = list.indexOf(card);
       if (index < 0) return;
+      if (index !== active) {
+        event.preventDefault();
+        event.stopPropagation();
+        focusCard(index);
+        return;
+      }
 
-      focusCard(index === active ? (active + 1) % list.length : index);
+      if (event.target.closest('button, select, input, textarea, label, a')) return;
+
+      focusCard((active + 1) % list.length);
     });
 
     rail.addEventListener(
@@ -7005,8 +7302,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setProfileActionCard('personal', {
       href: signed ? 'editar-perfil.html' : loginHref({ mode: 'register', redirect: 'perfil.html' }),
       text: profileActionText(signed, 'personal'),
-      cta: signed ? (profileComplete() ? 'Atualizar dados' : 'Completar perfil') : 'Entrar ou cadastrar',
-      label: signed ? 'Editar dados pessoais' : 'Entrar ou cadastrar para salvar dados',
+      cta: signed ? 'Ver dados' : 'Entrar ou cadastrar',
+      label: signed ? 'Ver dados pessoais' : 'Entrar ou cadastrar para salvar dados',
     });
 
     setProfileActionCard('orders', {
@@ -7029,6 +7326,136 @@ document.addEventListener('DOMContentLoaded', () => {
       cta: 'Chamar no WhatsApp',
       label: 'Abrir suporte direto no WhatsApp',
       external: true,
+    });
+  }
+
+  function personalFieldHTML(label, value, icon) {
+    return `
+      <div class="profile-popup-field">
+        <i class="fa-solid ${escapeHTML(icon)}"></i>
+        <span>
+          <small>${escapeHTML(label)}</small>
+          <strong>${escapeHTML(value || 'Nao informado')}</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  function ensureProfilePersonalModal() {
+    let modal = qs('#profile-personal-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-personal-modal';
+    modal.className = 'profile-popup-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'profile-personal-title');
+    modal.innerHTML = `
+      <button class="profile-popup-backdrop" type="button" data-close-profile-popup aria-label="Fechar dados pessoais"></button>
+      <div class="profile-popup-panel">
+        <div class="profile-popup-head">
+          <span>
+            <small class="eyebrow">Dados pessoais</small>
+            <h2 id="profile-personal-title">Resumo do perfil</h2>
+          </span>
+          <button class="icon-button" type="button" data-close-profile-popup aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="profile-popup-fields" data-profile-personal-fields></div>
+        <div class="profile-popup-actions">
+          <a class="btn btn-secondary" href="editar-perfil.html">
+            <i class="fa-solid fa-pen"></i>
+            Editar perfil
+          </a>
+          <button class="btn btn-primary" type="button" data-close-profile-popup>Concluir</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openProfilePersonalModal() {
+    if (!currentUser?.email) {
+      window.location.href = loginHref({ mode: 'register', redirect: 'perfil.html' });
+      return;
+    }
+
+    const modal = ensureProfilePersonalModal();
+    const fields = qs('[data-profile-personal-fields]', modal);
+    if (fields) {
+      fields.innerHTML = [
+        personalFieldHTML('Nome', currentUser.name || 'Cliente Monte Sinai', 'fa-user'),
+        personalFieldHTML('Email', currentUser.email, 'fa-envelope'),
+        personalFieldHTML('WhatsApp', currentUser.phone, 'fa-phone'),
+        personalFieldHTML('Endereco', currentUser.address, 'fa-location-dot'),
+      ].join('');
+    }
+    modal.classList.remove('hidden');
+    document.body.classList.add('profile-popup-open');
+  }
+
+  function closeProfilePersonalModal() {
+    qs('#profile-personal-modal')?.classList.add('hidden');
+    document.body.classList.remove('profile-popup-open');
+  }
+
+  function ensureProfileOrdersPopupModal() {
+    let modal = qs('#profile-orders-popup-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-orders-popup-modal';
+    modal.className = 'profile-popup-modal profile-orders-popup hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'profile-orders-popup-title');
+    modal.innerHTML = `
+      <button class="profile-popup-backdrop" type="button" data-close-profile-orders aria-label="Fechar historico de pedidos"></button>
+      <div class="profile-popup-panel profile-orders-popup-panel">
+        <div class="profile-popup-head profile-orders-popup-head">
+          <span>
+            <small class="eyebrow">Historico de pedidos</small>
+            <h2 id="profile-orders-popup-title">Todos os pedidos</h2>
+          </span>
+          <button class="icon-button" type="button" data-close-profile-orders aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="profile-orders-popup-body" data-profile-orders-popup-host></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  async function openProfileOrdersModal() {
+    const panel = qs('#profile-orders');
+    if (!panel) return;
+    const modal = ensureProfileOrdersPopupModal();
+    const host = qs('[data-profile-orders-popup-host]', modal);
+    if (host && panel.parentElement !== host) host.appendChild(panel);
+    panel.classList.remove('hidden');
+    panel.classList.add('profile-orders-modal', 'is-open');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', 'Historico de pedidos');
+    await renderOrdersEverywhere({ force: true });
+    modal.classList.remove('hidden');
+    document.body.classList.add('profile-orders-open');
+  }
+
+  function closeProfileOrdersModal() {
+    qs('#profile-orders-popup-modal')?.classList.add('hidden');
+    const panel = qs('#profile-orders');
+    panel?.classList.add('hidden');
+    panel?.classList.remove('is-open');
+    document.body.classList.remove('profile-orders-open');
+    qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item.dataset.profileTab === 'details'));
+    qsa('[data-profile-panel]').forEach((item) => {
+      if (item.id !== 'profile-orders') item.classList.toggle('hidden', item.dataset.profilePanel !== 'details');
     });
   }
 
@@ -7096,8 +7523,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (firstBind) {
       qsa('[data-profile-tab]').forEach((tab) => {
-        tab.addEventListener('click', () => {
+        tab.addEventListener('click', async () => {
           const target = tab.dataset.profileTab || 'details';
+          if (target === 'history') {
+            qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item === tab));
+            await openProfileOrdersModal();
+            return;
+          }
           qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item === tab));
           qsa('[data-profile-panel]').forEach((panel) => {
             panel.classList.toggle('hidden', panel.dataset.profilePanel !== target);
@@ -7118,11 +7550,36 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       document.body.addEventListener('click', async (event) => {
+        const personalCard = event.target.closest('[data-profile-action-card="personal"]');
+        if (personalCard && qs('#profile-page')) {
+          event.preventDefault();
+          openProfilePersonalModal();
+          return;
+        }
+
+        const closeProfilePopup = event.target.closest('[data-close-profile-popup]');
+        if (closeProfilePopup) {
+          closeProfilePersonalModal();
+          return;
+        }
+
+        const closeOrders = event.target.closest('[data-close-profile-orders]');
+        if (closeOrders) {
+          closeProfileOrdersModal();
+          return;
+        }
+
         const button = event.target.closest('[data-order-whatsapp]');
         if (!button) return;
         const orders = await loadOrdersFromSupabase();
         const order = orders.find((item) => item.id === button.dataset.orderWhatsapp);
         if (order) openWhatsAppOrder(order);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        closeProfilePersonalModal();
+        closeProfileOrdersModal();
       });
 
       document.body.dataset.profilePageBound = 'true';
@@ -9836,7 +10293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Limpar cache e histórico
           </button>
         </div>
-      `,
+        `,
       );
     }
 
