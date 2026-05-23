@@ -28852,3 +28852,403 @@ body:not(.admin-shell-body):not(.auth-body) {
     max-width: 100% !important;
   }
 }
+
+/* Etapa 6.4 - acabamento visual do painel admin em modo claro e noturno. */
+.admin-shell-body {
+  --admin-bg: #07162d;
+  --admin-bg-soft: #0b1f3f;
+  --admin-sidebar-bg: #061b39;
+  --admin-sidebar-soft: #0b2852;
+  --admin-card: #10284c;
+  --admin-card-soft: #142f58;
+  --admin-raised: #183865;
+  --admin-text: #edf5ff;
+  --admin-text-soft: #bed0e6;
+  --admin-muted: #8fa6c2;
+  --admin-line: rgba(203, 219, 240, 0.18);
+  --admin-line-strong: rgba(243, 199, 47, 0.34);
+  --admin-primary: #68a7ff;
+  --admin-primary-strong: #a9cdff;
+  --admin-accent: #f3c72f;
+  --admin-danger: #ff7b7b;
+  --admin-success: #62d990;
+  --admin-warning: #f3c72f;
+  --admin-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  --admin-shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.2);
+  background:
+    radial-gradient(circle at 12% -8%, rgba(104, 167, 255, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 4%, rgba(243, 199, 47, 0.16), transparent 28%),
+    linear-gradient(180deg, var(--admin-bg) 0%, #091b36 100%) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body.light-mode {
+  --admin-bg: #eef4fb;
+  --admin-bg-soft: #f5f8fc;
+  --admin-sidebar-bg: #0b2d5f;
+  --admin-sidebar-soft: #123a72;
+  --admin-card: #ffffff;
+  --admin-card-soft: #f7faff;
+  --admin-raised: #eef5ff;
+  --admin-text: #102036;
+  --admin-text-soft: #42556f;
+  --admin-muted: #667891;
+  --admin-line: rgba(15, 35, 64, 0.14);
+  --admin-line-strong: rgba(11, 45, 95, 0.28);
+  --admin-primary: #0b2d5f;
+  --admin-primary-strong: #061f44;
+  --admin-accent: #f3c72f;
+  --admin-danger: #b91c1c;
+  --admin-success: #0f8f4a;
+  --admin-warning: #9a6a00;
+  --admin-shadow: 0 16px 36px rgba(25, 66, 120, 0.12);
+  --admin-shadow-soft: 0 8px 22px rgba(25, 66, 120, 0.09);
+  background:
+    radial-gradient(circle at 10% -12%, rgba(11, 45, 95, 0.12), transparent 35%),
+    radial-gradient(circle at 90% 0%, rgba(243, 199, 47, 0.18), transparent 28%),
+    linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .admin-app-shell,
+.admin-shell-body .admin-main {
+  background: transparent !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .admin-sidebar {
+  border-color: var(--admin-line) !important;
+  background:
+    linear-gradient(180deg, var(--admin-sidebar-bg) 0%, #061730 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.18) !important;
+}
+
+.admin-shell-body.light-mode .admin-sidebar {
+  background:
+    linear-gradient(180deg, var(--admin-sidebar-bg) 0%, #08244f 100%) !important;
+  box-shadow: 10px 0 26px rgba(15, 35, 64, 0.12) !important;
+}
+
+.admin-shell-body .admin-sidebar-brand {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #ffffff !important;
+}
+
+.admin-shell-body .admin-sidebar-brand strong,
+.admin-shell-body .admin-sidebar-brand small {
+  color: #ffffff !important;
+}
+
+.admin-shell-body .admin-menu-btn,
+.admin-shell-body .admin-sidebar-footer .btn {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+}
+
+.admin-shell-body .admin-menu-btn i,
+.admin-shell-body .admin-sidebar-footer .btn i {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.admin-shell-body .admin-menu-btn.active,
+.admin-shell-body .admin-menu-btn:hover {
+  border-color: var(--admin-accent) !important;
+  background: var(--admin-accent) !important;
+  color: #172033 !important;
+}
+
+.admin-shell-body .admin-menu-btn.active i,
+.admin-shell-body .admin-menu-btn:hover i {
+  color: #172033 !important;
+}
+
+.admin-shell-body .admin-view,
+.admin-shell-body .admin-access-card,
+.admin-shell-body .admin-product-simple-form,
+.admin-shell-body .admin-product-list-panel,
+.admin-shell-body .admin-kanban-col,
+.admin-shell-body .admin-order-card,
+.admin-shell-body .admin-product-simple-card,
+.admin-shell-body .admin-config-form,
+.admin-shell-body .admin-console-card,
+.admin-shell-body .admin-team-card,
+.admin-shell-body .admin-system-card,
+.admin-shell-body .admin-profile-summary,
+.admin-shell-body .admin-profile-action,
+.admin-shell-body .admin-advanced-tools,
+.admin-shell-body .admin-product-detail-card,
+.admin-shell-body .admin-product-editor-panel,
+.admin-shell-body .admin-developer-card,
+.admin-shell-body .admin-placeholder-grid > *,
+.admin-shell-body .admin-product-detail-modal-panel {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-card) !important;
+  color: var(--admin-text) !important;
+  box-shadow: var(--admin-shadow-soft) !important;
+}
+
+.admin-shell-body .admin-view.active > .admin-view-header {
+  border-color: var(--admin-line) !important;
+  background: color-mix(in srgb, var(--admin-card) 92%, transparent) !important;
+  color: var(--admin-text) !important;
+  box-shadow: var(--admin-shadow-soft) !important;
+}
+
+.admin-shell-body .admin-view-header h1,
+.admin-shell-body .admin-view.active > .admin-view-header h1,
+.admin-shell-body .admin-list-head h2,
+.admin-shell-body .admin-product-manage-title strong,
+.admin-shell-body .admin-profile-summary strong,
+.admin-shell-body .admin-profile-action strong,
+.admin-shell-body .admin-system-card strong,
+.admin-shell-body .admin-order-customer h3,
+.admin-shell-body .admin-developer-card h2,
+.admin-shell-body .admin-product-detail-card h2,
+.admin-shell-body .admin-product-editor-head h2 {
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .admin-view-header p,
+.admin-shell-body .admin-view.active > .admin-view-header p,
+.admin-shell-body .admin-product-manage-title small,
+.admin-shell-body .admin-profile-summary p,
+.admin-shell-body .admin-profile-action small,
+.admin-shell-body .admin-system-card p,
+.admin-shell-body .admin-order-card p,
+.admin-shell-body .admin-empty-state,
+.admin-shell-body .form-help-text,
+.admin-shell-body .admin-filter-field,
+.admin-shell-body .admin-product-detail-card dt,
+.admin-shell-body .console-log-meta,
+.admin-shell-body .console-log-payload {
+  color: var(--admin-text-soft) !important;
+}
+
+.admin-shell-body .eyebrow {
+  color: var(--admin-primary-strong) !important;
+}
+
+.admin-shell-body.light-mode .eyebrow {
+  color: var(--admin-primary) !important;
+}
+
+.admin-shell-body input,
+.admin-shell-body select,
+.admin-shell-body textarea,
+.admin-shell-body .admin-search-field,
+.admin-shell-body .admin-filter-field select,
+.admin-shell-body .sql-console {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-card-soft) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body input::placeholder,
+.admin-shell-body textarea::placeholder {
+  color: var(--admin-muted) !important;
+  opacity: 1 !important;
+}
+
+.admin-shell-body .admin-search-field i {
+  color: var(--admin-primary-strong) !important;
+}
+
+.admin-shell-body .btn.btn-primary,
+.admin-shell-body .btn-primary {
+  border-color: var(--admin-primary) !important;
+  background: var(--admin-primary) !important;
+  color: #07162d !important;
+}
+
+.admin-shell-body.light-mode .btn.btn-primary,
+.admin-shell-body.light-mode .btn-primary {
+  color: #ffffff !important;
+}
+
+.admin-shell-body .btn.btn-secondary,
+.admin-shell-body .btn-secondary,
+.admin-shell-body .admin-product-quick-actions .btn {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-card-soft) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .btn.btn-accent,
+.admin-shell-body .btn-accent {
+  border-color: rgba(243, 199, 47, 0.4) !important;
+  background: var(--admin-accent) !important;
+  color: #172033 !important;
+}
+
+.admin-shell-body .admin-danger,
+.admin-shell-body .admin-product-quick-actions .admin-danger,
+.admin-shell-body .admin-profile-action.is-danger {
+  border-color: color-mix(in srgb, var(--admin-danger) 36%, transparent) !important;
+  background: color-mix(in srgb, var(--admin-danger) 12%, var(--admin-card)) !important;
+  color: var(--admin-danger) !important;
+}
+
+.admin-shell-body .admin-live-pill,
+.admin-shell-body .admin-product-badge,
+.admin-shell-body .admin-menu-badge,
+.admin-shell-body .admin-mobile-badge,
+.admin-shell-body .console-log-badge {
+  border-color: var(--admin-line-strong) !important;
+  background: var(--admin-raised) !important;
+  color: var(--admin-primary-strong) !important;
+}
+
+.admin-shell-body .admin-product-badge.is-active,
+.admin-shell-body .console-log-badge.success {
+  background: color-mix(in srgb, var(--admin-success) 18%, var(--admin-card)) !important;
+  color: var(--admin-success) !important;
+  border-color: color-mix(in srgb, var(--admin-success) 38%, transparent) !important;
+}
+
+.admin-shell-body .admin-product-badge.is-inactive,
+.admin-shell-body .admin-product-badge.is-out,
+.admin-shell-body .console-log-badge.error {
+  background: color-mix(in srgb, var(--admin-danger) 14%, var(--admin-card)) !important;
+  color: var(--admin-danger) !important;
+  border-color: color-mix(in srgb, var(--admin-danger) 34%, transparent) !important;
+}
+
+.admin-shell-body .admin-product-badge.is-low,
+.admin-shell-body .admin-product-badge.is-offer {
+  background: color-mix(in srgb, var(--admin-warning) 18%, var(--admin-card)) !important;
+  color: var(--admin-warning) !important;
+  border-color: color-mix(in srgb, var(--admin-warning) 42%, transparent) !important;
+}
+
+.admin-shell-body.light-mode .admin-product-badge.is-low,
+.admin-shell-body.light-mode .admin-product-badge.is-offer {
+  color: #7a5200 !important;
+}
+
+.admin-shell-body .admin-order-status-tab {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-card) !important;
+  color: var(--admin-text-soft) !important;
+}
+
+.admin-shell-body .admin-order-status-tab.active {
+  border-color: var(--admin-accent) !important;
+  background: color-mix(in srgb, var(--admin-accent) 18%, var(--admin-card)) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body.light-mode .admin-order-status-tab.active {
+  color: var(--admin-primary-strong) !important;
+}
+
+.admin-shell-body .admin-order-control-grid select,
+.admin-shell-body .admin-order-status-select select {
+  background: var(--admin-card-soft) !important;
+  color: var(--admin-text) !important;
+  border-color: var(--admin-line) !important;
+}
+
+.admin-shell-body .admin-product-thumb,
+.admin-shell-body .admin-product-detail-media,
+.admin-shell-body .admin-system-icon,
+.admin-shell-body .admin-profile-avatar,
+.admin-shell-body .admin-profile-action i {
+  background: var(--admin-raised) !important;
+  color: var(--admin-primary-strong) !important;
+}
+
+.admin-shell-body .admin-profile-avatar {
+  background: var(--admin-primary) !important;
+  color: #07162d !important;
+}
+
+.admin-shell-body.light-mode .admin-profile-avatar {
+  color: #ffffff !important;
+}
+
+.admin-shell-body .admin-team-table th,
+.admin-shell-body .admin-team-table td {
+  border-color: var(--admin-line) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .admin-team-table th {
+  background: var(--admin-card-soft) !important;
+  color: var(--admin-text-soft) !important;
+}
+
+.admin-shell-body .console-log-entry,
+.admin-shell-body .admin-stock-alert,
+.admin-shell-body .admin-metric-row {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-card-soft) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-shell-body .admin-mobile-bottom-nav {
+  border-color: var(--admin-line) !important;
+  background: color-mix(in srgb, var(--admin-card) 96%, transparent) !important;
+  box-shadow: var(--admin-shadow) !important;
+}
+
+.admin-shell-body .admin-mobile-bottom-nav button {
+  color: var(--admin-text-soft) !important;
+}
+
+.admin-shell-body .admin-mobile-bottom-nav button.active {
+  background: var(--admin-accent) !important;
+  color: #172033 !important;
+}
+
+body.admin-shell-body.light-mode {
+  background-color: #eef4fb !important;
+  color: #102036 !important;
+}
+
+body.admin-shell-body:not(.light-mode) {
+  background-color: #07162d !important;
+  color: #edf5ff !important;
+}
+
+body.admin-shell-body.light-mode .admin-view,
+body.admin-shell-body.light-mode .admin-access-card,
+body.admin-shell-body.light-mode .admin-product-simple-form,
+body.admin-shell-body.light-mode .admin-product-list-panel,
+body.admin-shell-body.light-mode .admin-kanban-col,
+body.admin-shell-body.light-mode .admin-order-card,
+body.admin-shell-body.light-mode .admin-product-simple-card,
+body.admin-shell-body.light-mode .admin-config-form,
+body.admin-shell-body.light-mode .admin-console-card,
+body.admin-shell-body.light-mode .admin-team-card,
+body.admin-shell-body.light-mode .admin-system-card,
+body.admin-shell-body.light-mode .admin-profile-summary,
+body.admin-shell-body.light-mode .admin-profile-action,
+body.admin-shell-body.light-mode .admin-advanced-tools,
+body.admin-shell-body.light-mode .admin-product-detail-card,
+body.admin-shell-body.light-mode .admin-product-editor-panel,
+body.admin-shell-body.light-mode .admin-developer-card,
+body.admin-shell-body.light-mode .admin-placeholder-grid > *,
+body.admin-shell-body.light-mode .admin-product-detail-modal-panel {
+  background: #ffffff !important;
+  color: #102036 !important;
+}
+
+body.admin-shell-body.light-mode .admin-product-manage-title strong,
+body.admin-shell-body.light-mode .admin-profile-summary strong,
+body.admin-shell-body.light-mode .admin-profile-action strong,
+body.admin-shell-body.light-mode .admin-system-card strong,
+body.admin-shell-body.light-mode .admin-order-customer h3,
+body.admin-shell-body.light-mode .admin-view-header h1 {
+  color: #102036 !important;
+}
+
+body.admin-shell-body.light-mode .admin-product-manage-title small,
+body.admin-shell-body.light-mode .admin-profile-summary p,
+body.admin-shell-body.light-mode .admin-profile-action small,
+body.admin-shell-body.light-mode .admin-system-card p,
+body.admin-shell-body.light-mode .admin-view-header p {
+  color: #42556f !important;
+}
