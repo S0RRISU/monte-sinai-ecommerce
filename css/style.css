@@ -29852,6 +29852,68 @@ html[data-theme] body.admin-shell-body textarea {
   }
 }
 
+/* Mobile dock polish: framed side buttons and yellow icon-only active state. */
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'] {
+    border: 1px solid color-mix(in srgb, var(--line) 82%, rgba(64, 169, 255, 0.35)) !important;
+    background: color-mix(in srgb, var(--surface-soft) 34%, transparent) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 12px 24px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'],
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'] {
+    border-color: rgba(153, 187, 228, 0.72) !important;
+    background: rgba(255, 255, 255, 0.42) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 12px 24px rgba(11, 83, 175, 0.08) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active {
+    border-color: color-mix(in srgb, var(--accent) 68%, var(--line)) !important;
+    background: color-mix(in srgb, var(--surface-soft) 38%, transparent) !important;
+    color: var(--dock-item-text-final, var(--text)) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 12px 24px rgba(0, 0, 0, 0.13),
+      0 0 0 1px rgba(250, 204, 21, 0.1) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active {
+    background: rgba(255, 255, 255, 0.5) !important;
+    color: #082d63 !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active i {
+    color: #facc15 !important;
+  }
+
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart {
+    border-color: #facc15 !important;
+    background: linear-gradient(145deg, #fff077 0%, #facc15 54%, #dfa900 100%) !important;
+    color: #0f172a !important;
+  }
+}
+
 /* Cart badge and active fill correction: blue cart, yellow ring, red counter. */
 @media (max-width: 760px) {
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
