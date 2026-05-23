@@ -2,9 +2,12 @@ document.addEventListener('DOMContentLoaded', () => {
   'use strict';
 
   const PRODUCT_IMAGE_BUCKET = 'produtos';
-  const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
-  const IMAGE_COMPRESS_TARGET = 1800;
-  const IMAGE_COMPRESS_QUALITY = 0.82;
+  const PRODUCT_IMAGE_MAX_SIDE = 1800;
+  const PRODUCT_IMAGE_MIN_SIDE = 900;
+  const PRODUCT_IMAGE_TARGET_SIZE = 2.4 * 1024 * 1024;
+  const PRODUCT_IMAGE_OUTPUT_TYPE = 'image/jpeg';
+  const PRODUCT_IMAGE_OUTPUT_EXTENSION = 'jpg';
+  const IMAGE_COMPRESS_QUALITY = 0.85;
   // Fallback mapping for admin emails — should NOT be relied on in production.
   // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
@@ -1573,7 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           <label class="admin-variation-upload">
                             <i class="fa-solid fa-image"></i>
                             <span>Enviar imagem</span>
-                            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-image-file="${escapeHTML(variation.id)}">
+                            <input type="file" accept="image/*" data-admin-variation-image-file="${escapeHTML(variation.id)}">
                           </label>
                         </div>
                       </div>
@@ -1614,7 +1617,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <label class="admin-variation-upload">
             <i class="fa-solid fa-image"></i>
             <span>Enviar imagem</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-new-file>
+            <input type="file" accept="image/*" data-admin-variation-new-file>
           </label>
           <button class="btn btn-primary" type="button" data-admin-variation-add="${escapeHTML(product.id)}">
             <i class="fa-solid fa-plus"></i>
@@ -1668,6 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
           </div>
           <div class="admin-image-preview admin-edit-image-preview hidden" data-admin-edit-image-preview="${escapeHTML(product.id)}" aria-live="polite"></div>
+          <small class="admin-image-feedback" data-admin-edit-image-feedback="${escapeHTML(product.id)}"></small>
         </div>
         <label>Estoque
           <input type="number" min="0" step="1" value="${escapeHTML(stock)}" data-admin-product-field="estoque" data-product-id="${escapeHTML(product.id)}">
@@ -1845,7 +1849,7 @@ document.addEventListener('DOMContentLoaded', () => {
       payload = override || variationPayloadFromEditor(variationId);
       if (!override) {
         const file = qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] || null;
-        if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId);
+        if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId, { productId });
       }
       if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
       if (!override && payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
@@ -1902,7 +1906,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ordem: productVariations(productId).length * 10 + 10,
       };
       const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
-      if (file) payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId);
+      if (file) payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId, { productId });
       if (!payload.nome) throw new Error('Informe o nome da variacao.');
     } catch (error) {
       variationSaveLocks.delete(`new-${productId}`);
@@ -1958,6 +1962,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
+    let uploadedImage = false;
     if (!override) {
       const file =
         qs(`[data-admin-product-image-file-camera="${escapeSelector(productId)}"]`)?.files?.[0] ||
@@ -1966,7 +1971,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (file) {
         try {
           showToast('Enviando nova imagem...', 'info');
-          payload.imagem = await resolveProductImage(file, payload.nome || productId);
+          payload.imagem = await resolveProductImage(file, payload.nome || productId, { productId });
+          uploadedImage = true;
         } catch (error) {
           unlockProductSave(productId);
           showToast(friendlyDbError(error, error.message || 'Nao consegui enviar a imagem.'), 'error');
@@ -2029,6 +2035,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload } : product));
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
+    if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
     showToast('Produto atualizado.', 'success');
     carregarProdutosAdmin();
     unlockProductSave(productId);
@@ -2072,13 +2079,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'png';
   }
 
+  function originalImageExtension(file) {
+    return text(file?.name).split('.').pop()?.toLowerCase() || '';
+  }
+
+  function isUnsupportedPhoneImage(file) {
+    const extension = originalImageExtension(file);
+    const type = text(file?.type).toLowerCase();
+    return ['heic', 'heif'].includes(extension) || ['image/heic', 'image/heif'].includes(type);
+  }
+
   function validateProductImageFile(file) {
     if (!file) return;
-    if (!file.type?.startsWith('image/')) {
+    if (isUnsupportedPhoneImage(file)) {
+      throw new Error('Este formato de foto nao foi aceito. Tente tirar novamente em JPG ou escolher outra imagem.');
+    }
+    const extension = originalImageExtension(file);
+    const acceptedByExtension = ['jpg', 'jpeg', 'png', 'webp'].includes(extension);
+    const acceptedByMime = ['image/jpeg', 'image/png', 'image/webp'].includes(text(file.type).toLowerCase());
+    if (!acceptedByMime && !acceptedByExtension) {
       throw new Error('Use uma imagem JPG, PNG ou WebP.');
     }
-    if (file.size > MAX_IMAGE_SIZE) {
-      console.info('[Admin] Imagem grande recebida; tentando reduzir antes do envio.');
+    if (file.size > PRODUCT_IMAGE_TARGET_SIZE) {
+      console.info('[Admin] Imagem grande recebida; preparando versao otimizada antes do envio.');
     }
   }
 
@@ -2090,39 +2113,120 @@ document.addEventListener('DOMContentLoaded', () => {
     return image;
   }
 
+  function setAdminImageFeedback(message = '', productId = '') {
+    const targets = productId
+      ? qsa(`[data-admin-edit-image-feedback="${escapeSelector(productId)}"]`)
+      : [qs('#admin-product-upload-feedback')].filter(Boolean);
+    targets.forEach((target) => {
+      target.textContent = message;
+    });
+  }
+
+  function imageSourceSize(source) {
+    return {
+      width: source.width || source.naturalWidth || 0,
+      height: source.height || source.naturalHeight || 0,
+    };
+  }
+
+  async function loadImageForCompression(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        return await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch (error) {
+        console.info('[Admin] createImageBitmap nao aceitou a imagem, usando fallback.', error);
+      }
+    }
+
+    return await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Nao consegui ler essa foto. Tente tirar novamente ou escolher outra imagem.'));
+      };
+      image.src = url;
+    });
+  }
+
+  function drawImageToCanvas(source, maxSide) {
+    const { width: sourceWidth, height: sourceHeight } = imageSourceSize(source);
+    if (!sourceWidth || !sourceHeight) throw new Error('Nao consegui identificar o tamanho da imagem.');
+    const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('Seu navegador nao conseguiu preparar essa imagem.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(source, 0, 0, width, height);
+    return canvas;
+  }
+
+  function canvasBlob(canvas, quality) {
+    return new Promise((resolve) => canvas.toBlob(resolve, PRODUCT_IMAGE_OUTPUT_TYPE, quality));
+  }
+
   async function compressProductImage(file) {
-    if (!file || typeof createImageBitmap !== 'function') return file;
-    if (file.size <= 900 * 1024 && ['image/jpeg', 'image/webp'].includes(file.type)) return file;
+    if (!file) return file;
+    validateProductImageFile(file);
+    let source = null;
 
     try {
-      const bitmap = await createImageBitmap(file);
-      const scale = Math.min(1, IMAGE_COMPRESS_TARGET / Math.max(bitmap.width, bitmap.height));
-      const width = Math.max(1, Math.round(bitmap.width * scale));
-      const height = Math.max(1, Math.round(bitmap.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      context.drawImage(bitmap, 0, 0, width, height);
-      const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, IMAGE_COMPRESS_QUALITY));
-      bitmap.close?.();
-      if (!blob) return file;
-      if (blob.size >= file.size && file.size <= MAX_IMAGE_SIZE) return file;
-      const extension = type === 'image/png' ? 'png' : 'jpg';
+      source = await loadImageForCompression(file);
+      const qualitySteps = [IMAGE_COMPRESS_QUALITY, 0.78, 0.7, 0.62];
+      const dimensionSteps = [PRODUCT_IMAGE_MAX_SIDE, 1600, 1400, 1200, PRODUCT_IMAGE_MIN_SIDE];
+      let bestBlob = null;
+
+      for (const maxSide of dimensionSteps) {
+        const canvas = drawImageToCanvas(source, maxSide);
+        for (const quality of qualitySteps) {
+          const blob = await canvasBlob(canvas, quality);
+          if (!blob) continue;
+          if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+          if (blob.size <= PRODUCT_IMAGE_TARGET_SIZE) {
+            const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
+            return new File([blob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
+              type: PRODUCT_IMAGE_OUTPUT_TYPE,
+              lastModified: Date.now(),
+            });
+          }
+        }
+      }
+
+      if (!bestBlob) throw new Error('Nao consegui comprimir essa imagem.');
+      if (bestBlob.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
+        throw new Error('A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.');
+      }
       const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
-      return new File([blob], `${baseName}.${extension}`, { type, lastModified: Date.now() });
+      return new File([bestBlob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
+        type: PRODUCT_IMAGE_OUTPUT_TYPE,
+        lastModified: Date.now(),
+      });
     } catch (error) {
-      console.warn('[Admin] Compressao de imagem falhou; tentando arquivo original.', error);
-      return file;
+      console.warn('[Admin] Compressao de imagem falhou.', error);
+      throw new Error(error.message || 'Nao consegui preparar essa imagem. Tente outra foto.');
+    } finally {
+      source?.close?.();
     }
   }
 
-  async function resolveProductImage(file, productNameOverride = '') {
+  async function resolveProductImage(file, productNameOverride = '', options = {}) {
     if (!file) return '';
+    const productId = options.productId || '';
     validateProductImageFile(file);
     try {
+      setAdminImageFeedback('Preparando imagem...', productId);
+      setAdminImageFeedback('Comprimindo imagem...', productId);
       const preparedFile = await compressProductImage(file);
+      setAdminImageFeedback('Enviando imagem...', productId);
       validateProductImageFile(preparedFile);
       return await uploadImagemProduto(preparedFile, productNameOverride);
     } catch (error) {
@@ -2144,7 +2248,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const extension = imageExtension(file);
     const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
-    const path = `${safeFileName(productName)}/${Date.now()}-${safeFileName(file.name)}.${extension}`;
+    const baseName = safeFileName(text(file.name).replace(/\.[^.]+$/, '') || productName || 'produto');
+    const path = `${safeFileName(productName)}/${Date.now()}-${baseName}.${extension}`;
     const { error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
       cacheControl: '3600',
       contentType: file.type || `image/${extension}`,
@@ -2162,21 +2267,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) {
       preview.classList.add('hidden');
       preview.innerHTML = '';
+      setAdminImageFeedback('');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...');
       preview.classList.remove('hidden');
       preview.innerHTML = `
-        <img src="${escapeHTML(reader.result || '')}" alt="Previa da imagem do produto">
-        <span>Imagem escolhida. Voce pode trocar antes de salvar.</span>
+        <img src="${escapeHTML(url)}" alt="Previa da imagem do produto">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente antes do envio.</span>
       `;
-    };
-    reader.onerror = () => {
+    } catch (error) {
       preview.classList.add('hidden');
-      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
-    };
-    reader.readAsDataURL(file);
+      preview.innerHTML = '';
+      setAdminImageFeedback('');
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
   }
 
   function renderEditProductImagePreview(productId, file) {
@@ -2185,21 +2293,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) {
       preview.classList.add('hidden');
       preview.innerHTML = '';
+      setAdminImageFeedback('', productId);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', productId);
       preview.classList.remove('hidden');
       preview.innerHTML = `
-        <img src="${escapeHTML(reader.result || '')}" alt="Previa da nova imagem do produto">
-        <span>Nova imagem escolhida. Ela sera enviada ao salvar.</span>
+        <img src="${escapeHTML(url)}" alt="Previa da nova imagem do produto">
+        <span>Nova imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
       `;
-    };
-    reader.onerror = () => {
+    } catch (error) {
       preview.classList.add('hidden');
-      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
-    };
-    reader.readAsDataURL(file);
+      preview.innerHTML = '';
+      setAdminImageFeedback('', productId);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
   }
 
   function selectedCreateProductImageFile() {
@@ -2996,6 +3107,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderEditProductImagePreview(productId, null);
         showToast('Imagem removida. Salve o produto para confirmar.', 'info');
+        return;
+      }
+
+      const createImageClear = event.target.closest('[data-admin-create-image-clear]');
+      if (createImageClear) {
+        qsa('#prod-foto, #prod-foto-camera').forEach((input) => {
+          input.value = '';
+        });
+        renderCreateProductImagePreview(null);
+        showToast('Imagem removida do novo produto.', 'info');
         return;
       }
 

@@ -34266,3 +34266,62 @@ body.profile-orders-open {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Etapa 9 - upload e enquadramento seguro de imagens de produto. */
+body.admin-shell-body .admin-image-mobile-actions,
+body.admin-shell-body .admin-product-photo-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+body.admin-shell-body .admin-image-remove,
+body.admin-shell-body [data-admin-product-image-clear] {
+  min-height: 44px !important;
+}
+
+body.admin-shell-body .admin-image-preview {
+  align-items: start !important;
+}
+
+body.admin-shell-body .admin-image-preview img {
+  width: 100% !important;
+  aspect-ratio: 4 / 3 !important;
+  max-height: 280px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  background:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.14) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(148, 163, 184, 0.14) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.14) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.14) 75%),
+    #ffffff !important;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0 !important;
+  background-size: 16px 16px !important;
+}
+
+body.admin-shell-body .admin-product-thumb img,
+body.admin-shell-body .admin-product-simple-card .admin-product-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+body:not(.admin-shell-body) .product-image,
+body:not(.admin-shell-body) .full-catalog-media img,
+body:not(.admin-shell-body) .cart-thumb-img {
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+@media (max-width: 900px) {
+  body.admin-shell-body .admin-image-mobile-actions,
+  body.admin-shell-body .admin-product-photo-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
