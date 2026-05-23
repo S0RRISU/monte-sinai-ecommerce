@@ -144,6 +144,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ADMIN_PANEL_HREF = '/pages/painel.html';
   const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
   const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const PUBLIC_PRODUCT_VIEW = 'vw_catalogo_publico';
+  const PUBLIC_PRODUCT_VARIATION_VIEW = 'vw_catalogo_variacoes_publicas';
+  const PUBLIC_PRODUCT_SELECT =
+    'id, nome, preco, preco_original, imagem, categoria, descricao, ativo, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque, pode_comprar, indisponivel, created_at, updated_at';
+  const PUBLIC_PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, preco_original, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, pode_comprar, indisponivel, created_at, updated_at';
   const PRODUCT_VARIATION_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
   const PRODUCT_VARIATION_BASIC_SELECT =
@@ -1351,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function normalizeProductVariation(raw = {}, product = {}) {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name || product.name || '');
-    const originalPrice = parsePrice(raw.preco ?? raw.originalPrice ?? raw.price ?? product.price ?? 0);
+    const originalPrice = parsePrice(raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price ?? product.price ?? 0);
     const offer = variationOfferData(raw);
     const stock =
       raw.estoque === null || raw.stock === null || raw.estoque === ''
@@ -1359,6 +1365,8 @@ document.addEventListener('DOMContentLoaded', () => {
         : Number.isFinite(Number(raw.estoque ?? raw.stock))
           ? Number(raw.estoque ?? raw.stock)
           : null;
+    const canBuy = raw.pode_comprar ?? raw.canBuy;
+    const unavailable = raw.indisponivel ?? raw.unavailable ?? (canBuy === false ? true : false);
 
     return {
       id: raw.id ?? raw.variationId ?? '',
@@ -1373,6 +1381,8 @@ document.addEventListener('DOMContentLoaded', () => {
       offerStartsAt: offer.startsAt,
       offerEndsAt: offer.endsAt,
       stock,
+      canBuy: canBuy === undefined || canBuy === null ? stock === null || stock > 0 : canBuy !== false,
+      unavailable: unavailable === true,
       active: (raw.ativo ?? raw.active ?? true) !== false,
       image,
       attributes: raw.atributos ?? raw.attributes ?? {},
@@ -1384,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const category = String(raw.categoria ?? raw.category ?? 'Produtos').trim() || 'Produtos';
     const description = String(raw.descricao ?? raw.description ?? '').trim();
-    const originalPrice = parsePrice(raw.preco ?? raw.originalPrice ?? raw.price);
+    const originalPrice = parsePrice(raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price);
     const promotionalPrice = parsePrice(raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice);
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name);
     const type =
@@ -1394,6 +1404,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
     const stock = productStockLevel(raw);
     const lowStockLimit = productLowStockLimit(raw);
+    const canBuy = raw.pode_comprar ?? raw.canBuy;
+    const unavailable = raw.indisponivel ?? raw.unavailable ?? (canBuy === false ? true : false);
     const active = raw.ativo ?? raw.active ?? true;
     const catalogVisible = raw.catalogo_visivel ?? raw.catalogVisible ?? true;
     const storeVisible = raw.loja_visivel ?? raw.storeVisible ?? true;
@@ -1415,7 +1427,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasVariations = options.length > 0;
     const stockState = hasVariations
       ? productVariationsStockState(options, lowStockLimit)
-      : productStockState({ estoque: stock, estoque_minimo: lowStockLimit });
+      : productStockState({
+          estoque: stock,
+          estoque_minimo: lowStockLimit,
+          pode_comprar: canBuy,
+          indisponivel: unavailable,
+        });
 
     return {
       id: raw.id ?? raw.productId ?? '',
@@ -1439,6 +1456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       stock,
       lowStockLimit,
       stockState,
+      canBuy: canBuy === undefined || canBuy === null ? stockState !== 'out' : canBuy !== false,
+      unavailable: unavailable === true,
       active: active !== false,
       catalogVisible: catalogVisible !== false,
       storeVisible: storeVisible !== false,
@@ -1781,42 +1800,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!client || !ids.length) return [];
 
     let { data, error } = await client
-      .from('produto_variacoes')
-      .select(PRODUCT_VARIATION_SELECT)
+      .from(PUBLIC_PRODUCT_VARIATION_VIEW)
+      .select(PUBLIC_PRODUCT_VARIATION_SELECT)
       .in('produto_id', ids)
-      .eq('ativo', true)
       .order('ordem', { ascending: true })
       .order('nome', { ascending: true });
 
     if (error) {
-      if (isMissingProductVariationTableError(error)) {
-        const message = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-        if (
-          message.includes('preco_promocional') ||
-          message.includes('oferta_ativa') ||
-          message.includes('oferta_inicio') ||
-          message.includes('oferta_fim') ||
-          message.includes('estoque_minimo')
-        ) {
-          console.info('[Supabase] Campos de oferta por variacao ausentes. Usando variacoes basicas ate aplicar a migracao da etapa 7.');
-          const fallback = await client
-            .from('produto_variacoes')
-            .select(PRODUCT_VARIATION_BASIC_SELECT)
-            .in('produto_id', ids)
-            .eq('ativo', true)
-            .order('ordem', { ascending: true })
-            .order('nome', { ascending: true });
-          data = fallback.data;
-          error = fallback.error;
-        } else {
-          console.info('[Supabase] produto_variacoes ainda nao existe. Produtos simples continuam funcionando.');
-          return [];
-        }
-      } else {
-        throw error;
+      if (error.code === 'PGRST205' || isMissingProductVariationTableError(error)) {
+        console.info('[Supabase] View publica de variacoes ausente. Execute a migracao da etapa 7 para liberar opcoes sem expor estoque.');
+        return [];
       }
-    }
-    if (error) {
       throw error;
     }
 
@@ -1849,33 +1843,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const tableNames = ['produtos'];
+      const tableNames = [PUBLIC_PRODUCT_VIEW];
       let products = [];
       let loadedTable = '';
       let lastError = null;
 
       for (const tableName of tableNames) {
-        const selectColumns =
-          tableName === 'produtos' && productExtendedColumnsReady
-            ? PRODUCT_EXTENDED_SELECT
-            : tableName === 'produtos'
-              ? PRODUCT_BASE_SELECT
-              : 'nome, preco, imagem, categoria, descricao';
-        let query = client.from(tableName).select(selectColumns).order('nome', { ascending: true });
-
-        if (tableName === 'produtos') query = query.eq('ativo', true);
+        const query = client.from(tableName).select(PUBLIC_PRODUCT_SELECT).order('nome', { ascending: true });
 
         let { data, error } = await query;
-        if (error && tableName === 'produtos' && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
-          productExtendedColumnsReady = false;
-          const fallback = await client
-            .from(tableName)
-            .select(PRODUCT_BASE_SELECT)
-            .eq('ativo', true)
-            .order('nome', { ascending: true });
-          data = fallback.data;
-          error = fallback.error;
-        }
 
         if (!error) {
           products = Array.isArray(data) ? data : [];
@@ -1885,18 +1861,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lastError = error;
         if (error.code !== 'PGRST205') throw error;
-        console.warn(`[Supabase] Tabela "${tableName}" não encontrada. Tentando próxima opção...`);
+        console.warn(`[Supabase] View publica "${tableName}" nao encontrada. Execute a migracao da etapa 7.`);
       }
 
       if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
-      const variations = loadedTable === 'produtos' ? await loadProductVariations(client, products) : [];
+      const variations = loadedTable === PUBLIC_PRODUCT_VIEW ? await loadProductVariations(client, products) : [];
       const productsWithVariations = attachProductVariations(products, variations);
       setProductIndex(productsWithVariations);
       pruneCartUnavailableProducts(productsWithVariations);
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
-      setProductIndex([]);
+      const localProducts = await loadLocalCatalogProducts().catch(() => []);
+      setProductIndex(localProducts);
       renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
         showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
@@ -2421,6 +2398,8 @@ document.addEventListener('DOMContentLoaded', () => {
         name: option.name || option.value || option.label || '',
         price: Number(option.price || product.price || 0),
         stock: normalizeVariationStockValue(option.stock),
+        canBuy: option.canBuy ?? option.pode_comprar,
+        unavailable: option.unavailable ?? option.indisponivel,
         image: option.image || '',
       }));
     }
@@ -2434,11 +2413,25 @@ document.addEventListener('DOMContentLoaded', () => {
         name: option.dataset.variationName || option.textContent.trim(),
         price: Number(option.dataset.price || product.price || 0),
         stock: normalizeVariationStockValue(option.dataset.stock),
+        canBuy: option.dataset.available === '' ? undefined : option.dataset.available !== 'false',
+        unavailable: option.dataset.available === 'false',
         image: option.dataset.image || '',
       }));
     }
 
-    return [{ id: '', label: 'Padrao', value: '', name: '', price: Number(product.price || 0), stock: product.stock, image: '' }];
+    return [
+      {
+        id: '',
+        label: 'Padrao',
+        value: '',
+        name: '',
+        price: Number(product.price || 0),
+        stock: product.stock,
+        canBuy: product.canBuy ?? product.pode_comprar,
+        unavailable: product.unavailable ?? product.indisponivel,
+        image: '',
+      },
+    ];
     if (Array.isArray(product?.options) && product.options.length) {
       return product.options.map((option) => ({
         label: option.label || option.value || 'Opção',
@@ -2832,8 +2825,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productStockState(product = {}) {
+    if (product.indisponivel === true || product.unavailable === true || product.pode_comprar === false || product.canBuy === false)
+      return 'out';
     const stock = productStockLevel(product);
     const limit = productLowStockLimit(product);
+    if (stock === null && (product.pode_comprar === true || product.canBuy === true)) return 'ok';
     if (stock === null) return 'untracked';
     if (stock <= 0) return 'out';
     if (stock <= limit) return 'low';
@@ -2841,7 +2837,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function variationStockState(variation = {}, lowStockLimit = siteConfig.stockAlertThreshold) {
+    if (
+      variation.indisponivel === true ||
+      variation.unavailable === true ||
+      variation.pode_comprar === false ||
+      variation.canBuy === false
+    )
+      return 'out';
     const stock = variation.stock;
+    if ((stock === null || stock === undefined || stock === '') && (variation.pode_comprar === true || variation.canBuy === true))
+      return 'ok';
     if (stock === null || stock === undefined || stock === '') return 'untracked';
     const value = Number(stock);
     if (!Number.isFinite(value)) return 'untracked';
@@ -4333,8 +4338,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function productStockText(product = {}) {
     const normalized = normalizeProduct(product);
     if (normalized.stockState === 'out') return 'Esgotado';
-    if (normalized.stock === null) return 'Quantidade livre';
-    return `${normalized.stock} em estoque`;
+    return 'Disponivel';
   }
 
   function customerAvailabilityText(product = {}, option = null) {
@@ -4344,16 +4348,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function optionStockText(option = {}, product = {}) {
-    const normalized = normalizeProduct(product);
-    const stock = option.stock;
-    if (stock === null || stock === undefined || stock === '') return 'Quantidade livre';
-    const value = Number(stock);
-    if (!Number.isFinite(value)) return 'Quantidade livre';
-    if (value <= 0) return 'Esgotado';
-    return `${value} em estoque${value <= normalized.lowStockLimit ? ' - baixo' : ''}`;
+    if (optionOutOfStock(option)) return 'Esgotado';
+    return 'Disponivel';
   }
 
   function optionOutOfStock(option = {}) {
+    if (option.unavailable === true || option.indisponivel === true || option.canBuy === false || option.pode_comprar === false)
+      return true;
     const stock = option.stock;
     return stock !== null && stock !== undefined && stock !== '' && Number(stock) <= 0;
   }
@@ -4371,7 +4372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="${option.stock == null ? '' : escapeHTML(option.stock)}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4393,13 +4394,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const price = Number(current?.price ?? option?.dataset.price ?? button?.dataset.price ?? 0);
     const image = current?.image || option?.dataset.image || button?.dataset.image || '';
     const name = current?.name || option?.dataset.variationName || option?.textContent?.trim() || '';
-    const out = stock !== null && stock <= 0;
+    const explicitOut = current
+      ? optionOutOfStock(current)
+      : option?.dataset.available === 'false' || button?.dataset.available === 'false';
+    const out = explicitOut || (stock !== null && stock <= 0);
 
     return {
       variationId,
       name,
       price: Number.isFinite(price) ? price : 0,
-      stock,
+      stock: null,
       image,
       out,
       stockText: out ? 'Indisponivel no momento' : '',
@@ -4454,7 +4458,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (button) {
       button.dataset.price = String(state.price);
-      button.dataset.stock = state.stock === null ? '' : String(state.stock);
+      button.dataset.stock = '';
+      button.dataset.available = state.out ? 'false' : 'true';
       button.dataset.image = state.image || button.dataset.image || '';
       button.dataset.variationId = state.variationId || '';
       button.dataset.variationName = state.name || '';
@@ -4526,7 +4531,7 @@ document.addEventListener('DOMContentLoaded', () => {
         )}</small>
         <div class="product-card-actions">
           ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
+            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
           }
           <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
             Ver detalhes
@@ -4687,7 +4692,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function fullCatalogStatusText(product) {
     const normalized = normalizeProduct(product);
     if (normalized.stockState === 'out') return 'Fora da loja agora';
-    if (normalized.stockState === 'low') return 'Estoque baixo';
     if (normalized.stock === null) return 'Disponivel';
     return 'Disponivel';
   }
@@ -4930,7 +4934,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class="fa-solid fa-circle-check"></i>
               ${selectedOutOfStock ? 'Indisponivel no momento' : 'Pronto para pedir'}
             </span>`
-                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
+                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
               ${selectedOutOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
             </button>`

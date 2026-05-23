@@ -8,6 +8,54 @@ begin;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
+do $$
+declare
+  missing_items text[];
+begin
+  select array_agg(item)
+  into missing_items
+  from (
+    values
+      ('public.produtos'),
+      ('public.produto_variacoes'),
+      ('public.pedidos'),
+      ('public.pedido_itens'),
+      ('public.enderecos')
+  ) as required(item)
+  where to_regclass(item) is null;
+
+  if coalesce(array_length(missing_items, 1), 0) > 0 then
+    raise exception
+      'create_order bloqueada: tabelas obrigatorias ausentes: %. Execute primeiro as migracoes base e 20260523-etapa-7-base-correta.sql.',
+      array_to_string(missing_items, ', ');
+  end if;
+
+  select array_agg(item)
+  into missing_items
+  from (
+    values
+      ('public.pedidos.pagamento_status'),
+      ('public.pedido_itens.variacao_id'),
+      ('public.produto_variacoes.preco_promocional'),
+      ('public.produto_variacoes.oferta_ativa'),
+      ('public.produto_variacoes.oferta_inicio'),
+      ('public.produto_variacoes.oferta_fim')
+  ) as required(item)
+  where not exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = split_part(required.item, '.', 1)
+      and c.table_name = split_part(required.item, '.', 2)
+      and c.column_name = split_part(required.item, '.', 3)
+  );
+
+  if coalesce(array_length(missing_items, 1), 0) > 0 then
+    raise exception
+      'create_order bloqueada: colunas obrigatorias ausentes: %. Execute primeiro 20260523-etapa-7-base-correta.sql.',
+      array_to_string(missing_items, ', ');
+  end if;
+end $$;
+
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
 language plpgsql

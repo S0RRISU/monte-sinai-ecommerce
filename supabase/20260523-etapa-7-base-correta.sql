@@ -1,11 +1,57 @@
 -- Etapa 7 - base correta para admin, financeiro, ofertas e historico.
 -- NAO EXECUTAR AUTOMATICAMENTE PELO FRONT-END.
 -- Revise e execute manualmente no Supabase SQL Editor.
+--
+-- Pre-requisitos:
+-- - Execute antes as migracoes oficiais que criam public.produtos,
+--   public.produto_variacoes, public.pedidos, public.pedido_itens e public.profiles.
+-- - Este arquivo nao apaga dados.
 
 begin;
 
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+
+do $$
+declare
+  missing_tables text[];
+begin
+  select array_agg(required_table)
+  into missing_tables
+  from (
+    values
+      ('public.produtos'),
+      ('public.produto_variacoes'),
+      ('public.pedidos'),
+      ('public.pedido_itens'),
+      ('public.profiles')
+  ) as required(required_table)
+  where to_regclass(required_table) is null;
+
+  if coalesce(array_length(missing_tables, 1), 0) > 0 then
+    raise exception
+      'Etapa 7 bloqueada: tabelas obrigatorias ausentes: %. Execute primeiro as migracoes base da loja/pedidos/admin.',
+      array_to_string(missing_tables, ', ');
+  end if;
+end $$;
+
+alter table public.produtos
+  add column if not exists tipo text not null default 'produto',
+  add column if not exists destaque boolean not null default false,
+  add column if not exists oferta_ativa boolean not null default false,
+  add column if not exists preco_promocional numeric(10, 2),
+  add column if not exists oferta_inicio timestamptz,
+  add column if not exists oferta_fim timestamptz,
+  add column if not exists kit_itens text not null default '',
+  add column if not exists estoque integer,
+  add column if not exists estoque_minimo integer not null default 3,
+  add column if not exists catalogo_visivel boolean not null default true,
+  add column if not exists loja_visivel boolean not null default true,
+  add column if not exists catalogo_ordem integer,
+  add column if not exists descricao_detalhada text not null default '',
+  add column if not exists catalogo_destaque boolean not null default false,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
 
 -- A) Produto variacoes com oferta formal.
 alter table public.produto_variacoes
@@ -15,6 +61,7 @@ alter table public.produto_variacoes
   add column if not exists oferta_fim timestamptz,
   add column if not exists estoque_minimo integer not null default 0,
   add column if not exists ordem integer not null default 0,
+  add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
 
 do $$
@@ -180,5 +227,111 @@ left join public.produtos pr on pr.id = pi.produto_id
 left join public.produto_variacoes pv on pv.id = pi.variacao_id
 where pi.variacao_id is not null or nullif(pi.variacao, '') is not null
 group by pi.produto_id, pi.variacao_id, pr.nome, pr.categoria, coalesce(pv.nome, nullif(pi.variacao, ''));
+
+-- F) Catalogo publico seguro.
+-- Estas views nao retornam estoque numerico. A loja publica usa apenas
+-- pode_comprar/indisponivel; o painel admin continua lendo as tabelas reais.
+create or replace view public.vw_catalogo_publico
+as
+select
+  p.id,
+  p.nome,
+  case
+    when p.oferta_ativa
+      and p.preco_promocional is not null
+      and p.preco_promocional > 0
+      and (p.oferta_inicio is null or p.oferta_inicio <= now())
+      and (p.oferta_fim is null or p.oferta_fim >= now())
+    then p.preco_promocional
+    else p.preco
+  end as preco,
+  p.preco as preco_original,
+  p.imagem,
+  p.categoria,
+  p.descricao,
+  p.ativo,
+  p.tipo,
+  p.destaque,
+  p.oferta_ativa,
+  p.preco_promocional,
+  p.oferta_inicio,
+  p.oferta_fim,
+  p.kit_itens,
+  p.catalogo_visivel,
+  p.loja_visivel,
+  p.catalogo_ordem,
+  p.descricao_detalhada,
+  p.catalogo_destaque,
+  p.created_at,
+  p.updated_at,
+  case
+    when exists (
+      select 1
+      from public.produto_variacoes pv
+      where pv.produto_id = p.id
+        and pv.ativo = true
+    ) then exists (
+      select 1
+      from public.produto_variacoes pv
+      where pv.produto_id = p.id
+        and pv.ativo = true
+        and (pv.estoque is null or pv.estoque > 0)
+    )
+    else p.estoque is null or p.estoque > 0
+  end as pode_comprar,
+  case
+    when exists (
+      select 1
+      from public.produto_variacoes pv
+      where pv.produto_id = p.id
+        and pv.ativo = true
+    ) then not exists (
+      select 1
+      from public.produto_variacoes pv
+      where pv.produto_id = p.id
+        and pv.ativo = true
+        and (pv.estoque is null or pv.estoque > 0)
+    )
+    else p.estoque is not null and p.estoque <= 0
+  end as indisponivel
+from public.produtos p
+where p.ativo = true
+  and p.loja_visivel = true;
+
+create or replace view public.vw_catalogo_variacoes_publicas
+as
+select
+  pv.id,
+  pv.produto_id,
+  pv.nome,
+  pv.slug,
+  pv.sku,
+  case
+    when pv.oferta_ativa
+      and pv.preco_promocional is not null
+      and pv.preco_promocional > 0
+      and (pv.oferta_inicio is null or pv.oferta_inicio <= now())
+      and (pv.oferta_fim is null or pv.oferta_fim >= now())
+    then pv.preco_promocional
+    else pv.preco
+  end as preco,
+  pv.preco as preco_original,
+  pv.ativo,
+  pv.imagem,
+  pv.atributos,
+  pv.ordem,
+  pv.preco_promocional,
+  pv.oferta_ativa,
+  pv.oferta_inicio,
+  pv.oferta_fim,
+  pv.created_at,
+  pv.updated_at,
+  (pv.estoque is null or pv.estoque > 0) as pode_comprar,
+  (pv.estoque is not null and pv.estoque <= 0) as indisponivel
+from public.produto_variacoes pv
+join public.produtos p on p.id = pv.produto_id
+where pv.ativo = true
+  and p.ativo = true
+  and p.loja_visivel = true;
 
 commit;

@@ -4,6 +4,30 @@
 
 begin;
 
+do $$
+declare
+  missing_items text[];
+begin
+  select array_agg(item)
+  into missing_items
+  from (
+    values
+      ('public.profiles'),
+      ('public.pedidos'),
+      ('public.pedido_eventos'),
+      ('public.vw_financeiro_pedidos'),
+      ('public.vw_financeiro_produtos'),
+      ('public.vw_financeiro_variacoes')
+  ) as required(item)
+  where to_regclass(item) is null;
+
+  if coalesce(array_length(missing_items, 1), 0) > 0 then
+    raise exception
+      'Funcoes da etapa 7 bloqueadas: objetos obrigatorios ausentes: %. Execute primeiro 20260523-etapa-7-base-correta.sql.',
+      array_to_string(missing_items, ', ');
+  end if;
+end $$;
+
 create or replace function public.admin_can_write()
 returns boolean
 language plpgsql
@@ -12,6 +36,7 @@ security invoker
 set search_path = public, pg_temp
 as $$
 declare
+  has_is_admin boolean := false;
   has_admin_role boolean := false;
   allowed boolean := false;
 begin
@@ -24,11 +49,20 @@ begin
     from information_schema.columns
     where table_schema = 'public'
       and table_name = 'profiles'
+      and column_name = 'is_admin'
+  )
+  into has_is_admin;
+
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
       and column_name = 'admin_role'
   )
   into has_admin_role;
 
-  if has_admin_role then
+  if has_is_admin and has_admin_role then
     execute
       'select coalesce(p.is_admin, false) or coalesce(p.admin_role, '''') in (''developer'', ''owner'', ''staff'')
          from public.profiles p
@@ -36,7 +70,7 @@ begin
         limit 1'
     using auth.uid()
     into allowed;
-  else
+  elsif has_is_admin then
     execute
       'select coalesce(p.is_admin, false)
          from public.profiles p
@@ -44,6 +78,16 @@ begin
         limit 1'
     using auth.uid()
     into allowed;
+  elsif has_admin_role then
+    execute
+      'select coalesce(p.admin_role, '''') in (''developer'', ''owner'', ''staff'')
+         from public.profiles p
+        where p.id = $1
+        limit 1'
+    using auth.uid()
+    into allowed;
+  else
+    return false;
   end if;
 
   return coalesce(allowed, false);
