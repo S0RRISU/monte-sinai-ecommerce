@@ -30727,3 +30727,80 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-card i {
     margin-top: 16px !important;
   }
 }
+
+/* Etapa 8.5 - contraste das sugestoes rapidas no carrinho. */
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestions {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestions {
+  border-color: rgba(226, 232, 240, 0.2) !important;
+  background: #111c2f !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestions-head strong,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-copy strong {
+  color: inherit !important;
+  text-shadow: none !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestions-head span,
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-copy small {
+  color: #334155 !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestions-head span,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-copy small {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-card {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-card {
+  border-color: rgba(226, 232, 240, 0.16) !important;
+  background: #162033 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-card:hover,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-card:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line-strong)) !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-media {
+  background: #eef4fb !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-media {
+  background: #0b1220 !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-suggestion-card > i {
+  background: #facc15 !important;
+  color: #0f172a !important;
+  box-shadow: 0 8px 18px rgba(234, 179, 8, 0.22) !important;
+}
+
+@media (min-width: 901px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-actions {
+    gap: 10px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product .btn,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card .btn,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-card .btn-add-cart {
+    align-self: stretch !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+  }
+}
