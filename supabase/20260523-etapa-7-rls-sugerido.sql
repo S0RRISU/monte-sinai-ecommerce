@@ -114,6 +114,8 @@ alter table public.produto_variacoes enable row level security;
 -- ficam sem policy publica para nao expor estoque numerico por Data API.
 drop policy if exists "produtos_public_read_active" on public.produtos;
 drop policy if exists "produto_variacoes_public_read_active" on public.produto_variacoes;
+revoke select on public.produtos from anon;
+revoke select on public.produto_variacoes from anon;
 
 drop policy if exists "produtos_admin_all" on public.produtos;
 create policy "produtos_admin_all"
@@ -177,6 +179,13 @@ grant select, insert on public.pedido_eventos to authenticated;
 grant select, insert, update on public.estoque_movimentacoes to authenticated;
 grant update (archived_at, archived_by, archived_reason) on public.pedidos to authenticated;
 
+-- Authenticated precisa de grants nas tabelas reais para o painel admin, mas
+-- usuarios comuns ficam bloqueados pelas policies admin_can_write().
+grant select, insert, update, delete on public.produtos to authenticated;
+grant select, insert, update, delete on public.produto_variacoes to authenticated;
+
+revoke all on public.vw_catalogo_publico from public, anon, authenticated;
+revoke all on public.vw_catalogo_variacoes_publicas from public, anon, authenticated;
 grant select on public.vw_catalogo_publico to anon, authenticated;
 grant select on public.vw_catalogo_variacoes_publicas to anon, authenticated;
 

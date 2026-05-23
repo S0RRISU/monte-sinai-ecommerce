@@ -137,6 +137,31 @@ create table if not exists public.pedido_eventos (
   created_at timestamptz not null default now()
 );
 
+-- Garante auditoria preservada mesmo se a tabela ja existia com CASCADE
+-- ou com uma FK de outro nome.
+do $$
+declare
+  fk record;
+begin
+  for fk in
+    select c.conname
+    from pg_constraint c
+    join pg_attribute a
+      on a.attrelid = c.conrelid
+     and a.attnum = any(c.conkey)
+    where c.conrelid = 'public.pedido_eventos'::regclass
+      and c.confrelid = 'public.pedidos'::regclass
+      and c.contype = 'f'
+      and a.attname = 'pedido_id'
+  loop
+    execute format('alter table public.pedido_eventos drop constraint %I', fk.conname);
+  end loop;
+end $$;
+
+alter table public.pedido_eventos
+  add constraint pedido_eventos_pedido_id_fkey
+  foreign key (pedido_id) references public.pedidos(id) on delete restrict;
+
 create index if not exists idx_pedido_eventos_pedido_data
   on public.pedido_eventos (pedido_id, created_at desc);
 
@@ -159,6 +184,14 @@ create table if not exists public.estoque_movimentacoes (
   constraint estoque_movimentacoes_quantidade_check
     check (quantidade > 0)
 );
+
+-- Quantidade sempre positiva; o tipo define entrada/saida.
+alter table public.estoque_movimentacoes
+  drop constraint if exists estoque_movimentacoes_quantidade_check;
+
+alter table public.estoque_movimentacoes
+  add constraint estoque_movimentacoes_quantidade_check
+  check (quantidade > 0);
 
 create index if not exists idx_estoque_movimentacoes_produto_data
   on public.estoque_movimentacoes (produto_id, created_at desc);
@@ -231,7 +264,11 @@ group by pi.produto_id, pi.variacao_id, pr.nome, pr.categoria, coalesce(pv.nome,
 -- F) Catalogo publico seguro.
 -- Estas views nao retornam estoque numerico. A loja publica usa apenas
 -- pode_comprar/indisponivel; o painel admin continua lendo as tabelas reais.
+-- Elas ficam como views owner-safe, com security_barrier, porque anon nao deve
+-- ter grant direto nas tabelas reais. Nao usar security_invoker aqui: isso
+-- exigiria liberar select nas tabelas com estoque para o usuario publico.
 create or replace view public.vw_catalogo_publico
+with (security_barrier = true)
 as
 select
   p.id,
@@ -249,7 +286,6 @@ select
   p.imagem,
   p.categoria,
   p.descricao,
-  p.ativo,
   p.tipo,
   p.destaque,
   p.oferta_ativa,
@@ -257,8 +293,6 @@ select
   p.oferta_inicio,
   p.oferta_fim,
   p.kit_itens,
-  p.catalogo_visivel,
-  p.loja_visivel,
   p.catalogo_ordem,
   p.descricao_detalhada,
   p.catalogo_destaque,
@@ -299,6 +333,7 @@ where p.ativo = true
   and p.loja_visivel = true;
 
 create or replace view public.vw_catalogo_variacoes_publicas
+with (security_barrier = true)
 as
 select
   pv.id,
@@ -316,7 +351,6 @@ select
     else pv.preco
   end as preco,
   pv.preco as preco_original,
-  pv.ativo,
   pv.imagem,
   pv.atributos,
   pv.ordem,

@@ -147,9 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const PUBLIC_PRODUCT_VIEW = 'vw_catalogo_publico';
   const PUBLIC_PRODUCT_VARIATION_VIEW = 'vw_catalogo_variacoes_publicas';
   const PUBLIC_PRODUCT_SELECT =
-    'id, nome, preco, preco_original, imagem, categoria, descricao, ativo, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque, pode_comprar, indisponivel, created_at, updated_at';
+    'id, nome, preco, preco_original, imagem, categoria, descricao, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_ordem, descricao_detalhada, catalogo_destaque, pode_comprar, indisponivel, created_at, updated_at';
   const PUBLIC_PRODUCT_VARIATION_SELECT =
-    'id, produto_id, nome, slug, sku, preco, preco_original, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, pode_comprar, indisponivel, created_at, updated_at';
+    'id, produto_id, nome, slug, sku, preco, preco_original, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, pode_comprar, indisponivel, created_at, updated_at';
   const PRODUCT_VARIATION_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
   const PRODUCT_VARIATION_BASIC_SELECT =
@@ -6497,10 +6497,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function loadLocalOrders() {
+    // Cache local apenas para o cliente reencontrar os pedidos recentes.
+    // Historico admin, arquivamento e financeiro devem vir sempre do Supabase.
     return dedupeOrders(loadJSON(STORAGE.orders, []).map(trackedOrderFromPayload));
   }
 
   function saveOrderLocally(order) {
+    // Nao usar este cache para operacoes administrativas ou dados de producao.
     const orders = dedupeOrders([trackedOrderFromPayload(order), ...loadLocalOrders()]);
     saveJSON(STORAGE.orders, orders.slice(0, 20));
   }
