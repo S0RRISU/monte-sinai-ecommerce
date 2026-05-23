@@ -29851,3 +29851,390 @@ html[data-theme] body.admin-shell-body textarea {
     gap: 9px !important;
   }
 }
+
+/* Etapa 8.1 - refinamento visual dos temas claro/noturno. */
+html[data-theme='light'],
+body.light-mode {
+  --bg: #eef3f8;
+  --background: #eef3f8;
+  --surface: #ffffff;
+  --surface-soft: #f7f9fc;
+  --surface-strong: #e5edf6;
+  --text: #172033;
+  --text-soft: #4d5e73;
+  --muted: #6d7d91;
+  --line: rgba(32, 54, 84, 0.14);
+  --line-strong: rgba(32, 54, 84, 0.22);
+  --primary: #123b73;
+  --primary-strong: #0a2854;
+  --primary-soft: #e8f0fb;
+  --accent: #e8bd28;
+  --accent-soft: #fff5cc;
+  --success: #188456;
+  --danger: #b4232a;
+  --warning: #a46b00;
+  --shadow-soft: 0 10px 26px rgba(27, 48, 78, 0.08);
+  --shadow-card: 0 18px 42px rgba(27, 48, 78, 0.11);
+}
+
+html[data-theme='dark'],
+body:not(.light-mode) {
+  --bg: #091525;
+  --background: #091525;
+  --surface: #101f34;
+  --surface-soft: #16283f;
+  --surface-strong: #1d344f;
+  --text: #edf3fb;
+  --text-soft: #bdcbe0;
+  --muted: #8fa2bb;
+  --line: rgba(190, 208, 230, 0.16);
+  --line-strong: rgba(190, 208, 230, 0.25);
+  --primary: #87b7ee;
+  --primary-strong: #b7d6ff;
+  --primary-soft: #17304d;
+  --accent: #edc84b;
+  --accent-soft: #352b11;
+  --success: #61d39a;
+  --danger: #ff8b8f;
+  --warning: #f0c94a;
+  --shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.22);
+  --shadow-card: 0 22px 52px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, var(--surface)) 0%, var(--bg) 52%, var(--background) 100%) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) {
+  background:
+    radial-gradient(circle at 12% -10%, rgba(135, 183, 238, 0.12), transparent 32%),
+    linear-gradient(180deg, #0b1828 0%, #091525 54%, #07111f 100%) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar {
+  border-color: var(--line) !important;
+  background: color-mix(in srgb, var(--surface) 92%, transparent) !important;
+  box-shadow: 0 8px 28px rgba(9, 21, 37, 0.08) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .navbar {
+  background: rgba(12, 27, 45, 0.94) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu a:not(.nav-orders-link):not(.nav-admin-link),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-only-link {
+  color: var(--text-soft) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu a.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu a:hover,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a:hover {
+  background: var(--primary-soft) !important;
+  color: var(--primary-strong) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu a.active,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu a:hover,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a.active,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a:hover {
+  color: var(--primary-strong) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .product-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-product,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .full-catalog-item,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-panel,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .cart-summary,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .modal-content,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .search-suggestions,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .orders-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .profile-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .contact-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .about-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .promo-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .section-card,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-dashboard article,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .public-panel {
+  border: 1px solid var(--line) !important;
+  background: color-mix(in srgb, var(--surface) 96%, var(--bg)) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-soft) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .product-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .catalog-product,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .full-catalog-item,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-panel,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .cart-summary,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .modal-content,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .search-suggestions,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .orders-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .profile-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .contact-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .about-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .promo-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .section-card,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .catalog-dashboard article,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .public-panel {
+  background: color-mix(in srgb, var(--surface) 94%, #07111f) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) input,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) select,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) textarea,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-search {
+  border: 1px solid var(--line-strong) !important;
+  background: color-mix(in srgb, var(--surface) 94%, var(--bg)) !important;
+  color: var(--text) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 24%, transparent) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) input,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) select,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) textarea,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-search {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) input:focus,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) select:focus,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) textarea:focus {
+  border-color: color-mix(in srgb, var(--primary) 72%, var(--line)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent) !important;
+  outline: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .btn-primary,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link {
+  border-color: color-mix(in srgb, var(--primary-strong) 88%, #000000) !important;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 94%, #ffffff), var(--primary-strong)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--primary) 22%, transparent) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .btn-primary,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link {
+  background: linear-gradient(180deg, #8fbeef, #5d92cd) !important;
+  color: #081525 !important;
+  box-shadow: 0 10px 24px rgba(93, 146, 205, 0.2) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .btn-secondary,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .category-chip,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .filter-chip {
+  border-color: var(--line-strong) !important;
+  background: color-mix(in srgb, var(--surface-soft) 92%, var(--surface)) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .badge,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .status-pill,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .recommended-badge,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .offer-badge {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line)) !important;
+  background: var(--accent-soft) !important;
+  color: color-mix(in srgb, var(--warning) 72%, var(--text)) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+  border-top: 1px solid var(--line) !important;
+  background: color-mix(in srgb, var(--surface) 95%, transparent) !important;
+  box-shadow: 0 -10px 28px rgba(9, 21, 37, 0.1) !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+  background: rgba(12, 27, 45, 0.96) !important;
+  box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme='light'] body.admin-shell-body {
+  --admin-bg: #eef3f8;
+  --admin-bg-soft: #f6f9fc;
+  --admin-sidebar-bg: #102f5b;
+  --admin-sidebar-soft: #173f73;
+  --admin-card: #ffffff;
+  --admin-card-soft: #f7f9fc;
+  --admin-raised: #edf3fa;
+  --admin-text: #172033;
+  --admin-text-soft: #4d5e73;
+  --admin-muted: #6d7d91;
+  --admin-line: rgba(32, 54, 84, 0.14);
+  --admin-line-strong: rgba(32, 54, 84, 0.24);
+  --admin-primary: #123b73;
+  --admin-primary-strong: #0a2854;
+  --admin-accent: #e8bd28;
+  --admin-danger: #b4232a;
+  --admin-success: #188456;
+  --admin-warning: #9a6500;
+  --admin-shadow: 0 18px 42px rgba(27, 48, 78, 0.12);
+  --admin-shadow-soft: 0 10px 26px rgba(27, 48, 78, 0.08);
+}
+
+html[data-theme='dark'] body.admin-shell-body {
+  --admin-bg: #091525;
+  --admin-bg-soft: #0c1a2d;
+  --admin-sidebar-bg: #07111f;
+  --admin-sidebar-soft: #112642;
+  --admin-card: #101f34;
+  --admin-card-soft: #16283f;
+  --admin-raised: #1d344f;
+  --admin-text: #edf3fb;
+  --admin-text-soft: #bdcbe0;
+  --admin-muted: #8fa2bb;
+  --admin-line: rgba(190, 208, 230, 0.16);
+  --admin-line-strong: rgba(190, 208, 230, 0.26);
+  --admin-primary: #87b7ee;
+  --admin-primary-strong: #b7d6ff;
+  --admin-accent: #edc84b;
+  --admin-danger: #ff8b8f;
+  --admin-success: #61d39a;
+  --admin-warning: #f0c94a;
+  --admin-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
+  --admin-shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme] body.admin-shell-body {
+  background: linear-gradient(180deg, var(--admin-bg) 0%, var(--admin-bg-soft) 100%) !important;
+}
+
+html[data-theme='dark'] body.admin-shell-body {
+  background:
+    radial-gradient(circle at 10% -8%, rgba(135, 183, 238, 0.11), transparent 32%),
+    linear-gradient(180deg, #0b1828 0%, #091525 55%, #07111f 100%) !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-view.active > .admin-view-header,
+html[data-theme] body.admin-shell-body .admin-product-simple-card,
+html[data-theme] body.admin-shell-body .admin-product-list-panel,
+html[data-theme] body.admin-shell-body .admin-order-card,
+html[data-theme] body.admin-shell-body .admin-finance-panel,
+html[data-theme] body.admin-shell-body .admin-product-editor-panel,
+html[data-theme] body.admin-shell-body .admin-product-variations,
+html[data-theme] body.admin-shell-body .admin-variation-row,
+html[data-theme] body.admin-shell-body .admin-image-preview,
+html[data-theme] body.admin-shell-body .admin-profile-action,
+html[data-theme] body.admin-shell-body .admin-profile-summary,
+html[data-theme] body.admin-shell-body .admin-system-card,
+html[data-theme] body.admin-shell-body .admin-console-card,
+html[data-theme] body.admin-shell-body .admin-mobile-bottom-nav,
+html[data-theme] body.admin-shell-body .admin-product-detail-card {
+  border: 1px solid var(--admin-line) !important;
+  background: color-mix(in srgb, var(--admin-card) 96%, var(--admin-bg)) !important;
+  color: var(--admin-text) !important;
+  box-shadow: var(--admin-shadow-soft) !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-view.active > .admin-view-header {
+  background: color-mix(in srgb, var(--admin-card) 88%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(135%) !important;
+}
+
+html[data-theme] body.admin-shell-body input,
+html[data-theme] body.admin-shell-body select,
+html[data-theme] body.admin-shell-body textarea,
+html[data-theme] body.admin-shell-body .admin-search-field,
+html[data-theme] body.admin-shell-body .sql-console {
+  border: 1px solid var(--admin-line-strong) !important;
+  background: color-mix(in srgb, var(--admin-card-soft) 92%, var(--admin-card)) !important;
+  color: var(--admin-text) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme='light'] body.admin-shell-body input,
+html[data-theme='light'] body.admin-shell-body select,
+html[data-theme='light'] body.admin-shell-body textarea,
+html[data-theme='light'] body.admin-shell-body .admin-search-field,
+html[data-theme='light'] body.admin-shell-body .sql-console {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
+}
+
+html[data-theme] body.admin-shell-body input:focus,
+html[data-theme] body.admin-shell-body select:focus,
+html[data-theme] body.admin-shell-body textarea:focus {
+  border-color: color-mix(in srgb, var(--admin-primary) 75%, var(--admin-line)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-primary) 17%, transparent) !important;
+  outline: none !important;
+}
+
+html[data-theme] body.admin-shell-body .btn.btn-primary,
+html[data-theme] body.admin-shell-body .btn-primary {
+  border-color: color-mix(in srgb, var(--admin-primary) 80%, #000000) !important;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--admin-primary) 96%, #ffffff), var(--admin-primary)) !important;
+  color: #081525 !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--admin-primary) 22%, transparent) !important;
+}
+
+html[data-theme='light'] body.admin-shell-body .btn.btn-primary,
+html[data-theme='light'] body.admin-shell-body .btn-primary {
+  background: linear-gradient(180deg, #17477f, #0d315f) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme] body.admin-shell-body .btn.btn-secondary,
+html[data-theme] body.admin-shell-body .btn-secondary,
+html[data-theme] body.admin-shell-body .admin-product-quick-actions .btn,
+html[data-theme] body.admin-shell-body .admin-upload-label,
+html[data-theme] body.admin-shell-body .admin-variation-upload {
+  border-color: var(--admin-line-strong) !important;
+  background: color-mix(in srgb, var(--admin-card-soft) 92%, var(--admin-card)) !important;
+  color: var(--admin-text) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-product-badge,
+html[data-theme] body.admin-shell-body .admin-live-pill,
+html[data-theme] body.admin-shell-body .admin-mobile-badge,
+html[data-theme] body.admin-shell-body .admin-menu-badge,
+html[data-theme] body.admin-shell-body .status-pill {
+  border-color: var(--admin-line-strong) !important;
+  background: var(--admin-raised) !important;
+  color: var(--admin-primary-strong) !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-product-badge.is-offer,
+html[data-theme] body.admin-shell-body .admin-product-badge.is-low {
+  border-color: color-mix(in srgb, var(--admin-warning) 44%, var(--admin-line)) !important;
+  background: color-mix(in srgb, var(--admin-warning) 15%, var(--admin-card)) !important;
+  color: var(--admin-warning) !important;
+}
+
+html[data-theme='light'] body.admin-shell-body .admin-product-badge.is-offer,
+html[data-theme='light'] body.admin-shell-body .admin-product-badge.is-low {
+  color: #7b5100 !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-sidebar {
+  background:
+    linear-gradient(180deg, var(--admin-sidebar-bg) 0%, color-mix(in srgb, var(--admin-sidebar-bg) 82%, #000000) 100%) !important;
+  box-shadow: 12px 0 30px rgba(0, 0, 0, 0.16) !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-menu-btn {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+html[data-theme] body.admin-shell-body .admin-menu-btn.active,
+html[data-theme] body.admin-shell-body .admin-menu-btn:hover {
+  background: var(--admin-accent) !important;
+  color: #172033 !important;
+}
+
+@media (max-width: 760px) {
+  html[data-theme] body.admin-shell-body .admin-mobile-bottom-nav {
+    background: color-mix(in srgb, var(--admin-card) 95%, transparent) !important;
+    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  html[data-theme] body.admin-shell-body .admin-mobile-bottom-nav button.active {
+    background: var(--admin-accent) !important;
+    color: #172033 !important;
+  }
+}

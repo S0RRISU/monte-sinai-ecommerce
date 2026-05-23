@@ -3039,7 +3039,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.dataset.theme = resolvedTheme;
     document.body.dataset.themeMode = themeMode;
     document.body.dataset.themeResolved = resolvedTheme;
-    qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#f4f9ff' : '#00061f');
+    qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#eef3f8' : '#091525');
     if (persist) localStorage.setItem(STORAGE.theme, themeMode);
     updateThemeControls();
   }

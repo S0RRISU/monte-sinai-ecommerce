@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.dataset.themeMode = resolved;
     document.body.dataset.themeResolved = resolved;
     document.body.dataset.adminTheme = resolved;
-    qs('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f4f8ff' : '#00061f');
+    qs('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#eef3f8' : '#091525');
     qsa('[data-admin-theme-toggle]').forEach((button) => {
       button.setAttribute('aria-pressed', String(resolved === 'light'));
       const label = resolved === 'light' ? 'Tema escuro' : 'Tema claro';
