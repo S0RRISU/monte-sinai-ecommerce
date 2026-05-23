@@ -8,16 +8,6 @@ begin;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
-alter table public.pedido_itens
-  add column if not exists variacao_id uuid references public.produto_variacoes(id) on delete set null;
-
-alter table public.produto_variacoes
-  add column if not exists preco_promocional numeric(10, 2),
-  add column if not exists oferta_ativa boolean not null default false,
-  add column if not exists oferta_inicio timestamptz,
-  add column if not exists oferta_fim timestamptz,
-  add column if not exists estoque_minimo integer not null default 0;
-
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
 language plpgsql
@@ -32,6 +22,7 @@ declare
   item jsonb;
   item_count integer;
   item_product_id uuid;
+  item_variation_key text;
   item_variation_id uuid;
   product_row public.produtos%rowtype;
   variation_row public.produto_variacoes%rowtype;
@@ -158,9 +149,16 @@ begin
       then (item->>'produto_id')::uuid
       else null
     end;
+    item_variation_key := coalesce(
+      item->>'variacao_id',
+      item->>'variationId',
+      item->>'variation_id',
+      item->>'variacaoId',
+      ''
+    );
     item_variation_id := case
-      when coalesce(item->>'variacao_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
-      then (item->>'variacao_id')::uuid
+      when item_variation_key ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then item_variation_key::uuid
       else null
     end;
     item_qty := greatest(coalesce(nullif(item->>'quantidade', '')::integer, 1), 1);
@@ -270,6 +268,14 @@ begin
       item_total,
       item_image
     );
+
+    if item_product_id is not null and to_regclass('public.estoque_movimentacoes') is not null then
+      execute
+        'insert into public.estoque_movimentacoes
+          (produto_id, variacao_id, tipo, quantidade, motivo, pedido_id, created_by)
+         values ($1, $2, ''saida_venda'', $3, ''Venda'', $4, $5)'
+      using item_product_id, item_variation_id, item_qty, new_order_id, caller_id;
+    end if;
   end loop;
 
   discount_amount := least(discount_amount, subtotal_calc);
@@ -298,6 +304,23 @@ begin
       coalesce(order_payload->>'observacao', ''),
       true
     );
+  end if;
+
+  if to_regclass('public.pedido_eventos') is not null then
+    execute
+      'insert into public.pedido_eventos
+        (pedido_id, tipo, status_anterior, status_novo, payload, created_by)
+       values ($1, ''pedido_criado'', null, $2, $3, $4)'
+    using new_order_id,
+      requested_status,
+      jsonb_build_object(
+        'codigo', order_code,
+        'total', final_total,
+        'subtotal', subtotal_calc,
+        'quantidade_itens', item_count,
+        'cliente_tipo', case when caller_id is null then 'visitante' else 'cliente' end
+      ),
+      caller_id;
   end if;
 
   return jsonb_build_object(

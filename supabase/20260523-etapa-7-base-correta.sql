@@ -43,7 +43,7 @@ create index if not exists idx_produto_variacoes_oferta_ativa
 create index if not exists idx_produto_variacoes_estoque_minimo
   on public.produto_variacoes (estoque_minimo);
 
-create or replace function public.set_updated_at()
+create or replace function public.set_produto_variacoes_updated_at()
 returns trigger
 language plpgsql
 as $$
@@ -56,10 +56,11 @@ $$;
 drop trigger if exists set_produto_variacoes_updated_at on public.produto_variacoes;
 create trigger set_produto_variacoes_updated_at
 before update on public.produto_variacoes
-for each row execute function public.set_updated_at();
+for each row execute function public.set_produto_variacoes_updated_at();
 
 -- B) Pedidos arquivados.
 alter table public.pedidos
+  add column if not exists pagamento_status text not null default 'Pendente',
   add column if not exists archived_at timestamptz,
   add column if not exists archived_by uuid,
   add column if not exists archived_reason text;
@@ -80,7 +81,7 @@ create index if not exists idx_pedido_itens_variacao_id
 -- C) Historico/eventos do pedido.
 create table if not exists public.pedido_eventos (
   id uuid primary key default extensions.gen_random_uuid(),
-  pedido_id uuid not null references public.pedidos(id) on delete cascade,
+  pedido_id uuid not null references public.pedidos(id) on delete restrict,
   tipo text not null,
   status_anterior text,
   status_novo text,
@@ -109,7 +110,7 @@ create table if not exists public.estoque_movimentacoes (
   constraint estoque_movimentacoes_tipo_check
     check (tipo in ('entrada', 'saida_venda', 'ajuste', 'cancelamento', 'devolucao')),
   constraint estoque_movimentacoes_quantidade_check
-    check (quantidade <> 0)
+    check (quantidade > 0)
 );
 
 create index if not exists idx_estoque_movimentacoes_produto_data
