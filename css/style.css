@@ -29852,31 +29852,74 @@ html[data-theme] body.admin-shell-body textarea {
   }
 }
 
+/* Last mobile dock override: no frame on inactive items, unmistakable yellow cart with items. */
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home']:not(.active),
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store']:not(.active),
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos']:not(.active) {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active {
+    border: 1px solid color-mix(in srgb, var(--accent) 68%, var(--line)) !important;
+    background: color-mix(in srgb, var(--surface-soft) 38%, transparent) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 12px 24px rgba(0, 0, 0, 0.13),
+      0 0 0 1px rgba(250, 204, 21, 0.1) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active {
+    background: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active i {
+    color: #facc15 !important;
+  }
+
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart {
+    border-color: #facc15 !important;
+    outline-color: rgba(250, 204, 21, 0.34) !important;
+    background: linear-gradient(145deg, #fff06a 0%, #facc15 58%, #d99a00 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 5px 10px rgba(255, 255, 255, 0.4),
+      inset 0 -12px 18px rgba(119, 77, 0, 0.2),
+      0 8px 0 rgba(135, 96, 0, 0.76),
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      0 0 0 8px rgba(250, 204, 21, 0.22) !important;
+  }
+
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart i {
+    color: #0b3b86 !important;
+  }
+
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart span {
+    color: #0f172a !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  }
+}
+
 /* Mobile dock polish: framed side buttons and yellow icon-only active state. */
 @media (max-width: 760px) {
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'] {
-    border: 1px solid color-mix(in srgb, var(--line) 82%, rgba(64, 169, 255, 0.35)) !important;
-    background: color-mix(in srgb, var(--surface-soft) 34%, transparent) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 12px 24px rgba(0, 0, 0, 0.1) !important;
-  }
-
-  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
-  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
-  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'],
-  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'],
-  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'],
-  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'] {
-    border-color: rgba(153, 187, 228, 0.72) !important;
-    background: rgba(255, 255, 255, 0.42) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.92),
-      0 12px 24px rgba(11, 83, 175, 0.08) !important;
-  }
-
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='home'].active,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='store'].active,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock [data-dock-section='promos'].active {
@@ -29905,13 +29948,6 @@ html[data-theme] body.admin-shell-body textarea {
     color: #facc15 !important;
   }
 
-  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
-  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart {
-    border-color: #facc15 !important;
-    background: linear-gradient(145deg, #fff077 0%, #facc15 54%, #dfa900 100%) !important;
-    color: #0f172a !important;
-  }
 }
 
 /* Cart badge and active fill correction: blue cart, yellow ring, red counter. */
