@@ -1273,7 +1273,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (normalized.includes('organiz')) return 'organizacao';
     if (normalized.includes('utens')) return 'utensilios';
     if (normalized.includes('limpeza')) return 'limpeza';
-    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+    const slug = normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+    return ['recomendado', 'recomendados', 'oferta', 'ofertas', 'promocao', 'promocoes', 'kit', 'kits'].includes(slug)
+      ? 'produtos'
+      : slug;
   }
 
   function categoryOrderIndex(slug) {
@@ -2464,6 +2467,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!matches.length) {
       showToast('Nenhum produto encontrado para essa busca.');
       return;
+    }
+
+    if (['produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) {
+      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]');
+      if (catalogInput) {
+        catalogInput.value = term;
+        if (catalogInput.matches('[data-catalog-search]')) {
+          activateCatalogFilter('all');
+          applyCatalogFilters();
+          scrollCatalogToTop('smooth');
+        } else {
+          qsa('[data-full-catalog-filter]').forEach((button) =>
+            button.classList.toggle('active', button.dataset.fullCatalogFilter === 'all'),
+          );
+          renderFullCatalogPage();
+          qs('[data-full-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
     }
 
     openProductSearchModal(matches[0], matches, term);
@@ -4340,8 +4362,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function productStockText(product = {}) {
     const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Esgotado';
-    return 'Disponivel';
+    if (normalized.stockState === 'out') return 'Indisponivel no momento';
+    return '';
   }
 
   function customerAvailabilityText(product = {}, option = null) {
@@ -4351,8 +4373,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function optionStockText(option = {}, product = {}) {
-    if (optionOutOfStock(option)) return 'Esgotado';
-    return 'Disponivel';
+    if (optionOutOfStock(option)) return 'Indisponivel no momento';
+    return '';
   }
 
   function optionOutOfStock(option = {}) {
@@ -4410,7 +4432,7 @@ document.addEventListener('DOMContentLoaded', () => {
       image,
       out,
       stockText: out ? 'Indisponivel no momento' : '',
-      statusText: out ? 'Indisponivel' : 'Disponivel',
+      statusText: out ? 'Indisponivel no momento' : '',
     };
   }
 
@@ -4453,11 +4475,13 @@ document.addEventListener('DOMContentLoaded', () => {
       statusBadge.classList.toggle('is-out', state.out);
       statusBadge.classList.toggle('is-ok', !state.out);
       statusBadge.classList.toggle('is-low', false);
+      statusBadge.classList.toggle('hidden', !state.statusText);
     }
     productCard?.classList.toggle('is-out-of-stock', state.out);
     fullCatalogItem?.classList.toggle('is-out-of-stock', state.out);
     if (stockBadge) {
-      stockBadge.textContent = state.out ? 'Esgotado' : 'Disponivel';
+      stockBadge.textContent = state.out ? 'Indisponivel' : '';
+      stockBadge.classList.toggle('hidden', !state.out);
     }
     if (button) {
       button.dataset.price = String(state.price);
@@ -4470,7 +4494,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.setAttribute('aria-disabled', String(state.out));
       button.classList.toggle('btn-primary', !state.out);
       button.classList.toggle('btn-esgotado', state.out);
-      button.innerHTML = state.out ? 'Esgotado' : 'Adicionar';
+      button.innerHTML = state.out ? 'Indisponivel' : 'Adicionar';
     }
   }
 
@@ -4492,7 +4516,6 @@ document.addEventListener('DOMContentLoaded', () => {
       normalized.offerActive ? 'is-offer-product' : '',
       normalized.isKit ? 'is-kit-product' : '',
       outOfStock ? 'is-out-of-stock' : '',
-      lowStock ? 'is-low-stock' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -4501,10 +4524,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
         ${
           outOfStock
-            ? '<span class="recommended-badge stock-badge">Esgotado</span>'
-            : lowStock
-              ? '<span class="recommended-badge stock-badge">Poucas unidades</span>'
-              : normalized.offerActive
+            ? '<span class="recommended-badge stock-badge">Indisponivel</span>'
+            : normalized.offerActive
                 ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
                 : normalized.isKit
                   ? '<span class="recommended-badge kit-badge">Kit especial</span>'
@@ -4534,7 +4555,7 @@ document.addEventListener('DOMContentLoaded', () => {
         )}</small>
         <div class="product-card-actions">
           ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
+            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`
           }
           <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
             Ver detalhes
@@ -4677,7 +4698,8 @@ document.addEventListener('DOMContentLoaded', () => {
           originalPrice: optionOffers[0].originalPrice || optionOffers[0].price,
           promotionalPrice: optionOffers[0].promotionalPrice || optionOffers[0].price,
           offerEndsAt: optionOffers[0].offerEndsAt,
-          options: [...optionOffers, ...normalized.options.filter((option) => !optionOffers.includes(option))],
+          options: optionOffers,
+          hasVariations: true,
         };
       })
       .filter((product) => normalizeProduct(product).offerActive && normalizeProduct(product).stockState !== 'out');
@@ -4694,14 +4716,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function fullCatalogStatusText(product) {
     const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Fora da loja agora';
-    if (normalized.stock === null) return 'Disponivel';
-    return 'Disponivel';
+    if (normalized.stockState === 'out') return 'Indisponivel no momento';
+    return '';
   }
 
   function fullCatalogMatchesFilter(product, filter) {
     const normalized = normalizeProduct(product);
-    if (filter === 'available') return normalized.stockState !== 'out';
     if (filter === 'out') return normalized.stockState === 'out';
     if (filter === 'low') return normalized.stockState === 'low';
     if (filter === 'offers') return normalized.offerActive;
@@ -4713,7 +4733,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const key = normalized.id || normalized.name;
@@ -4724,13 +4743,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayImage = (hasOptions && firstOption.image) || image;
 
     return `
-      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
+      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
         <div class="full-catalog-media">
           ${productMediaHTML(normalized, displayImage)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
-            <span class="catalog-status-badge ${outOfStock ? 'is-out' : lowStock ? 'is-low' : 'is-ok'}">${escapeHTML(statusText)}</span>
+            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
@@ -4755,17 +4774,10 @@ document.addEventListener('DOMContentLoaded', () => {
               : ''
           }
           <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
-          ${
-            outOfStock
-              ? `<button disabled class="btn btn-esgotado" type="button">
-                <i class="fa-solid fa-ban"></i>
-                Esgotado
-              </button>`
-              : `<span class="catalog-availability-note">
-                <i class="fa-solid fa-circle-check"></i>
-                Pronto para pedir
-              </span>`
-          }
+          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
+            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
+          </button>
           <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
             <i class="fa-solid fa-circle-info"></i>
             Ver detalhes
@@ -4798,10 +4810,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
-    const availableCount = products.filter((product) => normalizeProduct(product).stockState !== 'out').length;
+    const categoryCount = new Set(products.map((product) => normalizeProduct(product).categorySlug)).size;
     const outCount = products.filter((product) => normalizeProduct(product).stockState === 'out').length;
     setText('[data-full-catalog-total]', String(products.length));
-    setText('[data-full-catalog-available]', String(availableCount));
+    setText('[data-full-catalog-available]', String(categoryCount));
     setText('[data-full-catalog-out]', String(outCount));
 
     const grouped = orderedCategoryEntries(visible)
@@ -4885,7 +4897,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = qs('[data-catalog-detail-body]', modal);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
@@ -4894,7 +4905,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const displayImage = (hasOptions && firstOption.image) || image;
-    const catalogOnly = currentPage() === 'catalogo.html';
 
     if (body) {
       body.innerHTML = `
@@ -4903,7 +4913,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
-            <span class="catalog-status-badge ${outOfStock ? 'is-out' : lowStock ? 'is-low' : 'is-ok'}">${escapeHTML(statusText)}</span>
+            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
@@ -4913,10 +4923,10 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
             <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
-            <div><span>Disponibilidade</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+            <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
               hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
             )}</strong></div>
-            <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
+            <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
           ${
             hasOptions
@@ -4932,14 +4942,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           <div class="catalog-detail-actions">
             ${
-              catalogOnly
-                  ? `<span class="catalog-availability-note catalog-detail-note">
-              <i class="fa-solid fa-circle-check"></i>
-              ${selectedOutOfStock ? 'Indisponivel no momento' : 'Pronto para pedir'}
-            </span>`
-                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
-              ${selectedOutOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
+              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
             </button>`
             }
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
@@ -5040,7 +5045,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
     const searchProducts = term ? catalogSearchProducts(rawTerm, 8) : [];
-    const activeChip = qs('.filter-chips [data-filter].active', catalogRoot);
+    const activeChip =
+      qs('.products-page .filter-chips [data-filter].active') ||
+      qs('.filter-chips [data-filter].active', catalogRoot) ||
+      qs('.filter-chips [data-filter].active');
     const filter = activeChip?.dataset.filter || 'all';
     let visible = 0;
 
@@ -5420,7 +5428,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (action.dataset.cartAction === 'increase') {
         if (item.stock !== null && item.stock !== undefined && item.quantity >= Number(item.stock)) {
-          showToast('Quantidade maxima em estoque no carrinho.');
+          showToast('Limite de quantidade atingido para este item.');
           return;
         }
         item.quantity += 1;
@@ -6932,7 +6940,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '#profile-provider',
       signed ? currentUser.provider || 'Supabase Auth' : 'Entre ou cadastre-se para salvar seus dados',
     );
-    setText('#profile-email', signed ? currentUser.email || 'Não informado' : 'Disponível após entrar ou cadastrar');
+    setText('#profile-email', signed ? currentUser.email || 'Não informado' : 'Aparece após entrar ou cadastrar');
     setText(
       '#profile-phone',
       signed ? currentUser.phone || 'Complete seu WhatsApp' : 'Salve seu WhatsApp em uma conta',
