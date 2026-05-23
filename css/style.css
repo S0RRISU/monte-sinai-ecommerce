@@ -32498,7 +32498,8 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   body:not(.admin-shell-body):not(.auth-body) .toast-stack {
     left: 50% !important;
     right: auto !important;
-    bottom: calc(var(--mobile-dock-height, 108px) + 20px + env(safe-area-inset-bottom)) !important;
+    top: auto !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 12px + env(safe-area-inset-bottom)) !important;
     width: min(258px, calc(100vw - 56px)) !important;
     max-width: min(258px, calc(100vw - 56px)) !important;
     transform: translateX(-50%) !important;
