@@ -1895,6 +1895,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file) {
           payload.imagem = await resolveProductImage(file, payload.nome || variationId, {
             productId,
+            recordId: variationId,
             context: 'variacao',
             feedbackTarget: `[data-admin-variation-image-feedback="${escapeSelector(variationId)}"]`,
           });
@@ -1967,6 +1968,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (file) {
         payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId, {
           productId,
+          recordId: productId,
           context: 'nova-variacao',
           feedbackTarget: '[data-admin-variation-new-image-feedback]',
         });
@@ -2232,19 +2234,27 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function uploadLogPrefix(stage = '', context = '') {
+    if (stage.includes('erro') || stage.includes('falha')) return '[Storage erro]';
+    if (stage.includes('upload') || stage.includes('public-url')) return '[Storage upload]';
+    if (context.includes('variacao')) return '[Upload variacao]';
+    return '[Upload produto]';
+  }
+
   function logImageUploadDiagnostic(stage, details = {}) {
     const payload = {
       stage,
       bucket: PRODUCT_IMAGE_BUCKET,
       ...details,
     };
+    const prefix = uploadLogPrefix(stage, details.context || '');
     if (console.groupCollapsed) {
-      console.groupCollapsed(`[Admin Upload] ${stage}`);
+      console.groupCollapsed(`${prefix} ${stage}`);
       console.info(payload);
       console.groupEnd();
       return;
     }
-    console.info('[Admin Upload]', payload);
+    console.info(prefix, payload);
   }
 
   function friendlyStorageUploadError(error, fallback = 'Nao consegui enviar essa imagem.') {
@@ -2271,8 +2281,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (message.includes('mime') || message.includes('invalid') || message.includes('unsupported')) {
       return 'Formato de imagem nao aceito pelo Storage.';
     }
+    if (message.includes('path') || message.includes('key') || message.includes('object name')) {
+      return 'Path da imagem invalido para o Storage.';
+    }
     if (message.includes('too large') || message.includes('payload') || message.includes('413')) {
       return 'Imagem preparada, mas ainda ficou grande para envio.';
+    }
+    if (message.includes('400')) {
+      return `Erro 400 no Storage: ${error?.message || 'veja o console [Storage erro] para detalhes.'}`;
     }
     if (message.includes('storage') || message.includes('bucket')) {
       return 'O armazenamento de imagens nao esta configurado corretamente.';
@@ -2330,6 +2346,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function canvasBlob(canvas, quality) {
     return new Promise((resolve) => canvas.toBlob(resolve, PRODUCT_IMAGE_OUTPUT_TYPE, quality));
+  }
+
+  function randomUploadToken() {
+    const bytes = new Uint32Array(2);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+      return Array.from(bytes, (value) => value.toString(36)).join('-');
+    }
+    return Math.random().toString(36).slice(2, 12);
+  }
+
+  function buildProductImagePath(diagnostic = {}) {
+    const recordId = safeFileName(diagnostic.recordId || diagnostic.productId || 'novo');
+    const contextFolder = diagnostic.context?.includes('variacao') ? 'variacoes' : 'produtos';
+    const path = `${contextFolder}/${recordId || 'novo'}/${Date.now()}-${randomUploadToken()}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`;
+    if (
+      !path ||
+      path.includes('undefined') ||
+      path.includes('null') ||
+      path.includes('//') ||
+      !/^[a-z0-9-]+\/[a-z0-9-]+\/[0-9]+-[a-z0-9-]+(?:-[a-z0-9-]+)?\.jpg$/.test(path)
+    ) {
+      throw new Error(`Path invalido para upload: ${path || '(vazio)'}`);
+    }
+    return path;
+  }
+
+  async function validateOptimizedProductImage(file) {
+    if (!file) throw new Error('Arquivo final de imagem ausente.');
+    if (!(file instanceof Blob)) throw new Error('Arquivo final nao e Blob/File valido.');
+    if (!file.size || file.size <= 0) throw new Error('Arquivo final vazio.');
+    if (file.type !== PRODUCT_IMAGE_OUTPUT_TYPE) {
+      throw new Error(`ContentType invalido: ${file.type || '(vazio)'}. Esperado image/jpeg.`);
+    }
+    if (file.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
+      throw new Error(`Imagem final grande demais (${fileDiagnostic(file).sizeMb} MB).`);
+    }
+    let source = null;
+    try {
+      source = await loadImageForCompression(file);
+      const dimensions = imageSourceSize(source);
+      if (!dimensions.width || !dimensions.height) throw new Error('Imagem final sem largura/altura validas.');
+      return dimensions;
+    } finally {
+      source?.close?.();
+    }
   }
 
   async function compressProductImage(file) {
@@ -2414,12 +2476,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!api?.storage) throw new Error('Storage do Supabase indisponivel.');
     if (!file) return '';
     validateProductImageFile(file);
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(text(file.type).toLowerCase())) {
-      throw new Error('Formato de imagem nao aceito.');
-    }
-    if (file.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
-      throw new Error(`Imagem final grande demais (${fileDiagnostic(file).sizeMb} MB).`);
-    }
+    const dimensions = await validateOptimizedProductImage(file);
 
     try {
       const { data, error } = await api.auth.getUser();
@@ -2437,13 +2494,11 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Usuario admin nao autenticado para enviar imagem.');
     }
 
-    const extension = imageExtension(file);
-    const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
-    const baseName = safeFileName(text(file.name).replace(/\.[^.]+$/, '') || productName || 'produto');
-    const path = `${safeFileName(productName)}/${Date.now()}-${baseName}.${extension}`;
-    if (!/^[a-z0-9-]+\/[0-9]+-[a-z0-9-]+\.(jpg|png|webp)$/.test(path)) {
-      throw new Error('Caminho de upload invalido.');
-    }
+    const path = buildProductImagePath(diagnostic);
+    const uploadFile = new File([file], path.split('/').pop(), {
+      type: PRODUCT_IMAGE_OUTPUT_TYPE,
+      lastModified: Date.now(),
+    });
 
     if (api.storage.listBuckets) {
       try {
@@ -2470,25 +2525,43 @@ document.addEventListener('DOMContentLoaded', () => {
     logImageUploadDiagnostic('upload', {
       context: diagnostic.context || 'produto',
       originalFile: diagnostic.originalFile || null,
-      finalFile: fileDiagnostic(file),
+      finalFile: fileDiagnostic(uploadFile),
+      dimensions,
       path,
-      contentType: file.type || `image/${extension}`,
+      contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+      upsert: true,
     });
 
-    const { error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
+    const { data: uploadData, error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, uploadFile, {
       cacheControl: '3600',
-      contentType: file.type || `image/${extension}`,
-      upsert: false,
+      contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+      upsert: true,
     });
 
     if (error) {
-      logImageUploadDiagnostic('upload-falhou', {
+      const detail = {
         context: diagnostic.context || 'produto',
         path,
+        request: {
+          bucket: PRODUCT_IMAGE_BUCKET,
+          contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+          cacheControl: '3600',
+          upsert: true,
+          size: uploadFile.size,
+          dimensions,
+        },
         error: storageErrorDiagnostic(error),
-      });
+        rawError: error,
+      };
+      logImageUploadDiagnostic('upload-falhou', detail);
+      console.error('[Storage erro] Supabase retornou erro no upload.', detail);
       throw error;
     }
+    logImageUploadDiagnostic('upload-ok', {
+      context: diagnostic.context || 'produto',
+      path,
+      uploadData,
+    });
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('Upload concluido, mas nao consegui gerar URL publica.');
     logImageUploadDiagnostic('public-url', {
