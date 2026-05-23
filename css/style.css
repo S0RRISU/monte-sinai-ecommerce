@@ -32538,3 +32538,237 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
     line-height: 1.25 !important;
   }
 }
+
+/* Refatoracao base loja publica: shell compacto, renderer unico e responsivo. */
+body:not(.admin-shell-body) .products-public-page {
+  padding-block: clamp(16px, 3vw, 30px);
+}
+
+body:not(.admin-shell-body) .products-public-layout {
+  align-items: flex-start;
+  gap: clamp(14px, 2vw, 24px);
+}
+
+body:not(.admin-shell-body) .public-products-panel {
+  min-width: 0;
+}
+
+body:not(.admin-shell-body) .public-products-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+body:not(.admin-shell-body) .public-products-head h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(1.55rem, 2.4vw, 2.15rem);
+  line-height: 1.05;
+}
+
+body:not(.admin-shell-body) .public-products-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+body:not(.admin-shell-body) .public-products-tools {
+  margin-bottom: 10px;
+}
+
+body:not(.admin-shell-body) .public-products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+body:not(.admin-shell-body) .public-product-card {
+  min-width: 0;
+  height: 100%;
+  grid-template-columns: 86px minmax(0, 1fr) minmax(132px, 0.42fr);
+  gap: 12px;
+  padding: 12px;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-media {
+  width: 86px;
+  height: 86px;
+  min-height: 86px;
+  border-radius: 14px;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-copy h3 {
+  display: -webkit-box;
+  margin-bottom: 4px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-copy p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.84rem;
+  line-height: 1.32;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-badges {
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+body:not(.admin-shell-body) .catalog-status-badge.is-category {
+  border-color: color-mix(in srgb, var(--accent, #0f8cff) 36%, var(--line));
+  background: color-mix(in srgb, var(--accent, #0f8cff) 10%, transparent);
+  color: var(--accent-strong, var(--accent, #0f8cff));
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-action {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-action > strong {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+body:not(.admin-shell-body) .public-product-card .product-option-compact,
+body:not(.admin-shell-body) .public-product-card .full-catalog-action .btn {
+  width: 100%;
+  min-height: 40px;
+}
+
+@media (min-width: 1025px) {
+  body:not(.admin-shell-body) .products-public-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.32fr);
+  }
+
+  body:not(.admin-shell-body) .public-products-grid {
+    grid-template-columns: repeat(auto-fit, minmax(390px, 1fr));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  body:not(.admin-shell-body) .products-public-layout,
+  body:not(.admin-shell-body) .grid-shop-layout.products-public-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body:not(.admin-shell-body) .public-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:not(.admin-shell-body) .public-product-card {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-action {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(2, minmax(110px, 0.72fr));
+    align-items: center;
+  }
+}
+
+@media (max-width: 767px) {
+  body:not(.admin-shell-body) .products-public-page {
+    padding-block: 12px calc(var(--mobile-dock-height, 108px) + 32px);
+  }
+
+  body:not(.admin-shell-body) .products-public-layout,
+  body:not(.admin-shell-body) .grid-shop-layout.products-public-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  body:not(.admin-shell-body) .public-products-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  body:not(.admin-shell-body) .public-products-head h1 {
+    font-size: 1.42rem;
+  }
+
+  body:not(.admin-shell-body) .public-products-head .btn {
+    width: 100%;
+  }
+
+  body:not(.admin-shell-body) .public-products-tools {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  body:not(.admin-shell-body) .public-products-tools .filter-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-inline: -2px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  body:not(.admin-shell-body) .public-products-tools .filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  body:not(.admin-shell-body) .public-products-tools .filter-chip {
+    flex: 0 0 auto;
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  body:not(.admin-shell-body) .public-products-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  body:not(.admin-shell-body) .public-product-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-media {
+    width: 72px;
+    height: 72px;
+    min-height: 72px;
+    border-radius: 12px;
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-copy h3 {
+    font-size: 0.98rem;
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-copy p {
+    -webkit-line-clamp: 1;
+    font-size: 0.8rem;
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-action {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  body:not(.admin-shell-body) .public-product-card .full-catalog-action > strong,
+  body:not(.admin-shell-body) .public-product-card .product-option-compact {
+    grid-column: 1 / -1;
+  }
+
+  body:not(.admin-shell-body) .products-public-layout .cart-box {
+    display: none;
+  }
+}

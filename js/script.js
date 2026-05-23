@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingProfile: 'ms_pending_profile_email_v1',
     pendingProfileSavePassword: 'ms_pending_profile_save_password_v1',
     authSessions: 'ms_saved_auth_sessions_v1',
+    siteRemoteStatus: 'ms_site_config_remote_status_v1',
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
   const SITE_CONFIG_TABLE = 'site_configuracoes';
+  const SITE_CONFIG_MISSING_TTL = 6 * 60 * 60 * 1000;
   let productIndex = [];
   const CATALOG_CATEGORY_ORDER = [
     'agua',
@@ -230,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
   let ordersPageAdminMode = false;
+  const publicProductsState = {
+    allProducts: [],
+    selectedCategory: 'all',
+    searchTerm: '',
+  };
 
   applySavedTheme();
   applySiteConfig();
@@ -444,22 +451,54 @@ document.addEventListener('DOMContentLoaded', () => {
   function missingSiteConfigTable(error) {
     const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
     return (
-      text.includes('site_configuracoes') || text.includes('pgrst205') || text.includes('could not find the table')
+      text.includes('site_configuracoes') ||
+      text.includes('pgrst205') ||
+      text.includes('404') ||
+      text.includes('not found') ||
+      text.includes('could not find the table')
     );
+  }
+
+  function siteConfigTableMarkedMissing() {
+    const status = loadJSON(STORAGE.siteRemoteStatus, null);
+    return Boolean(status?.missing && Date.now() - Number(status.checkedAt || 0) < SITE_CONFIG_MISSING_TTL);
+  }
+
+  function markSiteConfigTableMissing() {
+    saveJSON(STORAGE.siteRemoteStatus, { missing: true, checkedAt: Date.now() });
+  }
+
+  function clearSiteConfigTableMissing() {
+    try {
+      localStorage.removeItem(STORAGE.siteRemoteStatus);
+    } catch (_error) {
+      // localStorage may be blocked; defaults still keep public pages usable.
+    }
+  }
+
+  function shouldLoadRemoteSiteConfig() {
+    if (siteConfigTableMarkedMissing()) return false;
+    return currentPage() === 'configuracoes.html';
   }
 
   async function loadRemoteSiteConfig() {
     const client = supabaseProductClient();
     if (!client) return null;
+    if (!shouldLoadRemoteSiteConfig()) return null;
 
     try {
       const { data, error } = await client.from(SITE_CONFIG_TABLE).select('config').eq('id', 'site').maybeSingle();
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return data?.config || null;
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Usando padrao local.');
+      } else {
         console.warn('[Supabase] Nao foi possivel carregar configuracoes do site.', error);
+      }
       return null;
     }
   }
@@ -467,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveRemoteSiteConfig() {
     const client = ordersClient();
     if (!client) return { saved: false, reason: 'no-client' };
+    if (siteConfigTableMarkedMissing()) return { saved: false, reason: 'missing-optional-table' };
 
     const config = {
       owner: normalizedOwnerConfig(ownerConfig),
@@ -484,10 +524,15 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return { saved: true };
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Salvamento remoto ignorado.');
+      } else {
         console.warn('[Supabase] Nao foi possivel salvar configuracoes do site.', error);
+      }
       return { saved: false, error };
     }
   }
@@ -958,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Finalize a atualizacao do SQL no Supabase antes de vender. O carrinho foi mantido.';
     }
     if (message.includes('estoque insuficiente') || message.includes('produto do pedido nao esta disponivel')) {
-      return 'Um produto ficou sem estoque ou indisponivel. Confira o carrinho e tente novamente.';
+      return 'Um produto ficou indisponivel. Confira o carrinho e tente novamente.';
     }
     if (message.includes('telefone')) return 'Confira o WhatsApp informado antes de finalizar.';
     return fallback;
@@ -1599,7 +1644,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setProductIndex(products) {
-    productIndex = uniqueProductList(products);
+    productIndex = uniqueProductList(groupProductVariants(products));
   }
 
   function clearPublicProductShell() {
@@ -3934,18 +3979,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const page = currentPage();
     const activeSection = (() => {
       if (page === 'index.html') return 'home';
-      if (page === 'produtos.html' || page === 'catalogo.html') return 'store';
+      if (page === 'produtos.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
-      if (
-        [
-          'login.html',
-          'perfil.html',
-          'pedidos.html',
-          'editar-perfil.html',
-          'configuracoes.html',
-          'criar.html',
-        ].includes(page)
-      )
+      if (['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(page))
         return 'account';
       return '';
     })();
@@ -4584,82 +4620,117 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function productCardHTML(product, mode = 'catalog') {
+  function publicProductCardHTML(product, options = {}) {
+    const { layout = 'store', rail = false } = options;
     const normalized = normalizeProduct(product);
-    const recommended = isRecommendedProduct(normalized);
-    const options = productOptions(normalized);
-    const hasOptions = normalized.hasVariations && options.length > 0;
-    const firstOption = options[0] || { price: normalized.price };
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : normalized.stockState === 'out';
+    const productOptionsList = productOptions(normalized);
+    const hasOptions = normalized.hasVariations && productOptionsList.length > 0;
+    const firstOption = productOptionsList[0] || { price: normalized.price };
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
-    const cardClass = [
-      'product-card',
-      mode === 'rail' ? 'rail-product tilt-3d' : 'catalog-product',
-      recommended ? 'is-recommended' : '',
-      normalized.offerActive ? 'is-offer-product' : '',
-      normalized.isKit ? 'is-kit-product' : '',
-      outOfStock ? 'is-out-of-stock' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const cardClass = rail
+      ? [
+          'product-card',
+          'catalog-product',
+          'rail-product',
+          'tilt-3d',
+          recommended ? 'is-recommended' : '',
+          normalized.offerActive ? 'is-offer-product' : '',
+          normalized.isKit ? 'is-kit-product' : '',
+          outOfStock ? 'is-out-of-stock' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : [
+          'full-catalog-item',
+          'public-product-card',
+          `public-product-card--${layout}`,
+          'catalog-product',
+          outOfStock ? 'is-out-of-stock' : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+    const selectHTML = hasOptions
+      ? `
+          <select class="product-option ${rail ? '' : 'product-option-compact'}" aria-label="${escapeHTML(
+            normalized.name.includes('Desinfetante') ? 'Escolher fragrancia do desinfetante' : 'Escolher opcao do produto',
+          )}">
+            ${productOptionsHTML(productOptionsList, normalized)}
+          </select>
+        `
+      : '';
+    const priceHTML = `<strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>`;
+    const addButtonHTML = `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${rail ? '' : `<i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>`}${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`;
+    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
 
-    return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
-        ${
-          outOfStock
-            ? '<span class="recommended-badge stock-badge">Indisponivel</span>'
-            : normalized.offerActive
-                ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
-                : normalized.isKit
-                  ? '<span class="recommended-badge kit-badge">Kit especial</span>'
-                  : recommended
-                    ? '<span class="recommended-badge">Recomendado</span>'
-                    : ''
-        }
+    if (rail) {
+      return `
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
+        ${selectedOutOfStock ? '<span class="recommended-badge stock-badge">Indisponivel</span>' : ''}
         <div class="product-media">
           ${productMediaHTML(normalized, image)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
-        <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
+        <span class="product-category-label">${escapeHTML(normalized.category)}</span>
+        <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
         ${normalized.kitItems ? `<p class="kit-items">${escapeHTML(normalized.kitItems)}</p>` : ''}
-        ${
-          hasOptions
-            ? `
-          <select class="product-option" aria-label="${escapeHTML(normalized.name.includes('Desinfetante') ? 'Escolher fragrância do desinfetante' : 'Escolher tipo do produto')}">
-            ${productOptionsHTML(options, normalized)}
-          </select>
-        `
-            : ''
-        }
-        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-        <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-          customerAvailabilityText(normalized, hasOptions ? firstOption : null),
-        )}</small>
+        ${selectHTML}
+        ${priceHTML}
+        ${selectedOutOfStock ? '<small class="product-stock-line is-unavailable">Indisponivel no momento</small>' : ''}
         <div class="product-card-actions">
-          ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`
-          }
-          <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
-            Ver detalhes
-          </button>
+          ${addButtonHTML}
+          ${detailButtonHTML}
         </div>
       </article>
     `;
+    }
+
+    return `
+      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        <div class="full-catalog-media">
+          ${productMediaHTML(normalized, image)}
+        </div>
+        <div class="full-catalog-copy">
+          <div class="full-catalog-badges">
+            <span class="catalog-status-badge is-category">${escapeHTML(normalized.category)}</span>
+            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+            ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
+          </div>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
+          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
+        </div>
+        <div class="full-catalog-action">
+          ${selectHTML}
+          ${priceHTML}
+          ${addButtonHTML}
+          ${detailButtonHTML}
+        </div>
+      </article>
+    `;
+  }
+
+  function productCardHTML(product, mode = 'catalog') {
+    return publicProductCardHTML(product, { layout: mode === 'rail' ? 'rail' : 'store', rail: mode === 'rail' });
   }
 
   function renderDynamicFilters() {
     const filterBar = qs('.filter-chips');
     if (!filterBar) return;
 
+    const current = qs('[data-filter].active', filterBar)?.dataset.filter || 'all';
+    const activeFilter = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === current) ? current : 'all';
     filterBar.innerHTML = [
-      '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
+      `<button class="filter-chip ${activeFilter === 'all' ? 'active' : ''}" type="button" data-filter="all">Todos</button>`,
       ...PUBLIC_CATEGORY_FILTERS.map(
         ([slug, label]) =>
-          `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
+          `<button class="filter-chip ${activeFilter === slug ? 'active' : ''}" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
       ),
     ].join('');
   }
@@ -4695,10 +4766,138 @@ document.addEventListener('DOMContentLoaded', () => {
     return groups;
   }
 
+  function publicProductsRoot() {
+    return qs('.products-page #todos-produtos');
+  }
+
+  function isPublicProductsPage() {
+    return Boolean(publicProductsRoot());
+  }
+
+  function publicProductsContainer() {
+    const root = publicProductsRoot();
+    return root?.querySelector(':scope > div') || root;
+  }
+
+  function publicStoreProducts() {
+    return storeProducts().sort(compareCatalogProducts);
+  }
+
+  function syncPublicProductsStateFromUI() {
+    const root = publicProductsRoot();
+    const activeFilter = qs('.filter-chips [data-filter].active', root || document)?.dataset.filter || 'all';
+    publicProductsState.selectedCategory = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === activeFilter)
+      ? activeFilter
+      : 'all';
+    publicProductsState.searchTerm = qs('[data-catalog-search]', root || document)?.value || '';
+  }
+
+  function publicProductMatchesSearch(product, rawTerm = '') {
+    const term = normalizeText(rawTerm);
+    if (!term) return true;
+
+    const normalized = normalizeProduct(product);
+    const options = productOptions(normalized);
+    const optionTerms = options
+      .map((option) => [option.name, option.label, option.sabor, option.marca].filter(Boolean).join(' '))
+      .join(' ');
+    const searchable = normalizeText(
+      [
+        normalized.name,
+        normalized.category,
+        normalized.description,
+        normalized.terms,
+        normalized.kitItems,
+        optionTerms,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+
+    return searchable.includes(term);
+  }
+
+  function getFilteredPublicProducts() {
+    const products = publicProductsState.allProducts.length
+      ? publicProductsState.allProducts
+      : publicStoreProducts();
+    const selectedCategory = publicProductsState.selectedCategory || 'all';
+    const searchTerm = publicProductsState.searchTerm || '';
+
+    return products.filter((product) => {
+      const normalized = normalizeProduct(product);
+      const matchesCategory = selectedCategory === 'all' || normalized.categorySlug === selectedCategory;
+      return matchesCategory && publicProductMatchesSearch(normalized, searchTerm);
+    });
+  }
+
+  function ensurePublicProductsGrid() {
+    const container = publicProductsContainer();
+    if (!container) return null;
+
+    qsa('.section-head, .grid-produtos:not([data-public-products-grid])', container).forEach((node) => node.remove());
+    let grid = qs('[data-public-products-grid]', container);
+    if (!grid) {
+      const empty = qs('#catalog-empty', container);
+      grid = document.createElement('div');
+      grid.className = 'grid-produtos public-products-grid';
+      grid.dataset.publicProductsGrid = '';
+      if (empty) container.insertBefore(grid, empty);
+      else container.appendChild(grid);
+    }
+    return grid;
+  }
+
+  function renderFilteredPublicProducts() {
+    const grid = ensurePublicProductsGrid();
+    if (!grid) return false;
+
+    syncPublicProductsStateFromUI();
+    const products = getFilteredPublicProducts();
+    grid.replaceChildren();
+    grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+
+    const container = publicProductsContainer();
+    const empty = qs('#catalog-empty', container || document);
+    if (empty) {
+      empty.textContent =
+        publicProductsState.selectedCategory !== 'all' && !normalizeText(publicProductsState.searchTerm)
+          ? 'Nenhum produto encontrado nesta categoria'
+          : 'Nenhum produto encontrado com esse filtro.';
+      empty.classList.toggle('hidden', products.length > 0);
+    }
+
+    const result = qs('[data-catalog-results]', container || document);
+    if (result) {
+      const rawTerm = String(publicProductsState.searchTerm || '').trim();
+      const suffix = rawTerm ? ` para "${rawTerm}"` : '';
+      const suggested = rawTerm && products.length ? (products.length === 1 ? ' sugerido' : ' sugeridos') : '';
+      result.textContent = `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
+    }
+
+    optimizeImageLoading();
+    return true;
+  }
+
+  function renderPublicProductsPage() {
+    if (!isPublicProductsPage()) return false;
+    qs('.products-page > .hero.hero-small')?.remove();
+    publicProductsRoot()?.classList.add('products-public-layout');
+    publicProductsContainer()?.classList.add('public-products-panel');
+    renderDynamicFilters();
+    publicProductsState.allProducts = publicStoreProducts();
+    publicProductsState.searchTerm = qs('[data-catalog-search]', publicProductsRoot())?.value || '';
+    publicProductsState.selectedCategory =
+      qs('.filter-chips [data-filter].active', publicProductsRoot())?.dataset.filter || 'all';
+    renderFilteredPublicProducts();
+    return true;
+  }
+
   function renderDynamicCatalog() {
+    if (renderPublicProductsPage()) return;
+
     const catalog = qs('#todos-produtos > div');
     if (!catalog) return;
-
     renderDynamicFilters();
 
     [...catalog.children].forEach((child) => {
@@ -4789,7 +4988,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
       })
       .filter((product) => normalizeProduct(product).offerActive && normalizeProduct(product).stockState !== 'out');
-    grid.innerHTML = offers.map((product) => productCardHTML(product, 'catalog')).join('');
+    grid.innerHTML = offers.map((product) => publicProductCardHTML(product, { layout: 'offer' })).join('');
     qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
     qsa('[data-promotions-count]').forEach((el) => {
       el.textContent = String(offers.length);
@@ -4816,61 +5015,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fullCatalogCardHTML(product) {
-    const normalized = normalizeProduct(product);
-    const image = productAssetPath(normalized);
-    const outOfStock = normalized.stockState === 'out';
-    const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
-    const key = normalized.id || normalized.name;
-    const options = productOptions(normalized);
-    const firstOption = options[0] || { price: normalized.price };
-    const hasOptions = normalized.hasVariations && options.length > 0;
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
-    const displayImage = (hasOptions && firstOption.image) || image;
-
-    return `
-      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
-        <div class="full-catalog-media">
-          ${productMediaHTML(normalized, displayImage)}
-        </div>
-        <div class="full-catalog-copy">
-          <div class="full-catalog-badges">
-            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
-            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
-            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
-          </div>
-          <h3>${escapeHTML(normalized.name)}</h3>
-          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
-          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
-        </div>
-        <div class="full-catalog-stock">
-          <strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-            hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-          )}</strong>
-          <span>${escapeHTML(normalized.category)}</span>
-        </div>
-        <div class="full-catalog-action">
-          ${
-            hasOptions
-              ? `
-            <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
-              ${productOptionsHTML(options, normalized)}
-            </select>
-          `
-              : ''
-          }
-          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
-            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
-            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
-          </button>
-          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
-            <i class="fa-solid fa-circle-info"></i>
-            Ver detalhes
-          </button>
-        </div>
-      </article>
-    `;
+    return publicProductCardHTML(product, { layout: 'catalog' });
   }
 
   function renderFullCatalogPage() {
@@ -4896,12 +5041,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
-    const categoryCount = new Set(products.map((product) => normalizeProduct(product).categorySlug)).size;
-    const outCount = products.filter((product) => normalizeProduct(product).stockState === 'out').length;
-    setText('[data-full-catalog-total]', String(products.length));
-    setText('[data-full-catalog-available]', String(categoryCount));
-    setText('[data-full-catalog-out]', String(outCount));
-
     const grouped = orderedCategoryEntries(visible)
       .map(([slug, label]) => {
         const meta = catalogSectionMeta(slug, label);
@@ -4913,7 +5052,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="full-catalog-category-head">
             <span class="eyebrow">${escapeHTML(meta.eyebrow)}</span>
             <h2>${escapeHTML(label)}</h2>
-            <small>${categoryProducts.length} item${categoryProducts.length === 1 ? '' : 's'}</small>
           </div>
           <div class="full-catalog-category-grid">
             ${categoryProducts.map(fullCatalogCardHTML).join('')}
@@ -4928,9 +5066,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const result = qs('[data-full-catalog-results]');
     if (result) {
-      result.textContent = products.length
-        ? `${visible.length} de ${products.length} produto${products.length === 1 ? '' : 's'} no catalogo`
-        : 'Carregando catalogo...';
+      result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
     }
   }
 
@@ -4984,7 +5120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
     const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
+
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
@@ -5009,9 +5145,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
             <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
-            <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-              hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-            )}</strong></div>
+
             <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
           ${
@@ -5097,7 +5231,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else applyCatalogHashFilter(false);
 
     input?.addEventListener('input', () => {
-      if (input.value.trim()) activateCatalogFilter('all');
+      if (isPublicProductsPage()) {
+        publicProductsState.searchTerm = input.value || '';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     });
 
@@ -5108,6 +5246,11 @@ document.addEventListener('DOMContentLoaded', () => {
       qsa('[data-filter]', scopedFilterBar || document).forEach((item) =>
         item.classList.toggle('active', item === chip),
       );
+      if (isPublicProductsPage()) {
+        publicProductsState.selectedCategory = chip.dataset.filter || 'all';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     };
 
@@ -5125,6 +5268,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyCatalogFilters() {
+    if (isPublicProductsPage() && renderFilteredPublicProducts()) return;
+
     const catalogRoot = qs('.products-page #todos-produtos') || qs('#todos-produtos') || document;
     const products = qsa('.catalog-product', catalogRoot);
 

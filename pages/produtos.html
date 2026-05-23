@@ -69,377 +69,46 @@
     <a href="contato.html">Contato</a>
   </div>
 
-  <main class="products-page">
-    <section class="hero container hero-small">
-      <div class="hero-copy">
-        <span class="eyebrow">Catálogo completo</span>
-        <h1>Todos os produtos para comprar com poucos cliques</h1>
-        <p>Use a busca, filtre por categoria e finalize pelo carrinho. Água e gás ficam destacados como recomendados.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+comprar+produtos" target="_blank" rel="noreferrer">
-            <i class="fa-brands fa-whatsapp"></i>
-            Pedir no WhatsApp
-          </a>
-          <a class="btn btn-secondary" href="#todos-produtos">
-            <i class="fa-solid fa-list"></i>
-            Ver catálogo
+  <main class="products-page products-public-page">
+    <section class="section container grid-shop-layout products-public-layout" id="todos-produtos">
+      <div class="public-products-panel">
+        <div class="public-products-head">
+          <div>
+            <span class="eyebrow">Produtos</span>
+            <h1>Produtos para comprar</h1>
+            <p>Filtre por categoria ou busque pelo nome do produto.</p>
+          </div>
+          <a class="btn btn-secondary" href="catalogo.html">
+            <i class="fa-solid fa-book-open"></i>
+            Cat&aacute;logo
           </a>
         </div>
-      </div>
-    </section>
 
-    <section class="section container grid-shop-layout" id="todos-produtos">
-      <div>
-        <div class="catalog-tools" aria-label="Ferramentas do catálogo">
+        <div class="catalog-tools public-products-tools" aria-label="Ferramentas de produtos">
           <form class="search-field catalog-search-form" role="search" data-site-search-form>
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="search" name="busca" data-catalog-search data-site-search-input placeholder="Buscar água, gás, detergente...">
+            <input type="search" name="busca" data-catalog-search data-site-search-input placeholder="Buscar &aacute;gua, g&aacute;s, detergente...">
             <button type="submit" aria-label="Pesquisar produto">
               <i class="fa-solid fa-arrow-right"></i>
             </button>
           </form>
-          <div class="filter-chips" aria-label="Filtros">
+          <div class="filter-chips" aria-label="Categorias de produtos">
             <button class="filter-chip active" type="button" data-filter="all">Todos</button>
-            <button class="filter-chip" type="button" data-filter="agua">Água</button>
-            <button class="filter-chip" type="button" data-filter="gas">Gás</button>
+            <button class="filter-chip" type="button" data-filter="agua">&Aacute;gua</button>
+            <button class="filter-chip" type="button" data-filter="gas">G&aacute;s</button>
             <button class="filter-chip" type="button" data-filter="limpeza">Limpeza</button>
             <button class="filter-chip" type="button" data-filter="lavanderia">Lavanderia</button>
             <button class="filter-chip" type="button" data-filter="higiene">Higiene</button>
             <button class="filter-chip" type="button" data-filter="banheiro">Banheiro</button>
             <button class="filter-chip" type="button" data-filter="cozinha">Cozinha</button>
-            <button class="filter-chip" type="button" data-filter="utensilios">Utensílios</button>
-            <button class="filter-chip" type="button" data-filter="organizacao">Organização</button>
+            <button class="filter-chip" type="button" data-filter="utensilios">Utens&iacute;lios</button>
+            <button class="filter-chip" type="button" data-filter="organizacao">Organiza&ccedil;&atilde;o</button>
             <button class="filter-chip" type="button" data-filter="limpeza-pesada">Limpeza pesada</button>
           </div>
         </div>
-        <p class="catalog-results" data-catalog-results>Produtos encontrados</p>
 
-        <div class="section-head">
-          <span class="eyebrow">Recomendados</span>
-          <h2>Água e gás mais pedidos</h2>
-        </div>
-        <div class="grid-produtos">
-          <article class="product-card catalog-product is-recommended" data-name="Água mineral 20L" data-category="agua" data-recommended="true">
-            <span class="recommended-badge">Recomendado</span>
-            <div class="product-media">
-              <img class="product-image" src="../assets/produtos/v2/agua-mineral-20l.png" alt="Água mineral 20L" loading="lazy" decoding="async">
-            </div>
-            <div class="product-icon"><i class="fa-solid fa-droplet"></i></div>
-            <h3>Água mineral 20L</h3>
-            <p>Galão retornável para abastecer sua casa.</p>
-            <strong>R$ 15,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Água mineral 20L" data-price="15">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product is-recommended" data-name="Gás de cozinha P13" data-category="gas" data-recommended="true">
-            <span class="recommended-badge">Recomendado</span>
-            <div class="product-media">
-              <img class="product-image" src="../assets/produtos/v2/gas-p13.png" alt="Gás de cozinha P13" loading="lazy" decoding="async">
-            </div>
-            <div class="product-icon"><i class="fa-solid fa-fire-flame-simple"></i></div>
-            <h3>Gás de cozinha P13</h3>
-            <p>Escolha o tipo: Supergás R$ 125,00 ou Ultragás R$ 135,00.</p>
-            <select class="product-option" aria-label="Escolher tipo de gás">
-              <option value="Supergás" data-price="125">Supergás • R$ 125,00</option>
-              <option value="Ultragás" data-price="135">Ultragás • R$ 135,00</option>
-            </select>
-            <strong>R$ 125,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Gás de cozinha P13" data-price="125">Adicionar</button>
-          </article>
-        </div>
-
-        <div class="section-head">
-          <span class="eyebrow">Líquidos e químicos</span>
-          <h2>Produtos de limpeza e higiene</h2>
-        </div>
-        <div class="grid-produtos">
-          <article class="product-card catalog-product" data-name="Álcool Perfumado 500ml" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/alcool-perfumado.png" alt="Álcool Perfumado 500ml" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-flask"></i></div>
-            <h3>Álcool Perfumado 500ml</h3>
-            <p>Perfumado para higienização rápida e fresca.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Álcool Perfumado 500ml" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Amaciante 2L" data-category="lavanderia">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/amaciante-2l.png" alt="Amaciante 2L" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-shirt"></i></div>
-            <h3>Amaciante 2L</h3>
-            <p>Roupas macias e fragrância agradável.</p>
-            <strong>R$ 10,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Amaciante 2L" data-price="10">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Cândida 2L Tradicional" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/candida-2l.png" alt="Cândida 2L Tradicional" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-droplet"></i></div>
-            <h3>Cândida 2L</h3>
-            <p>Limpeza pesada para banheiros, pisos e áreas externas.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Cândida 2L Tradicional" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Cândida Colorida 2L" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/candida-colorida.png" alt="Cândida Colorida 2L" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-shirt"></i></div>
-            <h3>Cândida Colorida 2L</h3>
-            <p>Cuidado para tecidos coloridos e limpeza do dia a dia.</p>
-            <strong>R$ 12,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Cândida Colorida 2L" data-price="12">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Cloro 1L Tradicional" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/cloro-1l.png" alt="Cloro 1L Tradicional" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-water"></i></div>
-            <h3>Cloro 1L</h3>
-            <p>Higienização prática para uso doméstico.</p>
-            <strong>R$ 7,50</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Cloro 1L" data-price="7.5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Cloro 2L Tradicional" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/cloro-2l.png" alt="Cloro 2L Tradicional" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-water"></i></div>
-            <h3>Cloro 2L</h3>
-            <p>Mais rendimento para limpezas frequentes.</p>
-            <strong>R$ 12,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Cloro 2L" data-price="12">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Detergente 2L Neutro" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/detergente-2l.png" alt="Detergente 2L Neutro" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-bottle-droplet"></i></div>
-            <h3>Detergente 2L</h3>
-            <p>Neutro, econômico e pronto para louças e superfícies.</p>
-            <strong>R$ 10,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Detergente 2L" data-price="10">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Desinfetante 2L" data-category="limpeza">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/desinfetante-2l.png" alt="Desinfetante 2L" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-spray-can"></i></div>
-            <h3>Desinfetante 2L</h3>
-            <p>Escolha a fragrância de sua preferência para perfumar a limpeza.</p>
-            <select class="product-option" aria-label="Escolher fragrância do desinfetante">
-              <option value="Kaialque" data-price="5">Kaialque</option>
-              <option value="Violeta" data-price="5">Violeta</option>
-              <option value="Eucalipto" data-price="5">Eucalipto</option>
-              <option value="Pinho" data-price="5">Pinho</option>
-              <option value="Jasmim" data-price="5">Jasmim</option>
-              <option value="Talco" data-price="5">Talco</option>
-              <option value="Dama da Noite" data-price="5">Dama da Noite</option>
-              <option value="Palmolive" data-price="5">Palmolive</option>
-            </select>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Desinfetante 2L" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Limpa Alumínio 500ml" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/limpa-aluminio.png" alt="Limpa Alumínio 500ml" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-brush"></i></div>
-            <h3>Limpa Alumínio 500ml</h3>
-            <p>Brilho e limpeza para peças de alumínio.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Limpa Alumínio 500ml" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Limpa Pedra 2L Uso Pesado" data-category="limpeza-pesada">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/limpa-pedra-2l.png" alt="Limpa Pedra 2L Uso Pesado" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-mountain"></i></div>
-            <h3>Limpa Pedra 2L</h3>
-            <p>Uso pesado para limpeza de pedras e áreas externas.</p>
-            <strong>R$ 12,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Limpa Pedra 2L" data-price="12">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Limpa Pedra 500ml Uso Diário" data-category="limpeza-pesada">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/limpa-pedra-500ml.png" alt="Limpa Pedra 500ml Uso Diário" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-mountain-city"></i></div>
-            <h3>Limpa Pedra 500ml</h3>
-            <p>Formato prático para manutenção e uso diário.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Limpa Pedra 500ml" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Sabão de Coco 2L" data-category="lavanderia">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/sabao-coco.png" alt="Sabão de Coco 2L" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-soap"></i></div>
-            <h3>Sabão de Coco 2L</h3>
-            <p>Limpeza suave para roupas e cuidados domésticos.</p>
-            <strong>R$ 12,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Sabão de Coco 2L" data-price="12">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Sabão Omo 2L" data-category="lavanderia">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/sabao-omo.png" alt="Sabão Omo 2L" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-shirt"></i></div>
-            <h3>Sabão Omo 2L</h3>
-            <p>Sabão líquido para roupas limpas e perfumadas.</p>
-            <strong>R$ 22,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Sabão Omo 2L" data-price="22">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Sabonete Líquido 500ml Dove" data-category="higiene">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/sabonete-liquido.png" alt="Sabonete Líquido 500ml Dove" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-pump-soap"></i></div>
-            <h3>Sabonete Líquido 500ml</h3>
-            <p>Higiene das mãos com toque suave.</p>
-            <strong>R$ 6,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Sabonete Líquido 500ml" data-price="6">Adicionar</button>
-          </article>
-        </div>
-
-        <div class="section-head">
-          <span class="eyebrow">Utensílios e acessórios</span>
-          <h2>Itens para limpeza e organização</h2>
-        </div>
-        <div class="grid-produtos">
-          <article class="product-card catalog-product" data-name="Escova de Roupa" data-category="lavanderia">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/escova-roupa.png" alt="Escova de Roupa" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-brush"></i></div>
-            <h3>Escova de Roupa</h3>
-            <p>Para lavar peças e remover sujeiras difíceis.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Escova de Roupa" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Escova de Vaso Sanitário com Pote" data-category="banheiro">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/escova-vaso.png" alt="Escova de Vaso Sanitário com Pote" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-toilet"></i></div>
-            <h3>Escova de Vaso com Pote</h3>
-            <p>Praticidade para manter o banheiro higienizado.</p>
-            <strong>R$ 8,50</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Escova de Vaso Sanitário" data-price="8.5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Esponja de Aço" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/esponja-aco.png" alt="Esponja de Aço" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-grip-lines"></i></div>
-            <h3>Esponja de Aço</h3>
-            <p>Remove sujeiras resistentes em panelas e utensílios.</p>
-            <strong>R$ 4,90</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Esponja de Aço" data-price="4.9">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Esponja de Louça" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/esponja-louca.png" alt="Esponja de Louça" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-square"></i></div>
-            <h3>Esponja de Louça</h3>
-            <p>Dupla face para pia e cozinha.</p>
-            <strong>R$ 2,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Esponja de Louça" data-price="2">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Esponjão" data-category="utensilios">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/esponjao.png" alt="Esponjão" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-square-full"></i></div>
-            <h3>Esponjão</h3>
-            <p>Maior área de limpeza para tarefas pesadas.</p>
-            <strong>R$ 9,90</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Esponjão" data-price="9.9">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Bombril" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/bombril.png" alt="Bombril" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-box"></i></div>
-            <h3>Bombril</h3>
-            <p>Tradicional para brilho e limpeza de utensílios.</p>
-            <strong>R$ 3,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Bombril" data-price="3">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Pá" data-category="utensilios">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/pa.png" alt="Pá" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-broom"></i></div>
-            <h3>Pá</h3>
-            <p>Parceira da vassoura para limpeza diária.</p>
-            <strong>R$ 7,50</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Pá" data-price="7.5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Pasta de Brilho" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/pasta-brilho.png" alt="Pasta de Brilho" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-sparkles"></i></div>
-            <h3>Pasta de Brilho</h3>
-            <p>Para dar acabamento e brilho em superfícies.</p>
-            <strong>R$ 6,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Pasta de Brilho" data-price="6">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Pedra de Vaso" data-category="banheiro">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/pedra-vaso.png" alt="Pedra de Vaso" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-water"></i></div>
-            <h3>Pedra de Vaso</h3>
-            <p>Perfume e cuidado para o vaso sanitário.</p>
-            <strong>R$ 2,50</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Pedra de Vaso" data-price="2.5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Prendedor de Madeira" data-category="organizacao">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/prendedor-madeira.png" alt="Prendedor de Madeira" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-grip"></i></div>
-            <h3>Prendedor de Madeira</h3>
-            <p>Para varal e organização da área de serviço.</p>
-            <strong>R$ 3,20</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Prendedor de Madeira" data-price="3.2">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Prendedor Plástico" data-category="organizacao">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/prendedor-plastico.png" alt="Prendedor Plástico" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-grip"></i></div>
-            <h3>Prendedor Plástico</h3>
-            <p>Leve, resistente e pronto para o uso diário.</p>
-            <strong>R$ 3,60</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Prendedor Plástico" data-price="3.6">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Rodo Grande" data-category="utensilios">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/rodo-grande.png" alt="Rodo Grande" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-ruler-horizontal"></i></div>
-            <h3>Rodo Grande</h3>
-            <p>Ideal para pisos maiores e áreas externas.</p>
-            <strong>R$ 9,90</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Rodo Grande" data-price="9.9">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Rodo Pequeno" data-category="utensilios">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/rodo-pequeno.png" alt="Rodo Pequeno" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-ruler-horizontal"></i></div>
-            <h3>Rodo Pequeno</h3>
-            <p>Prático para banheiro, cozinha e espaços menores.</p>
-            <strong>R$ 7,99</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Rodo Pequeno" data-price="7.99">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Rodinho de Pia" data-category="cozinha">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/rodinho-pia.png" alt="Rodinho de Pia" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-sink"></i></div>
-            <h3>Rodinho de Pia</h3>
-            <p>Ajuda a manter a pia seca e organizada.</p>
-            <strong>R$ 5,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Rodinho de Pia" data-price="5">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Saco de Lixo" data-category="organizacao">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/saco-lixo.png" alt="Saco de Lixo" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-trash-can"></i></div>
-            <h3>Saco de Lixo</h3>
-            <p>Produto essencial para descarte e limpeza.</p>
-            <strong>R$ 6,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Saco de Lixo" data-price="6">Adicionar</button>
-          </article>
-
-          <article class="product-card catalog-product" data-name="Vassoura" data-category="utensilios">
-            <div class="product-media"><img class="product-image" src="../assets/produtos/v2/vassoura.png" alt="Vassoura" loading="lazy" decoding="async"></div>
-            <div class="product-icon"><i class="fa-solid fa-broom"></i></div>
-            <h3>Vassoura</h3>
-            <p>Para varrer ambientes internos e externos.</p>
-            <strong>R$ 12,00</strong>
-            <button class="btn btn-primary btn-add-cart" data-name="Vassoura" data-price="12">Adicionar</button>
-          </article>
-        </div>
-
+        <p class="catalog-results" data-catalog-results data-products-count>Carregando produtos...</p>
+        <div class="grid-produtos public-products-grid" data-public-products-grid></div>
         <p id="catalog-empty" class="empty-cart hidden">Nenhum produto encontrado com esse filtro.</p>
       </div>
 
@@ -452,7 +121,7 @@
           <span id="cart-count">0</span>
         </div>
         <div id="cart-items" class="cart-items">
-          <p class="empty-cart">Seu carrinho está vazio.</p>
+          <p class="empty-cart">Seu carrinho est&aacute; vazio.</p>
         </div>
         <div class="cart-footer">
           <div class="cart-total">
