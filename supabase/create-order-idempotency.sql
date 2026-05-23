@@ -8,6 +8,54 @@ begin;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
+do $$
+declare
+  missing_items text[];
+begin
+  select array_agg(item)
+  into missing_items
+  from (
+    values
+      ('public.produtos'),
+      ('public.produto_variacoes'),
+      ('public.pedidos'),
+      ('public.pedido_itens'),
+      ('public.enderecos')
+  ) as required(item)
+  where to_regclass(item) is null;
+
+  if coalesce(array_length(missing_items, 1), 0) > 0 then
+    raise exception
+      'create_order bloqueada: tabelas obrigatorias ausentes: %. Execute primeiro as migracoes base e 20260523-etapa-7-base-correta.sql.',
+      array_to_string(missing_items, ', ');
+  end if;
+
+  select array_agg(item)
+  into missing_items
+  from (
+    values
+      ('public.pedidos.pagamento_status'),
+      ('public.pedido_itens.variacao_id'),
+      ('public.produto_variacoes.preco_promocional'),
+      ('public.produto_variacoes.oferta_ativa'),
+      ('public.produto_variacoes.oferta_inicio'),
+      ('public.produto_variacoes.oferta_fim')
+  ) as required(item)
+  where not exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = split_part(required.item, '.', 1)
+      and c.table_name = split_part(required.item, '.', 2)
+      and c.column_name = split_part(required.item, '.', 3)
+  );
+
+  if coalesce(array_length(missing_items, 1), 0) > 0 then
+    raise exception
+      'create_order bloqueada: colunas obrigatorias ausentes: %. Execute primeiro 20260523-etapa-7-base-correta.sql.',
+      array_to_string(missing_items, ', ');
+  end if;
+end $$;
+
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
 language plpgsql
@@ -22,7 +70,10 @@ declare
   item jsonb;
   item_count integer;
   item_product_id uuid;
+  item_variation_key text;
+  item_variation_id uuid;
   product_row public.produtos%rowtype;
+  variation_row public.produto_variacoes%rowtype;
   item_name text;
   item_image text;
   item_variant text;
@@ -146,6 +197,18 @@ begin
       then (item->>'produto_id')::uuid
       else null
     end;
+    item_variation_key := coalesce(
+      item->>'variacao_id',
+      item->>'variationId',
+      item->>'variation_id',
+      item->>'variacaoId',
+      ''
+    );
+    item_variation_id := case
+      when item_variation_key ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then item_variation_key::uuid
+      else null
+    end;
     item_qty := greatest(coalesce(nullif(item->>'quantidade', '')::integer, 1), 1);
     item_variant := btrim(coalesce(item->>'variacao', ''));
 
@@ -161,27 +224,64 @@ begin
         raise exception 'Produto do pedido nao esta disponivel.';
       end if;
 
-      if product_row.estoque is not null and product_row.estoque < item_qty then
-        raise exception 'Estoque insuficiente para %.', product_row.nome;
-      end if;
-
-      if product_row.estoque is not null then
-        update public.produtos
-        set estoque = estoque - item_qty
-        where id = product_row.id;
-      end if;
-
       item_name := product_row.nome;
       item_image := product_row.imagem;
-      item_price := case
-        when product_row.oferta_ativa
-          and product_row.preco_promocional is not null
-          and product_row.preco_promocional > 0
-          and (product_row.oferta_inicio is null or product_row.oferta_inicio <= now())
-          and (product_row.oferta_fim is null or product_row.oferta_fim >= now())
-        then product_row.preco_promocional
-        else product_row.preco
-      end;
+
+      if item_variation_id is not null then
+        select *
+        into variation_row
+        from public.produto_variacoes
+        where id = item_variation_id
+          and produto_id = product_row.id
+          and ativo = true
+        for update;
+
+        if not found then
+          raise exception 'Opcao do produto nao esta disponivel.';
+        end if;
+
+        if variation_row.estoque is not null and variation_row.estoque < item_qty then
+          raise exception 'Estoque insuficiente para % - %.', product_row.nome, variation_row.nome;
+        end if;
+
+        if variation_row.estoque is not null then
+          update public.produto_variacoes
+          set estoque = estoque - item_qty
+          where id = variation_row.id;
+        end if;
+
+        item_variant := variation_row.nome;
+        item_image := coalesce(nullif(variation_row.imagem, ''), product_row.imagem);
+        item_price := case
+          when variation_row.oferta_ativa
+            and variation_row.preco_promocional is not null
+            and variation_row.preco_promocional > 0
+            and (variation_row.oferta_inicio is null or variation_row.oferta_inicio <= now())
+            and (variation_row.oferta_fim is null or variation_row.oferta_fim >= now())
+          then variation_row.preco_promocional
+          else variation_row.preco
+        end;
+      else
+        if product_row.estoque is not null and product_row.estoque < item_qty then
+          raise exception 'Estoque insuficiente para %.', product_row.nome;
+        end if;
+
+        if product_row.estoque is not null then
+          update public.produtos
+          set estoque = estoque - item_qty
+          where id = product_row.id;
+        end if;
+
+        item_price := case
+          when product_row.oferta_ativa
+            and product_row.preco_promocional is not null
+            and product_row.preco_promocional > 0
+            and (product_row.oferta_inicio is null or product_row.oferta_inicio <= now())
+            and (product_row.oferta_fim is null or product_row.oferta_fim >= now())
+          then product_row.preco_promocional
+          else product_row.preco
+        end;
+      end if;
     else
       item_name := btrim(coalesce(item->>'nome', ''));
       item_image := btrim(coalesce(item->>'imagem', ''));
@@ -198,6 +298,7 @@ begin
     insert into public.pedido_itens (
       pedido_id,
       produto_id,
+      variacao_id,
       nome,
       variacao,
       quantidade,
@@ -207,6 +308,7 @@ begin
     ) values (
       new_order_id,
       item_product_id,
+      item_variation_id,
       item_name,
       item_variant,
       item_qty,
@@ -214,6 +316,14 @@ begin
       item_total,
       item_image
     );
+
+    if item_product_id is not null and to_regclass('public.estoque_movimentacoes') is not null then
+      execute
+        'insert into public.estoque_movimentacoes
+          (produto_id, variacao_id, tipo, quantidade, motivo, pedido_id, created_by)
+         values ($1, $2, ''saida_venda'', $3, ''Venda'', $4, $5)'
+      using item_product_id, item_variation_id, item_qty, new_order_id, caller_id;
+    end if;
   end loop;
 
   discount_amount := least(discount_amount, subtotal_calc);
@@ -242,6 +352,23 @@ begin
       coalesce(order_payload->>'observacao', ''),
       true
     );
+  end if;
+
+  if to_regclass('public.pedido_eventos') is not null then
+    execute
+      'insert into public.pedido_eventos
+        (pedido_id, tipo, status_anterior, status_novo, payload, created_by)
+       values ($1, ''pedido_criado'', null, $2, $3, $4)'
+    using new_order_id,
+      requested_status,
+      jsonb_build_object(
+        'codigo', order_code,
+        'total', final_total,
+        'subtotal', subtotal_calc,
+        'quantidade_itens', item_count,
+        'cliente_tipo', case when caller_id is null then 'visitante' else 'cliente' end
+      ),
+      caller_id;
   end if;
 
   return jsonb_build_object(

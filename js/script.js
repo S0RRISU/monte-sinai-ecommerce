@@ -144,7 +144,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const ADMIN_PANEL_HREF = '/pages/painel.html';
   const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
   const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
+  const PUBLIC_PRODUCT_VIEW = 'vw_catalogo_publico';
+  const PUBLIC_PRODUCT_VARIATION_VIEW = 'vw_catalogo_variacoes_publicas';
+  const PUBLIC_PRODUCT_SELECT =
+    'id, nome, preco, preco_original, imagem, categoria, descricao, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_ordem, descricao_detalhada, catalogo_destaque, pode_comprar, indisponivel, created_at, updated_at';
+  const PUBLIC_PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, preco_original, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, pode_comprar, indisponivel, created_at, updated_at';
   const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
+  const PRODUCT_VARIATION_BASIC_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const ADMIN_ORDER_POLL_MS = 25000;
   const ORDER_NOTIFICATION_SELECT =
@@ -1118,6 +1126,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
+  function variationOfferData(raw = {}) {
+    const enabled = Boolean(raw.oferta_ativa ?? raw.offerActive);
+    const promo = parsePrice(
+      raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice,
+    );
+    const start = raw.oferta_inicio || raw.offerStartsAt;
+    const end = raw.oferta_fim || raw.offerEndsAt;
+    const now = Date.now();
+    const startsOk = !start || new Date(start).getTime() <= now;
+    const endsOk = !end || new Date(end).getTime() >= now;
+    return {
+      active: enabled && promo > 0 && startsOk && endsOk,
+      promotionalPrice: promo,
+      startsAt: start || '',
+      endsAt: end || '',
+    };
+  }
+
   function offerCountdownText(value) {
     if (!value) return 'Oferta por tempo limitado';
     const end = new Date(value).getTime();
@@ -1331,12 +1357,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function normalizeProductVariation(raw = {}, product = {}) {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name || product.name || '');
+    const originalPrice = parsePrice(raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price ?? product.price ?? 0);
+    const offer = variationOfferData(raw);
     const stock =
       raw.estoque === null || raw.stock === null || raw.estoque === ''
         ? null
         : Number.isFinite(Number(raw.estoque ?? raw.stock))
           ? Number(raw.estoque ?? raw.stock)
           : null;
+    const canBuy = raw.pode_comprar ?? raw.canBuy;
+    const unavailable = raw.indisponivel ?? raw.unavailable ?? (canBuy === false ? true : false);
 
     return {
       id: raw.id ?? raw.variationId ?? '',
@@ -1344,8 +1374,15 @@ document.addEventListener('DOMContentLoaded', () => {
       name,
       slug: String(raw.slug ?? '').trim(),
       sku: String(raw.sku ?? '').trim(),
-      price: parsePrice(raw.preco ?? raw.price ?? product.price ?? 0),
+      price: offer.active ? offer.promotionalPrice : originalPrice,
+      originalPrice,
+      promotionalPrice: offer.promotionalPrice,
+      offerActive: offer.active,
+      offerStartsAt: offer.startsAt,
+      offerEndsAt: offer.endsAt,
       stock,
+      canBuy: canBuy === undefined || canBuy === null ? stock === null || stock > 0 : canBuy !== false,
+      unavailable: unavailable === true,
       active: (raw.ativo ?? raw.active ?? true) !== false,
       image,
       attributes: raw.atributos ?? raw.attributes ?? {},
@@ -1357,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const category = String(raw.categoria ?? raw.category ?? 'Produtos').trim() || 'Produtos';
     const description = String(raw.descricao ?? raw.description ?? '').trim();
-    const originalPrice = parsePrice(raw.preco ?? raw.originalPrice ?? raw.price);
+    const originalPrice = parsePrice(raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price);
     const promotionalPrice = parsePrice(raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice);
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name);
     const type =
@@ -1367,6 +1404,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlight = Boolean(raw.destaque ?? raw.highlight ?? raw.recommended) || offerActive || type === 'kit';
     const stock = productStockLevel(raw);
     const lowStockLimit = productLowStockLimit(raw);
+    const canBuy = raw.pode_comprar ?? raw.canBuy;
+    const unavailable = raw.indisponivel ?? raw.unavailable ?? (canBuy === false ? true : false);
     const active = raw.ativo ?? raw.active ?? true;
     const catalogVisible = raw.catalogo_visivel ?? raw.catalogVisible ?? true;
     const storeVisible = raw.loja_visivel ?? raw.storeVisible ?? true;
@@ -1388,7 +1427,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasVariations = options.length > 0;
     const stockState = hasVariations
       ? productVariationsStockState(options, lowStockLimit)
-      : productStockState({ estoque: stock, estoque_minimo: lowStockLimit });
+      : productStockState({
+          estoque: stock,
+          estoque_minimo: lowStockLimit,
+          pode_comprar: canBuy,
+          indisponivel: unavailable,
+        });
 
     return {
       id: raw.id ?? raw.productId ?? '',
@@ -1412,6 +1456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       stock,
       lowStockLimit,
       stockState,
+      canBuy: canBuy === undefined || canBuy === null ? stockState !== 'out' : canBuy !== false,
+      unavailable: unavailable === true,
       active: active !== false,
       catalogVisible: catalogVisible !== false,
       storeVisible: storeVisible !== false,
@@ -1753,17 +1799,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const ids = products.map((product) => product.id).filter(Boolean);
     if (!client || !ids.length) return [];
 
-    const { data, error } = await client
-      .from('produto_variacoes')
-      .select(PRODUCT_VARIATION_SELECT)
+    let { data, error } = await client
+      .from(PUBLIC_PRODUCT_VARIATION_VIEW)
+      .select(PUBLIC_PRODUCT_VARIATION_SELECT)
       .in('produto_id', ids)
-      .eq('ativo', true)
       .order('ordem', { ascending: true })
       .order('nome', { ascending: true });
 
     if (error) {
-      if (isMissingProductVariationTableError(error)) {
-        console.info('[Supabase] produto_variacoes ainda nao existe. Produtos simples continuam funcionando.');
+      if (error.code === 'PGRST205' || isMissingProductVariationTableError(error)) {
+        console.info('[Supabase] View publica de variacoes ausente. Execute a migracao da etapa 7 para liberar opcoes sem expor estoque.');
         return [];
       }
       throw error;
@@ -1798,33 +1843,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const tableNames = ['produtos'];
+      const tableNames = [PUBLIC_PRODUCT_VIEW];
       let products = [];
       let loadedTable = '';
       let lastError = null;
 
       for (const tableName of tableNames) {
-        const selectColumns =
-          tableName === 'produtos' && productExtendedColumnsReady
-            ? PRODUCT_EXTENDED_SELECT
-            : tableName === 'produtos'
-              ? PRODUCT_BASE_SELECT
-              : 'nome, preco, imagem, categoria, descricao';
-        let query = client.from(tableName).select(selectColumns).order('nome', { ascending: true });
-
-        if (tableName === 'produtos') query = query.eq('ativo', true);
+        const query = client.from(tableName).select(PUBLIC_PRODUCT_SELECT).order('nome', { ascending: true });
 
         let { data, error } = await query;
-        if (error && tableName === 'produtos' && productExtendedColumnsReady && isMissingProductExtensionError(error)) {
-          productExtendedColumnsReady = false;
-          const fallback = await client
-            .from(tableName)
-            .select(PRODUCT_BASE_SELECT)
-            .eq('ativo', true)
-            .order('nome', { ascending: true });
-          data = fallback.data;
-          error = fallback.error;
-        }
 
         if (!error) {
           products = Array.isArray(data) ? data : [];
@@ -1834,18 +1861,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lastError = error;
         if (error.code !== 'PGRST205') throw error;
-        console.warn(`[Supabase] Tabela "${tableName}" não encontrada. Tentando próxima opção...`);
+        console.warn(`[Supabase] View publica "${tableName}" nao encontrada. Execute a migracao da etapa 7.`);
       }
 
       if (!loadedTable) throw lastError || new Error('Nenhuma tabela de produtos encontrada no Supabase.');
-      const variations = loadedTable === 'produtos' ? await loadProductVariations(client, products) : [];
+      const variations = loadedTable === PUBLIC_PRODUCT_VIEW ? await loadProductVariations(client, products) : [];
       const productsWithVariations = attachProductVariations(products, variations);
       setProductIndex(productsWithVariations);
       pruneCartUnavailableProducts(productsWithVariations);
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
-      setProductIndex([]);
+      const localProducts = await loadLocalCatalogProducts().catch(() => []);
+      setProductIndex(localProducts);
       renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
         showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
@@ -2106,6 +2134,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(query ?? '').trim() ? featuredSearchProducts(Math.min(limit, 4)) : featuredSearchProducts(limit);
   }
 
+  function searchSuggestionEntries(query, limit = 5) {
+    const term = normalizeText(query);
+    const entries = [];
+    productIndex.forEach((product) => {
+      const normalized = normalizeProduct(product);
+      (normalized.options || []).forEach((option) => {
+        const blob = normalizeText(`${normalized.name} ${option.name} ${normalized.category}`);
+        if (term && blob.includes(term)) entries.push({ product: normalized, option });
+      });
+    });
+    searchSuggestionProducts(query, limit).forEach((product) => entries.push({ product: normalizeProduct(product), option: null }));
+    const seen = new Set();
+    return entries
+      .filter((entry) => {
+        const key = `${entry.product.id || entry.product.name}|${entry.option?.id || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, limit);
+  }
+
   function catalogSearchProducts(query, limit = Infinity) {
     const term = String(query ?? '').trim();
     if (!term) return [];
@@ -2242,14 +2292,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeText(value);
     if (!normalized) return null;
 
-    return (
+    const resolved =
       productIndex.find((product) => normalizeText(product.name) === normalized) ||
       productIndex.find((product) => {
         const productName = normalizeText(product.name);
         return productName.includes(normalized) || normalized.includes(productName);
       }) ||
-      (typeof productOrName === 'object' ? productOrName : null)
-    );
+      (typeof productOrName === 'object' ? productOrName : null);
+    return typeof productOrName === 'object' && productOrName?.preferredVariationId && resolved
+      ? { ...resolved, preferredVariationId: productOrName.preferredVariationId }
+      : resolved;
   }
 
   function uniqueProducts(products) {
@@ -2346,6 +2398,8 @@ document.addEventListener('DOMContentLoaded', () => {
         name: option.name || option.value || option.label || '',
         price: Number(option.price || product.price || 0),
         stock: normalizeVariationStockValue(option.stock),
+        canBuy: option.canBuy ?? option.pode_comprar,
+        unavailable: option.unavailable ?? option.indisponivel,
         image: option.image || '',
       }));
     }
@@ -2359,11 +2413,25 @@ document.addEventListener('DOMContentLoaded', () => {
         name: option.dataset.variationName || option.textContent.trim(),
         price: Number(option.dataset.price || product.price || 0),
         stock: normalizeVariationStockValue(option.dataset.stock),
+        canBuy: option.dataset.available === '' ? undefined : option.dataset.available !== 'false',
+        unavailable: option.dataset.available === 'false',
         image: option.dataset.image || '',
       }));
     }
 
-    return [{ id: '', label: 'Padrao', value: '', name: '', price: Number(product.price || 0), stock: product.stock, image: '' }];
+    return [
+      {
+        id: '',
+        label: 'Padrao',
+        value: '',
+        name: '',
+        price: Number(product.price || 0),
+        stock: product.stock,
+        canBuy: product.canBuy ?? product.pode_comprar,
+        unavailable: product.unavailable ?? product.indisponivel,
+        image: '',
+      },
+    ];
     if (Array.isArray(product?.options) && product.options.length) {
       return product.options.map((option) => ({
         label: option.label || option.value || 'Opção',
@@ -2490,7 +2558,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const image = productAssetPath(activeSearchProduct, card);
     const description = productDescription(activeSearchProduct, card);
     const options = productOptions(activeSearchProduct, card);
-    const firstOption = options[0] || { price: activeSearchProduct.price || 0 };
+    const preferredOption = options.find((option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''));
+    const firstOption = preferredOption || options[0] || { price: activeSearchProduct.price || 0 };
     const resultButtons =
       productSearchResults.length > 1
         ? `
@@ -2532,14 +2601,18 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="product-search-category">${escapeHTML(activeSearchProduct.category || 'Produto encontrado')}</span>
         <p>${escapeHTML(description)}</p>
         <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
-        <small class="product-stock-line">${escapeHTML(activeSearchProduct.hasVariations ? optionStockText(firstOption, activeSearchProduct) : productStockText(activeSearchProduct))}</small>
+        <small class="product-stock-line ${optionOutOfStock(firstOption) ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+          activeSearchProduct.hasVariations
+            ? customerAvailabilityText(activeSearchProduct, firstOption)
+            : customerAvailabilityText(activeSearchProduct),
+        )}</small>
         ${
           activeSearchProduct.hasVariations && options.length
             ? `
           <label class="product-search-variant">
             <span>Escolha uma opção</span>
             <select data-product-search-variant>
-              ${options.map((option, index) => `<option value="${index}">${escapeHTML(optionPriceLabel(option, activeSearchProduct))}</option>`).join('')}
+              ${options.map((option, index) => `<option value="${index}" ${String(option.id) === String(firstOption.id || '') ? 'selected' : ''}>${escapeHTML(optionPriceLabel(option, activeSearchProduct))}</option>`).join('')}
             </select>
           </label>
         `
@@ -2559,7 +2632,14 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('[data-product-search-variant]', content)?.addEventListener('change', (event) => {
       const selected = options[Number(event.target.value || 0)] || firstOption;
       const price = qs('[data-product-search-price]', content);
+      const stockLine = qs('.product-stock-line', content);
       if (price) price.textContent = formatMoney(selected.price || activeSearchProduct.price);
+      if (stockLine) {
+        const text = customerAvailabilityText(activeSearchProduct, selected);
+        stockLine.textContent = text;
+        stockLine.classList.toggle('is-empty', !text);
+        stockLine.classList.toggle('is-unavailable', Boolean(text));
+      }
     });
   }
 
@@ -2745,8 +2825,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productStockState(product = {}) {
+    if (product.indisponivel === true || product.unavailable === true || product.pode_comprar === false || product.canBuy === false)
+      return 'out';
     const stock = productStockLevel(product);
     const limit = productLowStockLimit(product);
+    if (stock === null && (product.pode_comprar === true || product.canBuy === true)) return 'ok';
     if (stock === null) return 'untracked';
     if (stock <= 0) return 'out';
     if (stock <= limit) return 'low';
@@ -2754,7 +2837,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function variationStockState(variation = {}, lowStockLimit = siteConfig.stockAlertThreshold) {
+    if (
+      variation.indisponivel === true ||
+      variation.unavailable === true ||
+      variation.pode_comprar === false ||
+      variation.canBuy === false
+    )
+      return 'out';
     const stock = variation.stock;
+    if ((stock === null || stock === undefined || stock === '') && (variation.pode_comprar === true || variation.canBuy === true))
+      return 'ok';
     if (stock === null || stock === undefined || stock === '') return 'untracked';
     const value = Number(stock);
     if (!Number.isFinite(value)) return 'untracked';
@@ -3888,8 +3980,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const matches = searchSuggestionProducts(term, 5);
-    const usingFallback = !directSearchProducts(term, 5).length;
+    const entries = searchSuggestionEntries(term, 5);
+    const matches = entries.map((entry) => entry.product);
+    const usingFallback = !directSearchProducts(term, 5).length && !entries.some((entry) => entry.option);
 
     suggestions.innerHTML = '';
 
@@ -3905,9 +3998,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    matches.forEach((product) => {
+    entries.forEach(({ product, option }) => {
       const item = document.createElement('button');
-      const image = productAssetPath(product);
+      const suggestionProduct = option ? { ...product, preferredVariationId: option.id } : product;
+      const image = option?.image || productAssetPath(product);
       const imageSrc = assetHref(image);
       item.className = 'search-suggestion-item';
       item.type = 'button';
@@ -3922,15 +4016,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </span>
         <span>
           <strong>${escapeHTML(product.name)}</strong>
-          <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}${usingFallback ? ' - sugestao' : ''}</small>
+          <small>${escapeHTML(product.category)}${option ? ` - ${escapeHTML(option.name)}` : ''} - ${formatMoney(option?.price || product.price)}${usingFallback ? ' - sugestao' : ''}</small>
         </span>
         <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
       `;
       item.addEventListener('click', () => {
         const input = qs('[data-site-search-input]', form);
-        if (input) input.value = product.name;
+        if (input) input.value = option ? `${product.name} ${option.name}` : product.name;
         hideSearchSuggestions(suggestions);
-        openProductSearchModal(product, matches, product.name);
+        openProductSearchModal(suggestionProduct, matches, input?.value || product.name);
       });
       suggestions.appendChild(item);
     });
@@ -4244,21 +4338,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function productStockText(product = {}) {
     const normalized = normalizeProduct(product);
     if (normalized.stockState === 'out') return 'Esgotado';
-    if (normalized.stock === null) return 'Quantidade livre';
-    return `${normalized.stock} em estoque`;
+    return 'Disponivel';
+  }
+
+  function customerAvailabilityText(product = {}, option = null) {
+    const normalized = normalizeProduct(product);
+    const out = option ? optionOutOfStock(option) : normalized.stockState === 'out';
+    return out ? 'Indisponivel no momento' : '';
   }
 
   function optionStockText(option = {}, product = {}) {
-    const normalized = normalizeProduct(product);
-    const stock = option.stock;
-    if (stock === null || stock === undefined || stock === '') return 'Quantidade livre';
-    const value = Number(stock);
-    if (!Number.isFinite(value)) return 'Quantidade livre';
-    if (value <= 0) return 'Esgotado';
-    return `${value} em estoque${value <= normalized.lowStockLimit ? ' - baixo' : ''}`;
+    if (optionOutOfStock(option)) return 'Esgotado';
+    return 'Disponivel';
   }
 
   function optionOutOfStock(option = {}) {
+    if (option.unavailable === true || option.indisponivel === true || option.canBuy === false || option.pode_comprar === false)
+      return true;
     const stock = option.stock;
     return stock !== null && stock !== undefined && stock !== '' && Number(stock) <= 0;
   }
@@ -4276,7 +4372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="${option.stock == null ? '' : escapeHTML(option.stock)}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4298,17 +4394,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const price = Number(current?.price ?? option?.dataset.price ?? button?.dataset.price ?? 0);
     const image = current?.image || option?.dataset.image || button?.dataset.image || '';
     const name = current?.name || option?.dataset.variationName || option?.textContent?.trim() || '';
-    const out = stock !== null && stock <= 0;
+    const explicitOut = current
+      ? optionOutOfStock(current)
+      : option?.dataset.available === 'false' || button?.dataset.available === 'false';
+    const out = explicitOut || (stock !== null && stock <= 0);
 
     return {
       variationId,
       name,
       price: Number.isFinite(price) ? price : 0,
-      stock,
+      stock: null,
       image,
       out,
-      stockText: stock === null ? 'Quantidade livre' : stock <= 0 ? 'Esgotado' : `${stock} em estoque`,
-      statusText: out ? 'Esgotado' : 'Disponivel',
+      stockText: out ? 'Indisponivel no momento' : '',
+      statusText: out ? 'Indisponivel' : 'Disponivel',
     };
   }
 
@@ -4332,14 +4431,18 @@ document.addEventListener('DOMContentLoaded', () => {
       priceEl.textContent = state.out ? 'Indisponivel' : formatMoney(state.price);
       priceEl.classList.toggle('product-unavailable', state.out);
     }
-    if (stockLine) stockLine.textContent = state.stockText;
+    if (stockLine) {
+      stockLine.textContent = state.stockText;
+      stockLine.classList.toggle('is-empty', !state.stockText);
+      stockLine.classList.toggle('is-unavailable', state.out);
+    }
     if (state.image && imageEl) imageEl.src = assetHref(state.image);
     if (availabilityNote) {
       const label = state.out
         ? 'Indisponivel no momento'
         : availabilityNote.classList.contains('catalog-detail-note')
-          ? 'Disponivel para comprar na loja'
-          : 'Disponivel na loja';
+          ? 'Pronto para pedir'
+          : 'Pronto para pedir';
       availabilityNote.innerHTML = `<i class="fa-solid ${state.out ? 'fa-ban' : 'fa-circle-check'}"></i> ${label}`;
     }
     if (statusBadge) {
@@ -4351,11 +4454,12 @@ document.addEventListener('DOMContentLoaded', () => {
     productCard?.classList.toggle('is-out-of-stock', state.out);
     fullCatalogItem?.classList.toggle('is-out-of-stock', state.out);
     if (stockBadge) {
-      stockBadge.textContent = state.out ? 'Esgotado' : state.stock === null ? 'Disponivel' : `${state.stock} em estoque`;
+      stockBadge.textContent = state.out ? 'Esgotado' : 'Disponivel';
     }
     if (button) {
       button.dataset.price = String(state.price);
-      button.dataset.stock = state.stock === null ? '' : String(state.stock);
+      button.dataset.stock = '';
+      button.dataset.available = state.out ? 'false' : 'true';
       button.dataset.image = state.image || button.dataset.image || '';
       button.dataset.variationId = state.variationId || '';
       button.dataset.variationName = state.name || '';
@@ -4396,7 +4500,7 @@ document.addEventListener('DOMContentLoaded', () => {
           outOfStock
             ? '<span class="recommended-badge stock-badge">Esgotado</span>'
             : lowStock
-              ? `<span class="recommended-badge stock-badge">Ultimas ${escapeHTML(normalized.stock)} un.</span>`
+              ? '<span class="recommended-badge stock-badge">Poucas unidades</span>'
               : normalized.offerActive
                 ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
                 : normalized.isKit
@@ -4422,10 +4526,12 @@ document.addEventListener('DOMContentLoaded', () => {
             : ''
         }
         <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
-        <small class="product-stock-line">${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : productStockText(normalized))}</small>
+        <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+          customerAvailabilityText(normalized, hasOptions ? firstOption : null),
+        )}</small>
         <div class="product-card-actions">
           ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
+            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
           }
           <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
             Ver detalhes
@@ -4556,7 +4662,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = qs('[data-promotions-grid]');
     if (!grid) return;
 
-    const offers = storeProducts().filter((product) => normalizeProduct(product).offerActive);
+    const offers = storeProducts()
+      .map((product) => {
+        const normalized = normalizeProduct(product);
+        const optionOffers = (normalized.options || []).filter((option) => option.offerActive && !optionOutOfStock(option));
+        if (!optionOffers.length) return normalized;
+        return {
+          ...normalized,
+          offerActive: true,
+          price: optionOffers[0].price,
+          originalPrice: optionOffers[0].originalPrice || optionOffers[0].price,
+          promotionalPrice: optionOffers[0].promotionalPrice || optionOffers[0].price,
+          offerEndsAt: optionOffers[0].offerEndsAt,
+          options: [...optionOffers, ...normalized.options.filter((option) => !optionOffers.includes(option))],
+        };
+      })
+      .filter((product) => normalizeProduct(product).offerActive && normalizeProduct(product).stockState !== 'out');
     grid.innerHTML = offers.map((product) => productCardHTML(product, 'catalog')).join('');
     qs('#promotions-empty')?.classList.toggle('hidden', offers.length > 0);
     qsa('[data-promotions-count]').forEach((el) => {
@@ -4565,13 +4686,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fullCatalogStockText(product) {
-    return productStockText(product);
+    return customerAvailabilityText(product);
   }
 
   function fullCatalogStatusText(product) {
     const normalized = normalizeProduct(product);
     if (normalized.stockState === 'out') return 'Fora da loja agora';
-    if (normalized.stockState === 'low') return 'Estoque baixo';
     if (normalized.stock === null) return 'Disponivel';
     return 'Disponivel';
   }
@@ -4616,7 +4736,9 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
         </div>
         <div class="full-catalog-stock">
-          <strong>${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : stockText)}</strong>
+          <strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+            hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
+          )}</strong>
           <span>${escapeHTML(normalized.category)}</span>
         </div>
         <div class="full-catalog-action">
@@ -4638,7 +4760,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </button>`
               : `<span class="catalog-availability-note">
                 <i class="fa-solid fa-circle-check"></i>
-                Disponivel na loja
+                Pronto para pedir
               </span>`
           }
           <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
@@ -4788,7 +4910,9 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
             <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
-            <div><span>Estoque</span><strong class="product-stock-line">${escapeHTML(hasOptions ? optionStockText(firstOption, normalized) : stockText)}</strong></div>
+            <div><span>Disponibilidade</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+              hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
+            )}</strong></div>
             <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
           </div>
           ${
@@ -4808,9 +4932,9 @@ document.addEventListener('DOMContentLoaded', () => {
               catalogOnly
                   ? `<span class="catalog-availability-note catalog-detail-note">
               <i class="fa-solid fa-circle-check"></i>
-              ${selectedOutOfStock ? 'Indisponivel no momento' : 'Disponivel para comprar na loja'}
+              ${selectedOutOfStock ? 'Indisponivel no momento' : 'Pronto para pedir'}
             </span>`
-                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="${hasOptions ? (firstOption.stock === null ? '' : escapeHTML(firstOption.stock)) : normalized.stock === null ? '' : escapeHTML(normalized.stock)}">
+                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
               ${selectedOutOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
             </button>`
@@ -6373,10 +6497,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function loadLocalOrders() {
+    // Cache local apenas para o cliente reencontrar os pedidos recentes.
+    // Historico admin, arquivamento e financeiro devem vir sempre do Supabase.
     return dedupeOrders(loadJSON(STORAGE.orders, []).map(trackedOrderFromPayload));
   }
 
   function saveOrderLocally(order) {
+    // Nao usar este cache para operacoes administrativas ou dados de producao.
     const orders = dedupeOrders([trackedOrderFromPayload(order), ...loadLocalOrders()]);
     saveJSON(STORAGE.orders, orders.slice(0, 20));
   }
@@ -8036,13 +8163,40 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  function inferredPublicCategoryLabel(name = '', fallback = 'Produtos') {
+    const normalized = normalizeText(name);
+    if (normalized.includes('agua')) return 'Agua';
+    if (normalized.includes('gas')) return 'Gas';
+    if (normalized.includes('amaciante') || normalized.includes('sabao') || normalized.includes('escova de roupa')) {
+      return 'Lavanderia';
+    }
+    if (normalized.includes('sabonete')) return 'Higiene';
+    if (normalized.includes('vaso')) return 'Banheiro';
+    if (
+      normalized.includes('detergente') ||
+      normalized.includes('esponja de louca') ||
+      normalized.includes('bombril') ||
+      normalized.includes('pasta de brilho') ||
+      normalized.includes('rodinho de pia') ||
+      normalized.includes('limpa aluminio')
+    ) {
+      return 'Cozinha';
+    }
+    if (normalized.includes('prendedor') || normalized.includes('saco de lixo')) return 'Organizacao';
+    if (normalized.includes('limpa pedra') || normalized.includes('cloro')) return 'Limpeza pesada';
+    return localCategoryLabel(fallback);
+  }
+
   function localProductFromCard(card, index = 0) {
     const button = qs('.btn-add-cart', card);
     const name =
       card.dataset.name || qs('h3', card)?.textContent?.trim() || button?.dataset.name || `Produto ${index + 1}`;
     const price = parsePrice(button?.dataset.price || qs('strong', card)?.textContent || 0);
     const image = canonicalAssetPath(qs('.product-image', card)?.getAttribute('src') || productAssetFallback(name));
-    const category = localCategoryLabel(card.dataset.category || qs('.eyebrow', card)?.textContent || 'Produtos');
+    const category = inferredPublicCategoryLabel(
+      name,
+      card.dataset.category || qs('.eyebrow', card)?.textContent || 'Produtos',
+    );
     return {
       id: `local-${storageSafeFileName(name)}-${index}`,
       nome: name,

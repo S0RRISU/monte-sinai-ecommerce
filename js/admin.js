@@ -2,7 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
   'use strict';
 
   const PRODUCT_IMAGE_BUCKET = 'produtos';
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+  const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
+  const IMAGE_COMPRESS_TARGET = 1800;
+  const IMAGE_COMPRESS_QUALITY = 0.82;
   // Fallback mapping for admin emails — should NOT be relied on in production.
   // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
@@ -33,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'estoque_minimo',
   ].join(', ');
   const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
+  const PRODUCT_VARIATION_BASIC_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
   const ADMIN_THEME_KEY = 'ms_admin_theme';
@@ -66,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     realtimeChannel: null,
     activeTab: 'pedidos',
     activeOrderStatus: 'pendente',
+    orderView: 'active',
     selectedProductId: '',
     user: null,
     profile: null,
@@ -74,6 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let productsExtendedReady = true;
   let ordersExtendedReady = true;
+  let ordersArchiveReady = true;
+  let orderEventsReady = true;
+  let variationsExtendedReady = true;
   let productCreateSaving = false;
   const productSaveLocks = new Set();
   const variationSaveLocks = new Set();
@@ -278,12 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
       p_pagamento_status: payload.pagamento_status ?? null,
       p_confirmado: payload.confirmado ?? null,
     });
-  }
-
-  async function rpcExcluirPedido(pedidoId) {
-    const api = client();
-    if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
-    return api.rpc('admin_delete_order', { p_id: pedidoId });
   }
 
   async function rpcAtualizarProduto(productId, payload = {}) {
@@ -520,8 +522,17 @@ document.addEventListener('DOMContentLoaded', () => {
       items: Array.isArray(row.pedido_itens) ? row.pedido_itens : [],
       statusUi: dbStatusToUi(row.status),
       totalNumber: Number(row.total || 0),
+      archivedAt: row.archived_at || null,
+      archivedBy: row.archived_by || null,
+      archivedReason: row.archived_reason || '',
     };
   }
+
+  function setOrderArchiveView(view = 'active') {
+    state.orderView = view === 'history' ? 'history' : 'active';
+    renderizarPedidosAdmin(state.pedidos);
+  }
+
 
   function unreadAdminOrders(pedidos = state.pedidos) {
     const list = pedidos || [];
@@ -652,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     if (!api) return [];
 
-    const extendedSelect = [
+    const extendedSelectFields = [
       'id',
       'codigo',
       'created_at',
@@ -668,16 +679,35 @@ document.addEventListener('DOMContentLoaded', () => {
       'confirmado',
       'confirmado_em',
       'pagamento_confirmado_em',
+      'archived_at',
+      'archived_by',
+      'archived_reason',
       'subtotal',
       'entrega',
       'total',
       'brinde',
-      'pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)',
-    ].join(', ');
+      'pedido_itens(id, produto_id, variacao_id, nome, variacao, quantidade, preco_unitario, total, imagem)',
+    ];
+    const extendedSelect = extendedSelectFields.join(', ');
     const baseSelect =
       'id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, total';
 
     let { data, error } = await api.from('pedidos').select(extendedSelect).order('created_at', { ascending: false });
+
+    if (error && isMissingSchemaError(error, ['archived_at', 'archived_by', 'archived_reason', 'variacao_id'])) {
+      console.warn('[Admin] Campos da etapa 7 ausentes; tentando pedidos sem historico formal.', error);
+      if (normalize(`${error?.message || ''} ${error?.details || ''}`).includes('archived')) ordersArchiveReady = false;
+      setDatabaseAlert(
+        'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar arquivamento e historico real de pedidos.',
+      );
+      const retrySelect = extendedSelectFields
+        .filter((field) => !['archived_at', 'archived_by', 'archived_reason'].includes(field))
+        .map((field) => field.replace('variacao_id, ', ''))
+        .join(', ');
+      const fallback = await api.from('pedidos').select(retrySelect).order('created_at', { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error && isMissingSchemaError(error, ['pagamento_status', 'confirmado'])) {
       console.warn('[Admin] Busca completa de pedidos falhou, tentando campos basicos.', error);
@@ -690,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
       error = fallback.error;
     } else if (!error) {
       ordersExtendedReady = true;
+      if (ordersArchiveReady !== false) ordersArchiveReady = true;
     }
 
     if (error || !data) {
@@ -697,6 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return [];
     }
 
+    // Pedidos ativos e arquivados vêm do Supabase. Nao usar localStorage
+    // para arquivamento administrativo, historico real ou financeiro.
     state.pedidos = (data || []).map(mapOrder);
     renderizarPedidosAdmin(state.pedidos, options);
     renderFinanceiro();
@@ -764,6 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function orderCardHTML(order, highlightId = '') {
     const highlighted = highlightId && order.id === highlightId;
     const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
+    const archived = Boolean(order.archivedAt);
     return `
       <article class="admin-order-card ${orderStatusClass(order.statusUi)} ${orderPaymentClass(payment)} ${order.confirmado ? 'is-confirmed' : 'is-unconfirmed'} ${highlighted ? 'is-new' : ''}" data-admin-order-card="${escapeHTML(order.id)}">
         <header>
@@ -789,10 +823,17 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fa-solid ${order.confirmado ? 'fa-circle-check' : 'fa-check-double'}"></i>
             ${!ordersExtendedReady ? 'Atualize o banco' : order.confirmado ? 'Pedido confirmado' : 'Confirmar pedido'}
           </button>
-          <button class="btn btn-secondary admin-danger" type="button" data-admin-order-delete="${escapeHTML(order.id)}">
-            <i class="fa-solid fa-trash"></i>
-            Apagar
-          </button>
+          ${
+            archived
+              ? `<button class="btn btn-secondary" type="button" data-admin-order-restore="${escapeHTML(order.id)}">
+            <i class="fa-solid fa-box-open"></i>
+            Restaurar
+          </button>`
+              : `<button class="btn btn-secondary" type="button" data-admin-order-archive="${escapeHTML(order.id)}" ${ordersArchiveReady ? '' : 'disabled'}>
+            <i class="fa-solid fa-box-archive"></i>
+            ${ordersArchiveReady ? 'Arquivar' : 'Aplique migração'}
+          </button>`
+          }
         </div>
       </article>
     `;
@@ -800,7 +841,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderizarPedidosAdmin(pedidos = state.pedidos, options = {}) {
     const query = adminSearchQuery('#admin-order-search');
-    const visiblePedidos = query ? pedidos.filter((order) => orderMatchesSearch(order, query)) : pedidos;
+    const archivedCount = pedidos.filter((order) => order.archivedAt).length;
+    const activeCount = pedidos.length - archivedCount;
+    const byArchive = pedidos.filter((order) =>
+      state.orderView === 'history' ? order.archivedAt : !order.archivedAt,
+    );
+    const visiblePedidos = query ? byArchive.filter((order) => orderMatchesSearch(order, query)) : byArchive;
     const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
     const activeConfig = ORDER_STATUS[activeStatus];
     const activePedidos = visiblePedidos.filter((order) => order.statusUi === activeStatus);
@@ -825,8 +871,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (column && key === activeStatus && !column.children.length) column.innerHTML = emptyColumnHTML(config.label);
     });
     updateOrderStatusTabs(visiblePedidos, query);
+    qsa('[data-admin-orders-view]').forEach((button) => {
+      const view = button.dataset.adminOrdersView || 'active';
+      button.classList.toggle('active', view === state.orderView);
+      button.setAttribute('aria-pressed', String(view === state.orderView));
+      const count = view === 'history' ? archivedCount : activeCount;
+      const badge = button.querySelector('[data-admin-orders-view-count]');
+      if (badge) badge.textContent = String(count);
+    });
 
-    const openCount = unreadAdminOrders(pedidos).length;
+    const openCount = unreadAdminOrders(pedidos.filter((order) => !order.archivedAt)).length;
     const badge = qs('#badge-pedidos');
     if (badge) badge.textContent = String(openCount);
     if (badge) {
@@ -928,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pedidos = state.pedidos.map((order) => (order.id === pedidoId ? { ...order, status, statusUi } : order));
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_status', 'pedido', pedidoId, { status });
+    await registrarPedidoEvento(pedidoId, 'status_alterado', { status_novo: status });
     await carregarPedidosAdmin({ highlightId: pedidoId });
     showToast('Status do pedido atualizado.', 'success');
     return true;
@@ -979,6 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_pagamento', 'pedido', pedidoId, { pagamento_status: pagamentoStatus });
+    await registrarPedidoEvento(pedidoId, 'pagamento_alterado', { pagamento_status: pagamentoStatus });
     showToast('Pagamento atualizado.', 'success');
     return true;
   }
@@ -1022,36 +1078,111 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
-  async function excluirPedidoAdmin(pedidoId) {
+  async function registrarPedidoEvento(pedidoId, tipo, payload = {}) {
+    const api = client();
+    if (!api || !pedidoId || orderEventsReady === false) return false;
+    const { error } = await api.from('pedido_eventos').insert({
+      pedido_id: pedidoId,
+      tipo,
+      status_anterior: payload.status_anterior || null,
+      status_novo: payload.status_novo || null,
+      payload,
+      created_by: state.user?.id || null,
+    });
+    if (error) {
+      orderEventsReady = false;
+      console.warn('[Admin] pedido_eventos indisponivel. Aplique a migracao da etapa 7.', error);
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para registrar eventos reais de pedidos.');
+      return false;
+    }
+    return true;
+  }
+
+  async function archiveOrderAdmin(pedidoId) {
     const api = client();
     if (!api || !pedidoId) return false;
-    const order = state.pedidos.find((item) => item.id === pedidoId);
-    const label = order ? `#${orderShortId(order)} de ${order.cliente_nome || 'cliente'}` : 'este pedido';
-    if (!confirm(`Apagar ${label}? Esta acao remove o pedido e os itens dele.`)) return false;
-
-    let { error } = await api.from('pedidos').delete().eq('id', pedidoId);
-
-    if (error) {
-      const rpc = await rpcExcluirPedido(pedidoId);
-      error = rpc.error;
+    if (!ordersArchiveReady) {
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.');
+      showToast('Aplique a migracao da etapa 7 para arquivar pedidos.', 'error');
+      return false;
     }
 
+    const button = qs(`[data-admin-order-archive="${escapeSelector(pedidoId)}"]`);
+    if (button) button.disabled = true;
+
+    const reason = 'Arquivado no painel administrativo';
+    const { data, error } = await api.rpc('archive_order', {
+      pedido_id: pedidoId,
+      reason,
+    });
+
+    if (button) button.disabled = false;
+
     if (error) {
-      showToast(friendlyDbError(error, 'Nao consegui apagar o pedido.'), 'error');
+      ordersArchiveReady = false;
+      setDatabaseAlert('A RPC public.archive_order não respondeu. Confira as funções da etapa 7 no Supabase.');
+      showToast(friendlyDbError(error, 'Nao consegui guardar o pedido no historico.'), 'error');
       await carregarPedidosAdmin();
       return false;
     }
 
-    state.pedidos = state.pedidos.filter((item) => item.id !== pedidoId);
+    const archivedOrder = Array.isArray(data) ? data[0] : data;
+    const archivedAt = archivedOrder?.archived_at || new Date().toISOString();
+    state.pedidos = state.pedidos.map((order) =>
+      String(order.id) === String(pedidoId)
+        ? {
+            ...order,
+            archivedAt,
+            archivedBy: archivedOrder?.archived_by || state.user?.id || null,
+            archivedReason: archivedOrder?.archived_reason || reason,
+          }
+        : order,
+    );
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
-    renderEntregas();
-    await logAdminAction('pedido_excluido', 'pedido', pedidoId, {
-      codigo: order?.codigo || '',
-      cliente: order?.cliente_nome || '',
-    });
-    showToast('Pedido apagado.', 'success');
+    await carregarPedidosAdmin();
+    showToast('Pedido guardado no historico.', 'success');
     return true;
+  }
+
+  async function restoreOrderAdmin(pedidoId) {
+    const api = client();
+    if (!api || !pedidoId) return false;
+    if (!ordersArchiveReady) {
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para restaurar pedidos do historico.');
+      showToast('Aplique a migracao da etapa 7 para restaurar pedidos.', 'error');
+      return false;
+    }
+
+    const button = qs(`[data-admin-order-restore="${escapeSelector(pedidoId)}"]`);
+    if (button) button.disabled = true;
+
+    const { error } = await api.rpc('restore_order', {
+      pedido_id: pedidoId,
+    });
+
+    if (button) button.disabled = false;
+
+    if (error) {
+      ordersArchiveReady = false;
+      setDatabaseAlert('A RPC public.restore_order não respondeu. Confira as funções da etapa 7 no Supabase.');
+      showToast(friendlyDbError(error, 'Nao consegui restaurar o pedido.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    state.pedidos = state.pedidos.map((order) =>
+      String(order.id) === String(pedidoId) ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' } : order,
+    );
+    renderizarPedidosAdmin(state.pedidos);
+    renderFinanceiro();
+    await carregarPedidosAdmin();
+    showToast('Pedido voltou para a tela principal.', 'success');
+    return true;
+  }
+
+  async function excluirPedidoAdmin(pedidoId) {
+    return archiveOrderAdmin(pedidoId);
   }
 
   async function carregarProdutosAdmin() {
@@ -1097,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.variacoes = [];
     if (!api || !ids.length) return [];
 
-    const { data, error } = await api
+    let { data, error } = await api
       .from('produto_variacoes')
       .select(PRODUCT_VARIATION_SELECT)
       .in('produto_id', ids)
@@ -1106,11 +1237,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error) {
       if (isMissingVariationTableError(error)) {
-        setDatabaseAlert(
-          'Execute supabase/20260522-produto-variacoes.sql para gerenciar variacoes no painel.',
-        );
+        const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+        if (message.includes('preco_promocional') || message.includes('oferta_ativa') || message.includes('oferta_inicio') || message.includes('oferta_fim') || message.includes('estoque_minimo')) {
+          variationsExtendedReady = false;
+          setDatabaseAlert(
+            'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar oferta formal por opcao.',
+          );
+          const fallback = await api
+            .from('produto_variacoes')
+            .select(PRODUCT_VARIATION_BASIC_SELECT)
+            .in('produto_id', ids)
+            .order('ordem', { ascending: true })
+            .order('nome', { ascending: true });
+          data = fallback.data;
+          error = fallback.error;
+        } else {
+          setDatabaseAlert('Execute supabase/20260522-produto-variacoes.sql para gerenciar variacoes no painel.');
+          return [];
+        }
+      } else {
+        showToast(friendlyDbError(error, 'Nao consegui carregar as variacoes.'), 'error');
         return [];
       }
+    }
+
+    if (!error && variationsExtendedReady !== false) variationsExtendedReady = true;
+    if (error) {
       showToast(friendlyDbError(error, 'Nao consegui carregar as variacoes.'), 'error');
       return [];
     }
@@ -1354,6 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   .map((variation) => {
                     const active = variation.ativo !== false;
                     const stock = variation.estoque ?? '';
+                    const offerActive = Boolean(variation.oferta_ativa);
                     return `
                     <article class="admin-variation-row ${active ? '' : 'is-inactive'}">
                       <div class="admin-variation-media">
@@ -1377,6 +1530,21 @@ document.addEventListener('DOMContentLoaded', () => {
                               <option value="false" ${!active ? 'selected' : ''}>Desativada</option>
                             </select>
                           </label>
+                          <label>Oferta
+                            <select data-admin-variation-field="oferta_ativa" data-variation-id="${escapeHTML(variation.id)}">
+                              <option value="false" ${!offerActive ? 'selected' : ''}>Nao</option>
+                              <option value="true" ${offerActive ? 'selected' : ''}>Sim</option>
+                            </select>
+                          </label>
+                          <label>Preco de oferta
+                            <input type="number" min="0" step="0.01" value="${variation.preco_promocional ? Number(variation.preco_promocional).toFixed(2) : ''}" data-admin-variation-field="preco_promocional" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label>Oferta comeca
+                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_inicio))}" data-admin-variation-field="oferta_inicio" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
+                          <label>Oferta termina
+                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_fim))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
+                          </label>
                           <label class="admin-variation-image-url">Imagem
                             <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
@@ -1395,6 +1563,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn btn-secondary" type="button" data-admin-variation-toggle="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}" data-variation-active="${active ? 'true' : 'false'}">
                           <i class="fa-solid ${active ? 'fa-eye-slash' : 'fa-eye'}"></i>
                           ${active ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <button class="btn btn-secondary" type="button" data-admin-variation-offer-24="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}" ${variationsExtendedReady ? '' : 'disabled'}>
+                          <i class="fa-solid fa-bolt"></i>
+                          ${variationsExtendedReady ? 'Oferta 24h' : 'Aplique SQL'}
                         </button>
                       </div>
                     </article>
@@ -1583,7 +1755,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function variationPayloadFromEditor(variationId) {
     const field = (name) => variationField(variationId, name);
     const name = field('nome')?.value.trim() || '';
-    return {
+    const payload = {
       nome: name,
       slug: safeSlug(name),
       preco: parsePrice(field('preco')?.value || 0),
@@ -1592,6 +1764,14 @@ document.addEventListener('DOMContentLoaded', () => {
       ativo: field('ativo')?.value !== 'false',
       imagem: ensureSafeProductImageValue(field('imagem')?.value || ''),
     };
+    if (variationsExtendedReady) {
+      const offerActive = field('oferta_ativa')?.value === 'true';
+      payload.oferta_ativa = offerActive;
+      payload.preco_promocional = offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null;
+      payload.oferta_inicio = offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null;
+      payload.oferta_fim = offerActive ? isoFromLocal(field('oferta_fim')?.value) : null;
+    }
+    return payload;
   }
 
   function setVariationBusy(variationId, busy) {
@@ -1629,6 +1809,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId);
       }
       if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
+      if (!override && payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
+        throw new Error('Informe o preco de oferta da opcao.');
+      }
       if (payload.imagem) payload.imagem = ensureSafeProductImageValue(payload.imagem);
     } catch (error) {
       variationSaveLocks.delete(variationId);
@@ -1677,7 +1860,6 @@ document.addEventListener('DOMContentLoaded', () => {
           field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
         ativo: true,
         imagem: ensureSafeProductImageValue(field('imagem')?.value || product.imagem || ''),
-        atributos: {},
         ordem: productVariations(productId).length * 10 + 10,
       };
       const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
@@ -1850,11 +2032,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function validateProductImageFile(file) {
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    if (!file.type?.startsWith('image/')) {
       throw new Error('Use uma imagem JPG, PNG ou WebP.');
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      throw new Error('Use uma imagem de ate 5 MB.');
+      console.info('[Admin] Imagem grande recebida; tentando reduzir antes do envio.');
     }
   }
 
@@ -1866,17 +2048,47 @@ document.addEventListener('DOMContentLoaded', () => {
     return image;
   }
 
+  async function compressProductImage(file) {
+    if (!file || typeof createImageBitmap !== 'function') return file;
+    if (file.size <= 900 * 1024 && ['image/jpeg', 'image/webp'].includes(file.type)) return file;
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, IMAGE_COMPRESS_TARGET / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(bitmap, 0, 0, width, height);
+      const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, IMAGE_COMPRESS_QUALITY));
+      bitmap.close?.();
+      if (!blob) return file;
+      if (blob.size >= file.size && file.size <= MAX_IMAGE_SIZE) return file;
+      const extension = type === 'image/png' ? 'png' : 'jpg';
+      const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
+      return new File([blob], `${baseName}.${extension}`, { type, lastModified: Date.now() });
+    } catch (error) {
+      console.warn('[Admin] Compressao de imagem falhou; tentando arquivo original.', error);
+      return file;
+    }
+  }
+
   async function resolveProductImage(file, productNameOverride = '') {
     if (!file) return '';
     validateProductImageFile(file);
     try {
-      return await uploadImagemProduto(file, productNameOverride);
+      const preparedFile = await compressProductImage(file);
+      validateProductImageFile(preparedFile);
+      return await uploadImagemProduto(preparedFile, productNameOverride);
     } catch (error) {
       console.warn('[Admin] Upload no Storage falhou.', error);
       throw new Error(
         friendlyDbError(
           error,
-          'Nao consegui enviar a imagem para o Storage. Confira o bucket produtos e tente novamente.',
+          'Nao consegui enviar essa imagem. Tente tirar outra foto ou escolher outra imagem.',
         ),
       );
     }
@@ -1902,12 +2114,39 @@ document.addEventListener('DOMContentLoaded', () => {
     return data?.publicUrl || '';
   }
 
+  function renderCreateProductImagePreview(file) {
+    const preview = qs('#admin-product-image-preview');
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(reader.result || '')}" alt="Previa da imagem do produto">
+        <span>Imagem escolhida. Voce pode trocar antes de salvar.</span>
+      `;
+    };
+    reader.onerror = () => {
+      preview.classList.add('hidden');
+      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function selectedCreateProductImageFile() {
+    return qs('#prod-foto-camera')?.files?.[0] || qs('#prod-foto')?.files?.[0] || null;
+  }
+
   async function salvarProdutoAdmin(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const submit = qs('button[type="submit"]', form);
     const feedback = qs('#admin-product-upload-feedback');
-    const file = qs('#prod-foto')?.files?.[0] || null;
+    const file = selectedCreateProductImageFile();
     const api = client();
 
     if (!api) {
@@ -1976,14 +2215,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (error) throw error;
 
       form.reset();
-      if (feedback) feedback.textContent = 'Produto salvo.';
+      renderCreateProductImagePreview(null);
+      if (feedback) {
+        feedback.textContent = file
+          ? 'Imagem enviada com sucesso. Produto salvo com sucesso.'
+          : 'Produto salvo com sucesso.';
+      }
       await carregarProdutosAdmin();
       await logAdminAction('produto_criado', 'produto', insertedProduct?.id || payload.nome, { nome: payload.nome });
-      showToast('Produto salvo no catálogo.', 'success');
+      showToast('Produto salvo com sucesso.', 'success');
     } catch (error) {
       console.warn('[Admin] Erro ao salvar produto.', error);
-      if (feedback) feedback.textContent = 'Falha ao salvar.';
-      showToast(friendlyDbError(error, error.message || 'Não consegui salvar o produto.'), 'error');
+      if (feedback) feedback.textContent = 'Nao consegui salvar o produto.';
+      showToast(friendlyDbError(error, error.message || 'Nao consegui salvar o produto.'), 'error');
     } finally {
       productCreateSaving = false;
       if (submit) {
@@ -2008,15 +2252,135 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('');
   }
 
+  function financePeriodRange(period = '7d') {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    if (period === 'today') return { start, end: now };
+    if (period === 'yesterday') {
+      const end = new Date(start);
+      start.setDate(start.getDate() - 1);
+      return { start, end };
+    }
+    if (period === 'month') {
+      start.setDate(1);
+      return { start, end: now };
+    }
+    if (period === 'all') return { start: null, end: null };
+    start.setDate(start.getDate() - 6);
+    return { start, end: now };
+  }
+
+  function orderInFinancePeriod(order, period) {
+    const { start, end } = financePeriodRange(period);
+    if (!start && !end) return true;
+    const value = new Date(order.created_at || 0).getTime();
+    if (!Number.isFinite(value)) return false;
+    if (start && value < start.getTime()) return false;
+    if (end && value > end.getTime()) return false;
+    return true;
+  }
+
+  function aggregateOrderItems(pedidos = []) {
+    const map = new Map();
+    pedidos.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const name = text(item.nome || 'Produto');
+        const variation = text(item.variacao || '');
+        const key = `${normalize(name)}|${normalize(variation)}`;
+        const quantity = Math.max(1, Number(item.quantidade || 1));
+        const total = Number(item.total || Number(item.preco_unitario || 0) * quantity || 0);
+        const current = map.get(key) || {
+          produto: name,
+          variacao: variation,
+          quantidade: 0,
+          valor: 0,
+          pedidos: new Set(),
+          ultima: '',
+          categoria: '',
+        };
+        current.quantidade += quantity;
+        current.valor += total;
+        current.pedidos.add(order.id);
+        current.ultima = !current.ultima || new Date(order.created_at) > new Date(current.ultima) ? order.created_at : current.ultima;
+        map.set(key, current);
+      });
+    });
+    return [...map.values()].sort((a, b) => b.quantidade - a.quantidade || b.valor - a.valor);
+  }
+
+  function financeTableHTML(rows = []) {
+    if (!rows.length) return '<p class="admin-empty-state">Nenhuma venda com itens carregados neste periodo.</p>';
+    return `
+      <div class="admin-finance-table-wrap">
+        <table class="admin-finance-table">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Opcao</th>
+              <th>Quantidade</th>
+              <th>Total vendido</th>
+              <th>Pedidos</th>
+              <th>Ultima venda</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .slice(0, 12)
+              .map(
+                (row) => `
+              <tr>
+                <td>${escapeHTML(row.produto)}</td>
+                <td>${escapeHTML(row.variacao || '-')}</td>
+                <td>${escapeHTML(row.quantidade)}</td>
+                <td>${formatMoney(row.valor)}</td>
+                <td>${row.pedidos.size}</td>
+                <td>${escapeHTML(formatDateTime(row.ultima))}</td>
+              </tr>
+            `,
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   function renderFinanceiro() {
-    const pedidos = state.pedidos;
+    const period = qs('#admin-finance-period')?.value || '7d';
+    const pedidos = state.pedidos.filter((order) => orderInFinancePeriod(order, period));
     const total = pedidos.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pagos = pedidos.filter((order) => normalize(order.pagamento_status) === 'pago');
+    const cancelados = pedidos.filter((order) => normalize(order.status).includes('cancel') || normalize(order.pagamento_status) === 'cancelado');
+    const ticket = pedidos.length ? total / pedidos.length : 0;
+    const itemRows = aggregateOrderItems(pedidos);
     renderMetric('#admin-finance-metrics', [
       { label: 'Pedidos', value: String(pedidos.length) },
       { label: 'Total vendido', value: formatMoney(total) },
-      { label: 'Pagos no painel', value: String(pagos.length) },
+      { label: 'Ticket medio', value: formatMoney(ticket) },
+      { label: 'Pagos', value: String(pagos.length) },
+      { label: 'Pendentes', value: String(pedidos.length - pagos.length - cancelados.length) },
+      { label: 'Cancelados', value: String(cancelados.length) },
     ]);
+    const details = qs('#admin-finance-details');
+    if (details) {
+      const top = itemRows[0];
+      details.innerHTML = `
+        <article class="admin-finance-panel">
+          <h2>Produtos mais vendidos</h2>
+          ${financeTableHTML(itemRows)}
+        </article>
+        <article class="admin-finance-panel">
+          <h2>Resumo operacional</h2>
+          <dl class="admin-finance-summary">
+            <div><dt>Produto que mais saiu</dt><dd>${escapeHTML(top ? `${top.produto}${top.variacao ? ` - ${top.variacao}` : ''}` : 'Sem dados')}</dd></div>
+            <div><dt>Itens vendidos</dt><dd>${itemRows.reduce((sum, item) => sum + item.quantidade, 0)}</dd></div>
+            <div><dt>Entregues</dt><dd>${pedidos.filter((order) => order.statusUi === 'entregue').length}</dd></div>
+            <div><dt>Em preparo</dt><dd>${pedidos.filter((order) => order.statusUi === 'preparo').length}</dd></div>
+          </dl>
+        </article>
+      `;
+    }
   }
 
   function renderEntregas() {
@@ -2269,40 +2633,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function executeAdminSql(sql) {
-    const api = client();
-    if (!api?.rpc) {
-      showToast('RPC admin_execute_sql indisponível no cliente.', 'error');
-      return null;
+  async function copyAdminSql(sql) {
+    const textToCopy = text(sql).trim();
+    if (!textToCopy) {
+      showToast('Cole o SQL antes de copiar.', 'error');
+      return false;
     }
     try {
-      const { data, error } = await api.rpc('admin_execute_sql', { p_sql: sql });
-      if (error) {
-        showToast(friendlyDbError(error, 'Erro ao executar SQL.'), 'error');
-        await logAdminAction('sql_failed', 'console', state.user?.id, { error: error?.message || '' });
-        return null;
-      }
-      showToast('SQL executado. Verifique logs.', 'success');
-      await logAdminAction('sql_executed', 'console', state.user?.id, { sql: sql.slice(0, 1200) });
-      // if data is returned, append a lightweight result entry
-      if (Array.isArray(data) && data.length) {
-        const preview = {
-          id: `local-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          action: 'sql_result',
-          actor_email: state.user?.email,
-          entity_type: 'rpc',
-          entity_id: '',
-          metadata: { rows: data.length },
-        };
-        const container = qs('#admin-console-logs');
-        if (container) container.insertAdjacentHTML('afterbegin', renderConsoleLogEntry(preview));
-      }
-      return data;
+      await navigator.clipboard.writeText(textToCopy);
+      showToast('SQL copiado. Execute manualmente no Supabase.', 'success');
+      await logAdminAction('sql_copiado', 'console', state.user?.id, { chars: textToCopy.length });
+      return true;
     } catch (err) {
-      console.warn('[Admin] Execucao SQL falhou', err);
-      showToast('Falha ao executar SQL.', 'error');
-      return null;
+      console.warn('[Admin] Nao consegui copiar SQL.', err);
+      showToast('Nao consegui copiar automaticamente. Selecione o texto e copie manualmente.', 'error');
+      return false;
     }
   }
 
@@ -2458,14 +2803,13 @@ document.addEventListener('DOMContentLoaded', () => {
       renderDeveloperAdmin();
     });
     qs('[data-admin-refresh-console]')?.addEventListener('click', () => carregarLogsConsole());
-    qs('#admin-sql-execute')?.addEventListener('click', async (event) => {
+    qs('#admin-sql-copy')?.addEventListener('click', async (event) => {
       event.preventDefault();
       const btn = event.currentTarget;
       const sql = qs('#admin-sql-console')?.value || '';
-      if (!sql.trim()) return showToast('SQL vazio.', 'error');
       try {
         if (btn) btn.disabled = true;
-        await executeAdminSql(sql);
+        await copyAdminSql(sql);
       } finally {
         if (btn) btn.disabled = false;
       }
@@ -2482,7 +2826,11 @@ document.addEventListener('DOMContentLoaded', () => {
       button.addEventListener('click', toggleAdminTheme);
     });
     qs('#admin-product-form-basic')?.addEventListener('submit', salvarProdutoAdmin);
+    qsa('#prod-foto, #prod-foto-camera').forEach((input) => {
+      input.addEventListener('change', () => renderCreateProductImagePreview(input.files?.[0] || null));
+    });
     qs('#admin-order-search')?.addEventListener('input', () => renderizarPedidosAdmin(state.pedidos));
+    qs('#admin-finance-period')?.addEventListener('change', renderFinanceiro);
     qs('#admin-product-search')?.addEventListener('input', () => renderizarProdutosAdmin(state.produtos));
     qs('#admin-product-category-filter')?.addEventListener('change', () => renderizarProdutosAdmin(state.produtos));
     qs('#admin-team-search')?.addEventListener('input', (event) => {
@@ -2495,6 +2843,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     qsa('[data-admin-order-filter]').forEach((button) => {
       button.addEventListener('click', () => setActiveOrderStatus(button.dataset.adminOrderFilter));
+    });
+    qsa('[data-admin-orders-view]').forEach((button) => {
+      button.addEventListener('click', () => setOrderArchiveView(button.dataset.adminOrdersView));
     });
     qsa('[data-admin-product-view]').forEach((button) => {
       button.addEventListener('click', () => setAdminProductView(button.dataset.adminProductView || 'list'));
@@ -2586,6 +2937,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const variationOffer24 = event.target.closest('[data-admin-variation-offer-24]');
+      if (variationOffer24) {
+        if (!variationsExtendedReady) {
+          setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para criar oferta por opcao.');
+          showToast('Aplique a migracao da etapa 7 para usar oferta por opcao.', 'error');
+          return;
+        }
+        const variation = state.variacoes.find((item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24));
+        const price = Number(variation?.preco || 0);
+        salvarVariacaoAdmin(variationOffer24.dataset.adminVariationOffer24, variationOffer24.dataset.productId, {
+          oferta_ativa: true,
+          preco_promocional: Math.max(0, Number((price * 0.9).toFixed(2))),
+          oferta_inicio: new Date().toISOString(),
+          oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        });
+        return;
+      }
+
       const stockZero = event.target.closest('[data-admin-product-stock-zero]');
       if (stockZero) {
         salvarEdicaoProduto(stockZero.dataset.adminProductStockZero, { estoque: 0 });
@@ -2628,9 +2997,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const deleteOrder = event.target.closest('[data-admin-order-delete]');
-      if (deleteOrder) {
-        excluirPedidoAdmin(deleteOrder.dataset.adminOrderDelete);
+      const archiveOrder = event.target.closest('[data-admin-order-archive]');
+      if (archiveOrder) {
+        archiveOrderAdmin(archiveOrder.dataset.adminOrderArchive);
+        return;
+      }
+
+      const restoreOrder = event.target.closest('[data-admin-order-restore]');
+      if (restoreOrder) {
+        restoreOrderAdmin(restoreOrder.dataset.adminOrderRestore);
         return;
       }
 
@@ -2669,14 +3044,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function initAdminPanel() {
-    bindAdminEvents();
-    const canAccess = await verificarAcessoAdmin();
-    if (!canAccess) return;
+    try {
+      bindAdminEvents();
+      const canAccess = await verificarAcessoAdmin();
+      if (!canAccess) return;
 
-    const initialTab = text(location.hash).replace('#', '') || 'pedidos';
-    renderAdminTab(initialTab);
-    await Promise.all([carregarPedidosAdmin(), carregarProdutosAdmin()]);
-    assinarPedidosRealtime();
+      const initialTab = text(location.hash).replace('#', '') || 'pedidos';
+      renderAdminTab(initialTab);
+      const results = await Promise.allSettled([carregarPedidosAdmin(), carregarProdutosAdmin()]);
+      const failed = results.find((result) => result.status === 'rejected');
+      if (failed) {
+        console.warn('[Admin] Uma parte do painel nao carregou.', failed.reason);
+        setDatabaseAlert('Uma parte do painel não carregou. Atualize a página ou confira as permissões no Supabase.');
+        showToast('Painel aberto, mas uma parte não carregou.', 'error');
+      }
+      assinarPedidosRealtime();
+    } catch (error) {
+      console.error('[Admin] Falha ao iniciar painel.', error);
+      setAccessState('Painel indisponível', 'Não consegui iniciar o painel agora. Atualize a página e tente novamente.', {
+        icon: 'triangle-exclamation',
+      });
+      showToast('Nao consegui iniciar o painel.', 'error');
+    }
   }
 
   window.initAdminPanel = initAdminPanel;
@@ -2691,7 +3080,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.carregarEquipeAdmin = carregarEquipeAdmin;
   window.atualizarCargoUsuario = atualizarCargoUsuario;
   window.carregarLogsConsole = carregarLogsConsole;
-  window.executeAdminSql = executeAdminSql;
+  window.copyAdminSql = copyAdminSql;
   window.renderDevConsole = renderDevConsole;
 
   window.switchTab = renderAdminTab;
