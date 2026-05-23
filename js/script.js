@@ -4089,6 +4089,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const trigger = event.target.closest('[data-nav-search-toggle]');
       if (trigger) {
         event.preventDefault();
+        if (isMobileSearchViewport()) {
+          closeNavSearch();
+          qsa('.search-suggestions').forEach(hideSearchSuggestions);
+          const seed = qs('.navbar .nav-search [data-site-search-input]')?.value || '';
+          openSmartSearch(seed);
+          return;
+        }
         const willOpen = !document.body.classList.contains('header-search-open');
         document.body.classList.toggle('header-search-open', willOpen);
         trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
@@ -4302,15 +4309,15 @@ document.addEventListener('DOMContentLoaded', () => {
     shell.className = 'smart-search';
     shell.setAttribute('role', 'dialog');
     shell.setAttribute('aria-modal', 'true');
-    shell.setAttribute('aria-label', 'Busca inteligente de produtos');
+    shell.setAttribute('aria-label', 'Busca global de produtos');
     shell.innerHTML = `
       <div class="smart-search-backdrop" data-close-search></div>
       <div class="smart-search-panel">
         <header class="smart-search-head">
           <div>
-            <span class="eyebrow">Busca inteligente</span>
-            <h2>O que você precisa hoje?</h2>
-            <p>Digite do seu jeito: banheiro, lavar roupa, tirar gordura, gás ou água.</p>
+            <span class="eyebrow">Busca</span>
+            <h2>Buscar produtos</h2>
+            <p>Digite o nome, categoria ou op&ccedil;&atilde;o do produto.</p>
           </div>
           <button class="smart-search-close" type="button" data-close-search aria-label="Fechar busca">
             <i class="fa-solid fa-xmark"></i>
@@ -4381,6 +4388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSmartSearchResults(seed);
     shell.classList.add('open');
     document.body.classList.add('smart-search-open');
+    qs('[data-nav-search-toggle]')?.setAttribute('aria-expanded', 'true');
     setDockSectionActive('search');
     setTimeout(() => input?.focus(), 80);
   }
@@ -4388,6 +4396,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeSmartSearch() {
     qs('.smart-search')?.classList.remove('open');
     document.body.classList.remove('smart-search-open');
+    qs('[data-nav-search-toggle]')?.setAttribute('aria-expanded', 'false');
     updateDockActive();
   }
 
@@ -4402,11 +4411,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!results) return;
 
     const term = query.trim();
-    const matches = smartSearchMatches(term);
-    const heading = term ? 'Produtos encontrados' : 'Mais procurados agora';
-    const subtitle = term
-      ? `${matches.length} sugestao${matches.length === 1 ? '' : 'es'} para "${escapeHTML(term)}"`
-      : 'Atalhos para os pedidos mais comuns no celular';
+    if (term.length < 2) {
+      results.innerHTML = `
+        <div class="smart-search-empty">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <strong>Digite pelo menos 2 letras</strong>
+          <span>As sugest&otilde;es aparecem automaticamente.</span>
+        </div>
+      `;
+      return;
+    }
+
+    const entries = searchSuggestionEntries(term, 6);
+    const heading = 'Produtos encontrados';
+    const subtitle = `${entries.length} ${entries.length === 1 ? 'sugest&atilde;o' : 'sugest&otilde;es'} para "${escapeHTML(term)}"`;
 
     results.innerHTML = `
       <div class="smart-search-result-head">
@@ -4416,14 +4434,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       ${
-        matches.length
+        entries.length
           ? `
         <div class="smart-search-result-grid">
-          ${matches
-            .map((product) => {
+          ${entries
+            .map(({ product, option }) => {
               const imageSrc = assetHref(productAssetPath(product));
+              const label = option ? `${product.name} ${option.name}` : product.name;
               return `
-              <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(product.name)}">
+              <button type="button" class="smart-search-product" data-smart-product="${escapeHTML(label)}">
                 <span class="smart-search-product-icon">
                   ${
                     imageSrc
@@ -4433,7 +4452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
                 <span class="smart-search-product-copy">
                   <strong>${escapeHTML(product.name)}</strong>
-                  <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}</small>
+                  <small>${escapeHTML(product.category)}${option ? ` - ${escapeHTML(option.name)}` : ''} - ${formatMoney(option?.price || product.price)}</small>
                 </span>
                 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
               </button>
