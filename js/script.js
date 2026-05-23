@@ -5702,9 +5702,37 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach(
       (button) => {
         button.classList.toggle('has-items', hasItems);
+        button.classList.toggle('cart-visible-items', hasItems);
         button.classList.toggle('is-empty', !hasItems);
       },
     );
+    qsa('.mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach((button) => {
+      const icon = button.querySelector('i');
+      const label = button.querySelector('span:not([data-cart-count])');
+      if (hasItems) {
+        button.style.setProperty('border-color', '#facc15', 'important');
+        button.style.setProperty('background', '#facc15', 'important');
+        button.style.setProperty(
+          'background-image',
+          'linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%)',
+          'important',
+        );
+        button.style.setProperty('color', '#0f172a', 'important');
+        button.style.setProperty(
+          'box-shadow',
+          'inset 0 6px 11px rgba(255,255,255,.44), inset 0 -12px 18px rgba(118,77,0,.22), 0 8px 0 rgba(132,93,0,.78), 0 18px 30px rgba(0,0,0,.3), 0 0 0 8px rgba(250,204,21,.28)',
+          'important',
+        );
+        icon?.style.setProperty('color', '#0b3b86', 'important');
+        label?.style.setProperty('color', '#0f172a', 'important');
+      } else {
+        ['border-color', 'background', 'background-image', 'color', 'box-shadow'].forEach((property) =>
+          button.style.removeProperty(property),
+        );
+        icon?.style.removeProperty('color');
+        label?.style.removeProperty('color');
+      }
+    });
 
     const pageItems = qs('#cart-items');
     const modalItems = qs('[data-modal-cart-items]');

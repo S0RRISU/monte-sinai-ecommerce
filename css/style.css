@@ -1284,6 +1284,60 @@ p {
   }
 }
 
+/* Hard override for the cart state with items. Uses a dedicated JS class to bypass older dock layers. */
+@media (max-width: 760px) {
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items {
+    border-color: #facc15 !important;
+    outline-color: rgba(250, 204, 21, 0.42) !important;
+    background: #facc15 !important;
+    background-image: linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 6px 11px rgba(255, 255, 255, 0.44),
+      inset 0 -12px 18px rgba(118, 77, 0, 0.22),
+      0 8px 0 rgba(132, 93, 0, 0.78),
+      0 18px 30px rgba(0, 0, 0, 0.3),
+      0 0 0 8px rgba(250, 204, 21, 0.28) !important;
+    filter: saturate(1.12) brightness(1.02) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items::before,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items::after {
+    display: none !important;
+    content: none !important;
+    background: transparent !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items i {
+    color: #0b3b86 !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items span {
+    color: #0f172a !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items {
+    border-color: #facc15 !important;
+    background: #facc15 !important;
+    background-image: linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 4px 8px rgba(255, 255, 255, 0.4),
+      0 10px 22px rgba(250, 204, 21, 0.26) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i {
+    color: #0b3b86 !important;
+  }
+}
+
 @media (max-width: 760px) {
   :root {
     --nav-height: 66px;
@@ -8113,6 +8167,19 @@ body.light-mode .cleaning-card {
   .mobile-quick-dock button.active {
     background: color-mix(in srgb, var(--primary) 12%, transparent);
     color: var(--primary-strong);
+  }
+
+  /* Forçar apenas o texto (rótulo) do botão ativo para preto, sem alterar ícones */
+  .mobile-quick-dock a.active span,
+  .mobile-quick-dock button.active span,
+  .mobile-quick-dock a.active strong,
+  .mobile-quick-dock button.active strong {
+    color: #000 !important;
+  }
+
+  /* Nav desktop: apenas o texto do item ativo em preto */
+  .nav-menu a.active {
+    color: #000 !important;
   }
 
   .mobile-quick-dock a.active::before,
@@ -32249,5 +32316,60 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   body:not(.admin-shell-body) .toast-stack {
     bottom: calc(var(--mobile-dock-height, 108px) + 58px + env(safe-area-inset-bottom)) !important;
     width: min(360px, calc(100vw - 28px)) !important;
+  }
+}
+
+/* Absolute last mobile cart rule: must stay at the end of the file. */
+@media (max-width: 760px) {
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
+  html[data-theme] body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items {
+    border-color: #facc15 !important;
+    outline-color: rgba(250, 204, 21, 0.42) !important;
+    background: #facc15 !important;
+    background-image: linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 6px 11px rgba(255, 255, 255, 0.44),
+      inset 0 -12px 18px rgba(118, 77, 0, 0.22),
+      0 8px 0 rgba(132, 93, 0, 0.78),
+      0 18px 30px rgba(0, 0, 0, 0.3),
+      0 0 0 8px rgba(250, 204, 21, 0.28) !important;
+    filter: saturate(1.12) brightness(1.02) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items::before,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items::after {
+    display: none !important;
+    content: none !important;
+    background: transparent !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items i {
+    color: #0b3b86 !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items span {
+    color: #0f172a !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items {
+    border-color: #facc15 !important;
+    background: #facc15 !important;
+    background-image: linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 4px 8px rgba(255, 255, 255, 0.4),
+      0 10px 22px rgba(250, 204, 21, 0.26) !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].cart-visible-items i {
+    color: #0b3b86 !important;
   }
 }
