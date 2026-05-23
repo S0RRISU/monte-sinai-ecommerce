@@ -2539,28 +2539,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (['produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) {
-      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]') || qs('[data-simple-catalog-search]');
-      if (catalogInput) {
-        catalogInput.value = term;
-        if (catalogInput.matches('[data-catalog-search]')) {
-          activateCatalogFilter('all');
-          applyCatalogFilters();
-          scrollCatalogToTop('smooth');
-        } else if (catalogInput.matches('[data-full-catalog-search]')) {
-          qsa('[data-full-catalog-filter]').forEach((button) =>
-            button.classList.toggle('active', button.dataset.fullCatalogFilter === 'all'),
-          );
-          renderFullCatalogPage();
-          qs('[data-full-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          renderSimpleCatalogPage();
-          qs('[data-simple-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        return;
-      }
-    }
-
     openProductSearchModal(matches[0], matches, term);
   }
 
@@ -2626,6 +2604,12 @@ document.addEventListener('DOMContentLoaded', () => {
     productSearchResults = uniqueProducts(results.length ? results : [resolved]);
     if (!productSearchResults.some((item) => normalizeText(item.name) === normalizeText(resolved.name))) {
       productSearchResults.unshift(resolved);
+    }
+
+    const detailKey = resolved.id || resolved.name;
+    if (catalogProductByKey(detailKey)) {
+      openCatalogDetailModal(detailKey);
+      return;
     }
 
     const modal = qs('.product-search-modal');
@@ -5307,12 +5291,6 @@ document.addEventListener('DOMContentLoaded', () => {
               : ''
           }
           <div class="catalog-detail-actions">
-            ${
-              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
-              <i class="fa-solid fa-cart-plus"></i>
-              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
-            </button>`
-            }
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
               <i class="fa-solid fa-store"></i>
               Ver na loja
@@ -5321,6 +5299,12 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class="fa-solid fa-arrow-left"></i>
               Voltar ao catalogo
             </button>
+            ${
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              <i class="fa-solid fa-cart-plus"></i>
+              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
+            </button>`
+            }
           </div>
         </div>
       `;
