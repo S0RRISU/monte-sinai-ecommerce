@@ -1338,6 +1338,107 @@ p {
   }
 }
 
+/* Final mobile polish: hide zero control badge, frame WhatsApp, compact non-blocking toasts. */
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) [data-client-order-count].is-empty,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .admin-order-badge.is-empty,
+body:not(.admin-shell-body):not(.auth-body) [data-client-order-count].is-empty,
+body:not(.admin-shell-body):not(.auth-body) .admin-order-badge.is-empty {
+  display: none !important;
+}
+
+.whatsapp-float {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 999px !important;
+  background: #22c55e !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 16px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 8px rgba(34, 197, 94, 0.12) !important;
+  overflow: hidden !important;
+}
+
+.whatsapp-float i {
+  color: #ffffff !important;
+  font-size: 1.36rem !important;
+  line-height: 1 !important;
+}
+
+.whatsapp-float span {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 760px) {
+  .whatsapp-float {
+    right: max(18px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 32px + env(safe-area-inset-bottom)) !important;
+    width: 56px !important;
+    height: 56px !important;
+    z-index: 1180 !important;
+  }
+
+  .toast-stack,
+  body:not(.admin-shell-body) .toast-stack {
+    right: max(14px, env(safe-area-inset-right)) !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 98px + env(safe-area-inset-bottom)) !important;
+    width: min(300px, calc(100vw - 28px)) !important;
+    gap: 6px !important;
+    z-index: 2400 !important;
+  }
+}
+
+.toast-modern,
+.toast {
+  width: auto !important;
+  max-width: 300px !important;
+  min-height: 0 !important;
+  grid-template-columns: 28px minmax(0, 1fr) 26px !important;
+  gap: 8px !important;
+  border-radius: 12px !important;
+  padding: 8px 9px !important;
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+}
+
+.toast-icon {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 9px !important;
+  font-size: 0.82rem !important;
+}
+
+.toast-copy {
+  gap: 0 !important;
+  min-width: 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.25 !important;
+}
+
+.toast-copy strong,
+.toast-copy span {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.toast-close {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 8px !important;
+}
+
 @media (max-width: 760px) {
   :root {
     --nav-height: 66px;
