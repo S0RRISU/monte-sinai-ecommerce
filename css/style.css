@@ -32489,7 +32489,7 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
 
   body:not(.admin-shell-body):not(.auth-body) .whatsapp-float {
     right: max(14px, env(safe-area-inset-right)) !important;
-    bottom: calc(var(--mobile-dock-height, 108px) + 18px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(var(--mobile-dock-height, 108px) + 34px + env(safe-area-inset-bottom)) !important;
     width: 56px !important;
     height: 56px !important;
     z-index: 1190 !important;
