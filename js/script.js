@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingProfile: 'ms_pending_profile_email_v1',
     pendingProfileSavePassword: 'ms_pending_profile_save_password_v1',
     authSessions: 'ms_saved_auth_sessions_v1',
+    siteRemoteStatus: 'ms_site_config_remote_status_v1',
   };
 
   const THEME_MODES = ['system', 'light', 'dark'];
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const DELIVERY_FEE = 3;
   const FREE_SHIPPING_FROM = 50;
   const SITE_CONFIG_TABLE = 'site_configuracoes';
+  const SITE_CONFIG_MISSING_TTL = 6 * 60 * 60 * 1000;
   let productIndex = [];
   const CATALOG_CATEGORY_ORDER = [
     'agua',
@@ -230,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
   let ordersPageAdminMode = false;
+  const publicProductsState = {
+    allProducts: [],
+    selectedCategory: 'all',
+    searchTerm: '',
+  };
 
   applySavedTheme();
   applySiteConfig();
@@ -444,22 +451,54 @@ document.addEventListener('DOMContentLoaded', () => {
   function missingSiteConfigTable(error) {
     const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
     return (
-      text.includes('site_configuracoes') || text.includes('pgrst205') || text.includes('could not find the table')
+      text.includes('site_configuracoes') ||
+      text.includes('pgrst205') ||
+      text.includes('404') ||
+      text.includes('not found') ||
+      text.includes('could not find the table')
     );
+  }
+
+  function siteConfigTableMarkedMissing() {
+    const status = loadJSON(STORAGE.siteRemoteStatus, null);
+    return Boolean(status?.missing && Date.now() - Number(status.checkedAt || 0) < SITE_CONFIG_MISSING_TTL);
+  }
+
+  function markSiteConfigTableMissing() {
+    saveJSON(STORAGE.siteRemoteStatus, { missing: true, checkedAt: Date.now() });
+  }
+
+  function clearSiteConfigTableMissing() {
+    try {
+      localStorage.removeItem(STORAGE.siteRemoteStatus);
+    } catch (_error) {
+      // localStorage can be blocked; defaults still keep the site usable.
+    }
+  }
+
+  function shouldLoadRemoteSiteConfig() {
+    if (siteConfigTableMarkedMissing()) return false;
+    return currentPage() === 'configuracoes.html';
   }
 
   async function loadRemoteSiteConfig() {
     const client = supabaseProductClient();
     if (!client) return null;
+    if (!shouldLoadRemoteSiteConfig()) return null;
 
     try {
       const { data, error } = await client.from(SITE_CONFIG_TABLE).select('config').eq('id', 'site').maybeSingle();
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return data?.config || null;
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Usando padrao local.');
+      } else {
         console.warn('[Supabase] Nao foi possivel carregar configuracoes do site.', error);
+      }
       return null;
     }
   }
@@ -467,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function saveRemoteSiteConfig() {
     const client = ordersClient();
     if (!client) return { saved: false, reason: 'no-client' };
+    if (siteConfigTableMarkedMissing()) return { saved: false, reason: 'missing-optional-table' };
 
     const config = {
       owner: normalizedOwnerConfig(ownerConfig),
@@ -484,10 +524,15 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       if (error) throw error;
+      clearSiteConfigTableMissing();
       return { saved: true };
     } catch (error) {
-      if (!missingSiteConfigTable(error))
+      if (missingSiteConfigTable(error)) {
+        markSiteConfigTableMissing();
+        console.info('[Supabase] Configuracoes opcionais do site ausentes. Salvamento remoto ignorado.');
+      } else {
         console.warn('[Supabase] Nao foi possivel salvar configuracoes do site.', error);
+      }
       return { saved: false, error };
     }
   }
@@ -4706,6 +4751,57 @@ document.addEventListener('DOMContentLoaded', () => {
     return storeProducts().sort(compareCatalogProducts);
   }
 
+  function isPublicProductsPage() {
+    return Boolean(qs('[data-public-products-grid]'));
+  }
+
+  function syncPublicProductsStateFromUI() {
+    const activeFilter = qs('.products-page .filter-chips [data-filter].active')?.dataset.filter || 'all';
+    publicProductsState.selectedCategory = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === activeFilter)
+      ? activeFilter
+      : 'all';
+    publicProductsState.searchTerm = qs('.products-page [data-catalog-search]')?.value || '';
+  }
+
+  function publicProductMatchesSearch(product, rawTerm = '') {
+    const term = normalizeText(rawTerm);
+    if (!term) return true;
+
+    const normalized = normalizeProduct(product);
+    const options = productOptions(normalized);
+    const optionTerms = options
+      .map((option) => [option.name, option.label, option.sabor, option.marca].filter(Boolean).join(' '))
+      .join(' ');
+    const searchable = normalizeText(
+      [
+        normalized.name,
+        normalized.category,
+        normalized.description,
+        normalized.terms,
+        normalized.kitItems,
+        optionTerms,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+
+    return searchable.includes(term);
+  }
+
+  function getFilteredPublicProducts() {
+    const products = publicProductsState.allProducts.length
+      ? publicProductsState.allProducts
+      : publicStoreProducts();
+    const selectedCategory = publicProductsState.selectedCategory || 'all';
+    const searchTerm = publicProductsState.searchTerm || '';
+
+    return products.filter((product) => {
+      const normalized = normalizeProduct(product);
+      const matchesCategory = selectedCategory === 'all' || normalized.categorySlug === selectedCategory;
+      return matchesCategory && publicProductMatchesSearch(normalized, searchTerm);
+    });
+  }
+
   function publicProductCardHTML(product) {
     const normalized = normalizeProduct(product);
     const image = productAssetPath(normalized);
@@ -4757,12 +4853,45 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function renderFilteredPublicProducts() {
+    const grid = qs('[data-public-products-grid]');
+    if (!grid) return false;
+
+    syncPublicProductsStateFromUI();
+    const products = getFilteredPublicProducts();
+    grid.replaceChildren();
+    grid.insertAdjacentHTML('beforeend', products.map(publicProductCardHTML).join(''));
+
+    const empty = qs('#catalog-empty');
+    if (empty) {
+      empty.textContent =
+        publicProductsState.selectedCategory !== 'all' && !normalizeText(publicProductsState.searchTerm)
+          ? 'Nenhum produto encontrado nesta categoria'
+          : 'Nenhum produto encontrado com esse filtro.';
+      empty.classList.toggle('hidden', products.length > 0);
+    }
+
+    const result = qs('[data-catalog-results]');
+    if (result) {
+      const rawTerm = String(publicProductsState.searchTerm || '').trim();
+      const suffix = rawTerm ? ` para "${rawTerm}"` : '';
+      const suggested = rawTerm && products.length ? (products.length === 1 ? ' sugerido' : ' sugeridos') : '';
+      result.textContent = `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
+    }
+
+    optimizeImageLoading();
+    return true;
+  }
+
   function renderPublicProductsPage() {
     const grid = qs('[data-public-products-grid]');
     if (!grid) return false;
 
     renderDynamicFilters();
-    grid.innerHTML = publicStoreProducts().map(publicProductCardHTML).join('');
+    publicProductsState.allProducts = publicStoreProducts();
+    publicProductsState.searchTerm = qs('.products-page [data-catalog-search]')?.value || '';
+    publicProductsState.selectedCategory =
+      qs('.products-page .filter-chips [data-filter].active')?.dataset.filter || 'all';
 
     let empty = qs('#catalog-empty');
     if (!empty) {
@@ -4773,7 +4902,7 @@ document.addEventListener('DOMContentLoaded', () => {
       grid.insertAdjacentElement('afterend', empty);
     }
 
-    applyCatalogFilters();
+    renderFilteredPublicProducts();
     return true;
   }
 
@@ -4982,7 +5111,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="full-catalog-category-head">
             <span class="eyebrow">${escapeHTML(meta.eyebrow)}</span>
             <h2>${escapeHTML(label)}</h2>
-            <small>${categoryProducts.length} item${categoryProducts.length === 1 ? '' : 's'}</small>
           </div>
           <div class="full-catalog-category-grid">
             ${categoryProducts.map(fullCatalogCardHTML).join('')}
@@ -4997,9 +5125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const result = qs('[data-full-catalog-results]');
     if (result) {
-      result.textContent = products.length
-        ? `${visible.length} de ${products.length} produto${products.length === 1 ? '' : 's'} no catalogo`
-        : 'Carregando catalogo...';
+      result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
     }
   }
 
@@ -5161,6 +5287,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else applyCatalogHashFilter(false);
 
     input?.addEventListener('input', () => {
+      if (isPublicProductsPage()) {
+        publicProductsState.searchTerm = input.value || '';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     });
 
@@ -5171,6 +5302,11 @@ document.addEventListener('DOMContentLoaded', () => {
       qsa('[data-filter]', scopedFilterBar || document).forEach((item) =>
         item.classList.toggle('active', item === chip),
       );
+      if (isPublicProductsPage()) {
+        publicProductsState.selectedCategory = chip.dataset.filter || 'all';
+        renderFilteredPublicProducts();
+        return;
+      }
       applyCatalogFilters();
     };
 
@@ -5188,6 +5324,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyCatalogFilters() {
+    if (isPublicProductsPage() && renderFilteredPublicProducts()) return;
+
     const catalogRoot = qs('.products-page #todos-produtos') || qs('#todos-produtos') || document;
     const products = qsa('.catalog-product', catalogRoot);
 
