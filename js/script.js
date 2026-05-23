@@ -252,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSiteSearch();
   bindCatalog();
   bindFullCatalogPage();
+  bindSimpleCatalogPage();
   bindProductCards();
   bindProductRail();
   ensureCartShell();
@@ -1940,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSupabaseProducts() {
     renderDynamicCatalog();
     renderFullCatalogPage();
+    renderSimpleCatalogPage();
     renderPromotionsPage();
     renderDynamicProductRail();
     injectProductJsonLd();
@@ -2523,19 +2525,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (['produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) {
-      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]');
+      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]') || qs('[data-simple-catalog-search]');
       if (catalogInput) {
         catalogInput.value = term;
         if (catalogInput.matches('[data-catalog-search]')) {
           activateCatalogFilter('all');
           applyCatalogFilters();
           scrollCatalogToTop('smooth');
-        } else {
+        } else if (catalogInput.matches('[data-full-catalog-search]')) {
           qsa('[data-full-catalog-filter]').forEach((button) =>
             button.classList.toggle('active', button.dataset.fullCatalogFilter === 'all'),
           );
           renderFullCatalogPage();
           qs('[data-full-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          renderSimpleCatalogPage();
+          qs('[data-simple-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         return;
       }
@@ -5011,11 +5016,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (filter === 'low') return normalized.stockState === 'low';
     if (filter === 'offers') return normalized.offerActive;
     if (filter === 'kits') return normalized.isKit;
+    if (filter && filter !== 'all') return normalized.categorySlug === filter;
     return true;
   }
 
   function fullCatalogCardHTML(product) {
     return publicProductCardHTML(product, { layout: 'catalog' });
+  }
+
+  function catalogProductSearchBlob(product) {
+    const normalized = normalizeProduct(product);
+    const optionTerms = (normalized.options || [])
+      .map((option) => [option.name, option.label, option.value].filter(Boolean).join(' '))
+      .join(' ');
+    return normalizeText(
+      `${normalized.name} ${normalized.category} ${normalized.description} ${normalized.kitItems} ${optionTerms}`,
+    );
   }
 
   function renderFullCatalogPage() {
@@ -5035,9 +5051,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const visible = products.filter((product) => {
       const normalized = normalizeProduct(product);
-      const blob = normalizeText(
-        `${normalized.name} ${normalized.category} ${normalized.description} ${normalized.kitItems}`,
-      );
+      const blob = catalogProductSearchBlob(normalized);
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
@@ -5068,6 +5082,86 @@ document.addEventListener('DOMContentLoaded', () => {
     if (result) {
       result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
     }
+  }
+
+  function simpleCatalogRowHTML(product) {
+    const normalized = normalizeProduct(product);
+    const options = productOptions(normalized);
+    const hasOptions = normalized.hasVariations && options.length > 0;
+    const firstOption = options[0] || { price: normalized.price };
+    const outOfStock = normalized.stockState === 'out';
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const detailKey = normalized.id || normalized.name;
+    const selectHTML = hasOptions
+      ? `
+        <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
+          ${productOptionsHTML(options, normalized)}
+        </select>
+      `
+      : '<span class="simple-catalog-option">Padrão</span>';
+
+    return `
+      <article class="simple-catalog-row catalog-product ${selectedOutOfStock ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+        <div class="simple-catalog-main">
+          <strong>${escapeHTML(normalized.name)}</strong>
+          <span>${escapeHTML(normalized.category)}</span>
+        </div>
+        <div class="simple-catalog-choice">
+          ${selectHTML}
+        </div>
+        <strong class="simple-catalog-price" data-product-price-display>${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
+        <div class="simple-catalog-actions">
+          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
+            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
+          </button>
+          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
+            <i class="fa-solid fa-circle-info"></i>
+            Detalhes
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderSimpleCatalogPage() {
+    const list = qs('[data-simple-catalog-list]');
+    if (!list) return;
+
+    const input = qs('[data-simple-catalog-search]');
+    const term = normalizeText(input?.value || '');
+    const products = catalogProducts().sort((a, b) => {
+      const productA = normalizeProduct(a);
+      const productB = normalizeProduct(b);
+      const categoryCompare = categoryOrderIndex(productA.categorySlug) - categoryOrderIndex(productB.categorySlug);
+      if (categoryCompare !== 0) return categoryCompare;
+      return compareCatalogProducts(a, b);
+    });
+    const visible = products.filter((product) => !term || catalogProductSearchBlob(product).includes(term));
+
+    const grouped = orderedCategoryEntries(visible)
+      .map(([slug, label]) => {
+        const categoryProducts = visible
+          .filter((product) => normalizeProduct(product).categorySlug === slug)
+          .sort(compareCatalogProducts);
+        if (!categoryProducts.length) return '';
+        return `
+          <section class="simple-catalog-group" data-simple-catalog-category="${escapeHTML(slug)}">
+            <h2>${escapeHTML(label)}</h2>
+            <div class="simple-catalog-rows">
+              ${categoryProducts.map(simpleCatalogRowHTML).join('')}
+            </div>
+          </section>
+        `;
+      })
+      .join('');
+
+    list.innerHTML = grouped;
+    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    const result = qs('[data-simple-catalog-results]');
+    if (result) result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+    optimizeImageLoading();
   }
 
   function ensureCatalogDetailModal() {
@@ -5219,6 +5313,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     renderFullCatalogPage();
+  }
+
+  function bindSimpleCatalogPage() {
+    const list = qs('[data-simple-catalog-list]');
+    if (!list) return;
+
+    qs('[data-simple-catalog-search]')?.addEventListener('input', renderSimpleCatalogPage);
+    list.addEventListener('click', (event) => {
+      const detailButton = event.target.closest('[data-catalog-detail]');
+      if (!detailButton) return;
+      event.preventDefault();
+      openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+    });
+
+    renderSimpleCatalogPage();
   }
 
   function bindCatalog() {

@@ -69,72 +69,49 @@
     <a href="contato.html">Contato</a>
   </div>
 
-  <main class="products-page products-public-page">
-    <section class="section container grid-shop-layout products-public-layout" id="todos-produtos">
-      <div class="public-products-panel">
-        <div class="public-products-head">
-          <div>
-            <span class="eyebrow">Produtos</span>
-            <h1>Produtos para comprar</h1>
-            <p>Filtre por categoria ou busque pelo nome do produto.</p>
-          </div>
+  <main class="container catalog-page products-store-page">
+    <section class="hero hero-small catalog-hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Loja Monte Sinai</span>
+        <h1>Produtos para comprar</h1>
+        <p>Escolha por categoria, use a busca e adicione ao carrinho sem ver dados internos da loja.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#loja-produtos">
+            <i class="fa-solid fa-store"></i>
+            Comprar produtos
+          </a>
           <a class="btn btn-secondary" href="catalogo.html">
-            <i class="fa-solid fa-book-open"></i>
-            Cat&aacute;logo
+            <i class="fa-solid fa-list"></i>
+            Cat&aacute;logo simples
           </a>
         </div>
+      </div>
+    </section>
 
-        <div class="catalog-tools public-products-tools" aria-label="Ferramentas de produtos">
-          <form class="search-field catalog-search-form" role="search" data-site-search-form>
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="search" name="busca" data-catalog-search data-site-search-input placeholder="Buscar &aacute;gua, g&aacute;s, detergente...">
-            <button type="submit" aria-label="Pesquisar produto">
-              <i class="fa-solid fa-arrow-right"></i>
-            </button>
-          </form>
-          <div class="filter-chips" aria-label="Categorias de produtos">
-            <button class="filter-chip active" type="button" data-filter="all">Todos</button>
-            <button class="filter-chip" type="button" data-filter="agua">&Aacute;gua</button>
-            <button class="filter-chip" type="button" data-filter="gas">G&aacute;s</button>
-            <button class="filter-chip" type="button" data-filter="limpeza">Limpeza</button>
-            <button class="filter-chip" type="button" data-filter="lavanderia">Lavanderia</button>
-            <button class="filter-chip" type="button" data-filter="higiene">Higiene</button>
-            <button class="filter-chip" type="button" data-filter="banheiro">Banheiro</button>
-            <button class="filter-chip" type="button" data-filter="cozinha">Cozinha</button>
-            <button class="filter-chip" type="button" data-filter="utensilios">Utens&iacute;lios</button>
-            <button class="filter-chip" type="button" data-filter="organizacao">Organiza&ccedil;&atilde;o</button>
-            <button class="filter-chip" type="button" data-filter="limpeza-pesada">Limpeza pesada</button>
-          </div>
+    <section class="section full-catalog-section" id="loja-produtos" aria-label="Produtos da loja">
+      <div class="full-catalog-toolbar">
+        <form class="full-catalog-search" role="search" data-full-catalog-form data-site-search-form>
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" data-full-catalog-search data-site-search-input placeholder="Buscar produto" aria-label="Buscar produto">
+        </form>
+        <div class="full-catalog-filters" role="group" aria-label="Categorias de produtos">
+          <button class="active" type="button" data-full-catalog-filter="all">Todos</button>
+          <button type="button" data-full-catalog-filter="agua">&Aacute;gua</button>
+          <button type="button" data-full-catalog-filter="gas">G&aacute;s</button>
+          <button type="button" data-full-catalog-filter="limpeza">Limpeza</button>
+          <button type="button" data-full-catalog-filter="lavanderia">Lavanderia</button>
+          <button type="button" data-full-catalog-filter="higiene">Higiene</button>
+          <button type="button" data-full-catalog-filter="banheiro">Banheiro</button>
+          <button type="button" data-full-catalog-filter="cozinha">Cozinha</button>
+          <button type="button" data-full-catalog-filter="utensilios">Utens&iacute;lios</button>
+          <button type="button" data-full-catalog-filter="organizacao">Organiza&ccedil;&atilde;o</button>
+          <button type="button" data-full-catalog-filter="limpeza-pesada">Limpeza pesada</button>
         </div>
-
-        <p class="catalog-results" data-catalog-results data-products-count>Carregando produtos...</p>
-        <div class="grid-produtos public-products-grid" data-public-products-grid></div>
-        <p id="catalog-empty" class="empty-cart hidden">Nenhum produto encontrado com esse filtro.</p>
       </div>
 
-      <aside class="cart-box" aria-label="Carrinho">
-        <div class="cart-header">
-          <div>
-            <span class="eyebrow">Carrinho</span>
-            <h3>Seu pedido</h3>
-          </div>
-          <span id="cart-count">0</span>
-        </div>
-        <div id="cart-items" class="cart-items">
-          <p class="empty-cart">Seu carrinho est&aacute; vazio.</p>
-        </div>
-        <div class="cart-footer">
-          <div class="cart-total">
-            <span>Total</span>
-            <strong id="cart-total">R$ 0,00</strong>
-          </div>
-          <button class="btn btn-primary btn-full hidden" type="button" data-page-checkout>Finalizar pedido</button>
-          <button class="btn btn-secondary btn-full cart-clear-button hidden" type="button" data-clear-cart>
-            <i class="fa-solid fa-trash-can"></i>
-            Limpar carrinho
-          </button>
-        </div>
-      </aside>
+      <p class="catalog-results" data-full-catalog-results>Carregando produtos...</p>
+      <div class="full-catalog-list" data-full-catalog-list></div>
+      <p class="empty-cart hidden" data-full-catalog-empty>Nenhum produto encontrado neste filtro.</p>
     </section>
   </main>
 
