@@ -5634,16 +5634,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     rail.addEventListener('click', (event) => {
-      if (event.target.closest('button, select, input, textarea, label, a')) return;
-
       const card = event.target.closest('.rail-product');
       if (!card || !rail.contains(card)) return;
 
       const list = cards();
       const index = list.indexOf(card);
       if (index < 0) return;
+      if (index !== active) {
+        event.preventDefault();
+        event.stopPropagation();
+        focusCard(index);
+        return;
+      }
 
-      focusCard(index === active ? (active + 1) % list.length : index);
+      if (event.target.closest('button, select, input, textarea, label, a')) return;
+
+      focusCard((active + 1) % list.length);
     });
 
     rail.addEventListener(
