@@ -8,6 +8,16 @@ begin;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
+alter table public.pedido_itens
+  add column if not exists variacao_id uuid references public.produto_variacoes(id) on delete set null;
+
+alter table public.produto_variacoes
+  add column if not exists preco_promocional numeric(10, 2),
+  add column if not exists oferta_ativa boolean not null default false,
+  add column if not exists oferta_inicio timestamptz,
+  add column if not exists oferta_fim timestamptz,
+  add column if not exists estoque_minimo integer not null default 0;
+
 create or replace function public.create_order(order_payload jsonb, items_payload jsonb)
 returns jsonb
 language plpgsql
@@ -22,7 +32,9 @@ declare
   item jsonb;
   item_count integer;
   item_product_id uuid;
+  item_variation_id uuid;
   product_row public.produtos%rowtype;
+  variation_row public.produto_variacoes%rowtype;
   item_name text;
   item_image text;
   item_variant text;
@@ -146,6 +158,11 @@ begin
       then (item->>'produto_id')::uuid
       else null
     end;
+    item_variation_id := case
+      when coalesce(item->>'variacao_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then (item->>'variacao_id')::uuid
+      else null
+    end;
     item_qty := greatest(coalesce(nullif(item->>'quantidade', '')::integer, 1), 1);
     item_variant := btrim(coalesce(item->>'variacao', ''));
 
@@ -161,27 +178,64 @@ begin
         raise exception 'Produto do pedido nao esta disponivel.';
       end if;
 
-      if product_row.estoque is not null and product_row.estoque < item_qty then
-        raise exception 'Estoque insuficiente para %.', product_row.nome;
-      end if;
-
-      if product_row.estoque is not null then
-        update public.produtos
-        set estoque = estoque - item_qty
-        where id = product_row.id;
-      end if;
-
       item_name := product_row.nome;
       item_image := product_row.imagem;
-      item_price := case
-        when product_row.oferta_ativa
-          and product_row.preco_promocional is not null
-          and product_row.preco_promocional > 0
-          and (product_row.oferta_inicio is null or product_row.oferta_inicio <= now())
-          and (product_row.oferta_fim is null or product_row.oferta_fim >= now())
-        then product_row.preco_promocional
-        else product_row.preco
-      end;
+
+      if item_variation_id is not null then
+        select *
+        into variation_row
+        from public.produto_variacoes
+        where id = item_variation_id
+          and produto_id = product_row.id
+          and ativo = true
+        for update;
+
+        if not found then
+          raise exception 'Opcao do produto nao esta disponivel.';
+        end if;
+
+        if variation_row.estoque is not null and variation_row.estoque < item_qty then
+          raise exception 'Estoque insuficiente para % - %.', product_row.nome, variation_row.nome;
+        end if;
+
+        if variation_row.estoque is not null then
+          update public.produto_variacoes
+          set estoque = estoque - item_qty
+          where id = variation_row.id;
+        end if;
+
+        item_variant := variation_row.nome;
+        item_image := coalesce(nullif(variation_row.imagem, ''), product_row.imagem);
+        item_price := case
+          when variation_row.oferta_ativa
+            and variation_row.preco_promocional is not null
+            and variation_row.preco_promocional > 0
+            and (variation_row.oferta_inicio is null or variation_row.oferta_inicio <= now())
+            and (variation_row.oferta_fim is null or variation_row.oferta_fim >= now())
+          then variation_row.preco_promocional
+          else variation_row.preco
+        end;
+      else
+        if product_row.estoque is not null and product_row.estoque < item_qty then
+          raise exception 'Estoque insuficiente para %.', product_row.nome;
+        end if;
+
+        if product_row.estoque is not null then
+          update public.produtos
+          set estoque = estoque - item_qty
+          where id = product_row.id;
+        end if;
+
+        item_price := case
+          when product_row.oferta_ativa
+            and product_row.preco_promocional is not null
+            and product_row.preco_promocional > 0
+            and (product_row.oferta_inicio is null or product_row.oferta_inicio <= now())
+            and (product_row.oferta_fim is null or product_row.oferta_fim >= now())
+          then product_row.preco_promocional
+          else product_row.preco
+        end;
+      end if;
     else
       item_name := btrim(coalesce(item->>'nome', ''));
       item_image := btrim(coalesce(item->>'imagem', ''));
@@ -198,6 +252,7 @@ begin
     insert into public.pedido_itens (
       pedido_id,
       produto_id,
+      variacao_id,
       nome,
       variacao,
       quantidade,
@@ -207,6 +262,7 @@ begin
     ) values (
       new_order_id,
       item_product_id,
+      item_variation_id,
       item_name,
       item_variant,
       item_qty,

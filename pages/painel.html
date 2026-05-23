@@ -315,16 +315,16 @@
                 Mostrar ferramentas avançadas
               </summary>
               <div class="admin-console-card">
-                <label for="admin-sql-console" class="eyebrow">Terminal SQL</label>
-                <p class="form-help-text">Use apenas com orientação técnica.</p>
+                <label for="admin-sql-console" class="eyebrow">SQL para copiar</label>
+                <p class="form-help-text">Por segurança, o painel não executa SQL. Cole aqui apenas para revisar e copiar para o Supabase.</p>
                 <textarea
                   id="admin-sql-console"
                   class="sql-console"
-                  placeholder="Digite script SQL apenas quando houver orientação técnica."
+                  placeholder="Cole o SQL orientado e execute manualmente no Supabase."
                 ></textarea>
                 <div class="admin-advanced-actions">
-                  <button class="btn btn-primary" id="admin-sql-execute">
-                    <i class="fa-solid fa-play"></i> Executar script
+                  <button class="btn btn-primary" id="admin-sql-copy">
+                    <i class="fa-solid fa-copy"></i> Copiar SQL
                   </button>
                   <button class="btn btn-secondary" id="admin-sql-clear">
                     <i class="fa-solid fa-trash"></i> Limpar

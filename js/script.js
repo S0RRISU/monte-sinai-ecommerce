@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
   const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
   const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
+  const PRODUCT_VARIATION_BASIC_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const ADMIN_ORDER_POLL_MS = 25000;
   const ORDER_NOTIFICATION_SELECT =
@@ -1119,13 +1121,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function variationOfferData(raw = {}) {
-    const attrs = raw.atributos && typeof raw.atributos === 'object' ? raw.atributos : raw.attributes || {};
-    const enabled = Boolean(raw.oferta_ativa ?? raw.offerActive ?? attrs.oferta_ativa ?? attrs.offerActive);
+    const enabled = Boolean(raw.oferta_ativa ?? raw.offerActive);
     const promo = parsePrice(
-      raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice ?? attrs.preco_promocional ?? attrs.promotionalPrice,
+      raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice,
     );
-    const start = raw.oferta_inicio || raw.offerStartsAt || attrs.oferta_inicio || attrs.offerStartsAt;
-    const end = raw.oferta_fim || raw.offerEndsAt || attrs.oferta_fim || attrs.offerEndsAt;
+    const start = raw.oferta_inicio || raw.offerStartsAt;
+    const end = raw.oferta_fim || raw.offerEndsAt;
     const now = Date.now();
     const startsOk = !start || new Date(start).getTime() <= now;
     const endsOk = !end || new Date(end).getTime() >= now;
@@ -1779,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ids = products.map((product) => product.id).filter(Boolean);
     if (!client || !ids.length) return [];
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('produto_variacoes')
       .select(PRODUCT_VARIATION_SELECT)
       .in('produto_id', ids)
@@ -1789,9 +1790,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error) {
       if (isMissingProductVariationTableError(error)) {
-        console.info('[Supabase] produto_variacoes ainda nao existe. Produtos simples continuam funcionando.');
-        return [];
+        const message = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+        if (
+          message.includes('preco_promocional') ||
+          message.includes('oferta_ativa') ||
+          message.includes('oferta_inicio') ||
+          message.includes('oferta_fim') ||
+          message.includes('estoque_minimo')
+        ) {
+          console.info('[Supabase] Campos de oferta por variacao ausentes. Usando variacoes basicas ate aplicar a migracao da etapa 7.');
+          const fallback = await client
+            .from('produto_variacoes')
+            .select(PRODUCT_VARIATION_BASIC_SELECT)
+            .in('produto_id', ids)
+            .eq('ativo', true)
+            .order('ordem', { ascending: true })
+            .order('nome', { ascending: true });
+          data = fallback.data;
+          error = fallback.error;
+        } else {
+          console.info('[Supabase] produto_variacoes ainda nao existe. Produtos simples continuam funcionando.');
+          return [];
+        }
+      } else {
+        throw error;
       }
+    }
+    if (error) {
       throw error;
     }
 
@@ -2132,6 +2157,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(query ?? '').trim() ? featuredSearchProducts(Math.min(limit, 4)) : featuredSearchProducts(limit);
   }
 
+  function searchSuggestionEntries(query, limit = 5) {
+    const term = normalizeText(query);
+    const entries = [];
+    productIndex.forEach((product) => {
+      const normalized = normalizeProduct(product);
+      (normalized.options || []).forEach((option) => {
+        const blob = normalizeText(`${normalized.name} ${option.name} ${normalized.category}`);
+        if (term && blob.includes(term)) entries.push({ product: normalized, option });
+      });
+    });
+    searchSuggestionProducts(query, limit).forEach((product) => entries.push({ product: normalizeProduct(product), option: null }));
+    const seen = new Set();
+    return entries
+      .filter((entry) => {
+        const key = `${entry.product.id || entry.product.name}|${entry.option?.id || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, limit);
+  }
+
   function catalogSearchProducts(query, limit = Infinity) {
     const term = String(query ?? '').trim();
     if (!term) return [];
@@ -2268,14 +2315,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeText(value);
     if (!normalized) return null;
 
-    return (
+    const resolved =
       productIndex.find((product) => normalizeText(product.name) === normalized) ||
       productIndex.find((product) => {
         const productName = normalizeText(product.name);
         return productName.includes(normalized) || normalized.includes(productName);
       }) ||
-      (typeof productOrName === 'object' ? productOrName : null)
-    );
+      (typeof productOrName === 'object' ? productOrName : null);
+    return typeof productOrName === 'object' && productOrName?.preferredVariationId && resolved
+      ? { ...resolved, preferredVariationId: productOrName.preferredVariationId }
+      : resolved;
   }
 
   function uniqueProducts(products) {
@@ -2516,7 +2565,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const image = productAssetPath(activeSearchProduct, card);
     const description = productDescription(activeSearchProduct, card);
     const options = productOptions(activeSearchProduct, card);
-    const firstOption = options[0] || { price: activeSearchProduct.price || 0 };
+    const preferredOption = options.find((option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''));
+    const firstOption = preferredOption || options[0] || { price: activeSearchProduct.price || 0 };
     const resultButtons =
       productSearchResults.length > 1
         ? `
@@ -2569,7 +2619,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <label class="product-search-variant">
             <span>Escolha uma opção</span>
             <select data-product-search-variant>
-              ${options.map((option, index) => `<option value="${index}">${escapeHTML(optionPriceLabel(option, activeSearchProduct))}</option>`).join('')}
+              ${options.map((option, index) => `<option value="${index}" ${String(option.id) === String(firstOption.id || '') ? 'selected' : ''}>${escapeHTML(optionPriceLabel(option, activeSearchProduct))}</option>`).join('')}
             </select>
           </label>
         `
@@ -3925,8 +3975,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const matches = searchSuggestionProducts(term, 5);
-    const usingFallback = !directSearchProducts(term, 5).length;
+    const entries = searchSuggestionEntries(term, 5);
+    const matches = entries.map((entry) => entry.product);
+    const usingFallback = !directSearchProducts(term, 5).length && !entries.some((entry) => entry.option);
 
     suggestions.innerHTML = '';
 
@@ -3942,9 +3993,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    matches.forEach((product) => {
+    entries.forEach(({ product, option }) => {
       const item = document.createElement('button');
-      const image = productAssetPath(product);
+      const suggestionProduct = option ? { ...product, preferredVariationId: option.id } : product;
+      const image = option?.image || productAssetPath(product);
       const imageSrc = assetHref(image);
       item.className = 'search-suggestion-item';
       item.type = 'button';
@@ -3959,15 +4011,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </span>
         <span>
           <strong>${escapeHTML(product.name)}</strong>
-          <small>${escapeHTML(product.category)} - ${formatMoney(product.price)}${usingFallback ? ' - sugestao' : ''}</small>
+          <small>${escapeHTML(product.category)}${option ? ` - ${escapeHTML(option.name)}` : ''} - ${formatMoney(option?.price || product.price)}${usingFallback ? ' - sugestao' : ''}</small>
         </span>
         <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
       `;
       item.addEventListener('click', () => {
         const input = qs('[data-site-search-input]', form);
-        if (input) input.value = product.name;
+        if (input) input.value = option ? `${product.name} ${option.name}` : product.name;
         hideSearchSuggestions(suggestions);
-        openProductSearchModal(product, matches, product.name);
+        openProductSearchModal(suggestionProduct, matches, input?.value || product.name);
       });
       suggestions.appendChild(item);
     });

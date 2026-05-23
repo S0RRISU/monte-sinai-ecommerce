@@ -35,10 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'estoque_minimo',
   ].join(', ');
   const PRODUCT_VARIATION_SELECT =
+    'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
+  const PRODUCT_VARIATION_BASIC_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
   const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
   const ADMIN_THEME_KEY = 'ms_admin_theme';
-  const ADMIN_ARCHIVED_ORDERS_KEY = 'ms_admin_archived_orders_v1';
 
   function orderStatusClass(statusUi = 'pendente') {
     return (
@@ -78,10 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let productsExtendedReady = true;
   let ordersExtendedReady = true;
+  let ordersArchiveReady = true;
+  let orderEventsReady = true;
+  let variationsExtendedReady = true;
   let productCreateSaving = false;
   const productSaveLocks = new Set();
   const variationSaveLocks = new Set();
-  let archivedOrderIds = new Set();
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
@@ -283,12 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
       p_pagamento_status: payload.pagamento_status ?? null,
       p_confirmado: payload.confirmado ?? null,
     });
-  }
-
-  async function rpcExcluirPedido(pedidoId) {
-    const api = client();
-    if (!api?.rpc) return { data: null, error: new Error('RPC indisponivel') };
-    return api.rpc('admin_delete_order', { p_id: pedidoId });
   }
 
   async function rpcAtualizarProduto(productId, payload = {}) {
@@ -525,21 +522,10 @@ document.addEventListener('DOMContentLoaded', () => {
       items: Array.isArray(row.pedido_itens) ? row.pedido_itens : [],
       statusUi: dbStatusToUi(row.status),
       totalNumber: Number(row.total || 0),
-      archivedLocal: archivedOrderIds.has(String(row.id)),
+      archivedAt: row.archived_at || null,
+      archivedBy: row.archived_by || null,
+      archivedReason: row.archived_reason || '',
     };
-  }
-
-  function loadArchivedOrders() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(ADMIN_ARCHIVED_ORDERS_KEY) || '[]');
-      archivedOrderIds = new Set(Array.isArray(raw) ? raw.map((id) => String(id)) : []);
-    } catch (error) {
-      archivedOrderIds = new Set();
-    }
-  }
-
-  function saveArchivedOrders() {
-    localStorage.setItem(ADMIN_ARCHIVED_ORDERS_KEY, JSON.stringify([...archivedOrderIds]));
   }
 
   function setOrderArchiveView(view = 'active') {
@@ -547,33 +533,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarPedidosAdmin(state.pedidos);
   }
 
-  function archiveOrderAdmin(pedidoId) {
-    if (!pedidoId) return false;
-    archivedOrderIds.add(String(pedidoId));
-    saveArchivedOrders();
-    state.pedidos = state.pedidos.map((order) =>
-      String(order.id) === String(pedidoId) ? { ...order, archivedLocal: true } : order,
-    );
-    renderizarPedidosAdmin(state.pedidos);
-    renderFinanceiro();
-    showToast('Pedido guardado no historico.', 'success');
-    logAdminAction('pedido_arquivado_local', 'pedido', pedidoId, { storage: 'localStorage' });
-    return true;
-  }
-
-  function restoreOrderAdmin(pedidoId) {
-    if (!pedidoId) return false;
-    archivedOrderIds.delete(String(pedidoId));
-    saveArchivedOrders();
-    state.pedidos = state.pedidos.map((order) =>
-      String(order.id) === String(pedidoId) ? { ...order, archivedLocal: false } : order,
-    );
-    renderizarPedidosAdmin(state.pedidos);
-    renderFinanceiro();
-    showToast('Pedido voltou para a tela principal.', 'success');
-    logAdminAction('pedido_restaurado_local', 'pedido', pedidoId, { storage: 'localStorage' });
-    return true;
-  }
 
   function unreadAdminOrders(pedidos = state.pedidos) {
     const list = pedidos || [];
@@ -704,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     if (!api) return [];
 
-    const extendedSelect = [
+    const extendedSelectFields = [
       'id',
       'codigo',
       'created_at',
@@ -720,16 +679,35 @@ document.addEventListener('DOMContentLoaded', () => {
       'confirmado',
       'confirmado_em',
       'pagamento_confirmado_em',
+      'archived_at',
+      'archived_by',
+      'archived_reason',
       'subtotal',
       'entrega',
       'total',
       'brinde',
-      'pedido_itens(id, produto_id, nome, variacao, quantidade, preco_unitario, total, imagem)',
-    ].join(', ');
+      'pedido_itens(id, produto_id, variacao_id, nome, variacao, quantidade, preco_unitario, total, imagem)',
+    ];
+    const extendedSelect = extendedSelectFields.join(', ');
     const baseSelect =
       'id, codigo, created_at, cliente_nome, cliente_email, cliente_telefone, endereco_entrega, observacao, pagamento, status, total';
 
     let { data, error } = await api.from('pedidos').select(extendedSelect).order('created_at', { ascending: false });
+
+    if (error && isMissingSchemaError(error, ['archived_at', 'archived_by', 'archived_reason', 'variacao_id'])) {
+      console.warn('[Admin] Campos da etapa 7 ausentes; tentando pedidos sem historico formal.', error);
+      if (normalize(`${error?.message || ''} ${error?.details || ''}`).includes('archived')) ordersArchiveReady = false;
+      setDatabaseAlert(
+        'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar arquivamento e historico real de pedidos.',
+      );
+      const retrySelect = extendedSelectFields
+        .filter((field) => !['archived_at', 'archived_by', 'archived_reason'].includes(field))
+        .map((field) => field.replace('variacao_id, ', ''))
+        .join(', ');
+      const fallback = await api.from('pedidos').select(retrySelect).order('created_at', { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error && isMissingSchemaError(error, ['pagamento_status', 'confirmado'])) {
       console.warn('[Admin] Busca completa de pedidos falhou, tentando campos basicos.', error);
@@ -742,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
       error = fallback.error;
     } else if (!error) {
       ordersExtendedReady = true;
+      if (ordersArchiveReady !== false) ordersArchiveReady = true;
     }
 
     if (error || !data) {
@@ -816,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function orderCardHTML(order, highlightId = '') {
     const highlighted = highlightId && order.id === highlightId;
     const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
-    const archived = Boolean(order.archivedLocal);
+    const archived = Boolean(order.archivedAt);
     return `
       <article class="admin-order-card ${orderStatusClass(order.statusUi)} ${orderPaymentClass(payment)} ${order.confirmado ? 'is-confirmed' : 'is-unconfirmed'} ${highlighted ? 'is-new' : ''}" data-admin-order-card="${escapeHTML(order.id)}">
         <header>
@@ -848,9 +827,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fa-solid fa-box-open"></i>
             Restaurar
           </button>`
-              : `<button class="btn btn-secondary" type="button" data-admin-order-archive="${escapeHTML(order.id)}">
+              : `<button class="btn btn-secondary" type="button" data-admin-order-archive="${escapeHTML(order.id)}" ${ordersArchiveReady ? '' : 'disabled'}>
             <i class="fa-solid fa-box-archive"></i>
-            Arquivar
+            ${ordersArchiveReady ? 'Arquivar' : 'Aplique migração'}
           </button>`
           }
         </div>
@@ -860,10 +839,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderizarPedidosAdmin(pedidos = state.pedidos, options = {}) {
     const query = adminSearchQuery('#admin-order-search');
-    const archivedCount = pedidos.filter((order) => order.archivedLocal).length;
+    const archivedCount = pedidos.filter((order) => order.archivedAt).length;
     const activeCount = pedidos.length - archivedCount;
     const byArchive = pedidos.filter((order) =>
-      state.orderView === 'history' ? order.archivedLocal : !order.archivedLocal,
+      state.orderView === 'history' ? order.archivedAt : !order.archivedAt,
     );
     const visiblePedidos = query ? byArchive.filter((order) => orderMatchesSearch(order, query)) : byArchive;
     const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
@@ -899,7 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (badge) badge.textContent = String(count);
     });
 
-    const openCount = unreadAdminOrders(pedidos.filter((order) => !order.archivedLocal)).length;
+    const openCount = unreadAdminOrders(pedidos.filter((order) => !order.archivedAt)).length;
     const badge = qs('#badge-pedidos');
     if (badge) badge.textContent = String(openCount);
     if (badge) {
@@ -1001,6 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pedidos = state.pedidos.map((order) => (order.id === pedidoId ? { ...order, status, statusUi } : order));
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_status', 'pedido', pedidoId, { status });
+    await registrarPedidoEvento(pedidoId, 'status_alterado', { status_novo: status });
     await carregarPedidosAdmin({ highlightId: pedidoId });
     showToast('Status do pedido atualizado.', 'success');
     return true;
@@ -1052,6 +1032,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_pagamento', 'pedido', pedidoId, { pagamento_status: pagamentoStatus });
+    await registrarPedidoEvento(pedidoId, 'pagamento_alterado', { pagamento_status: pagamentoStatus });
     showToast('Pagamento atualizado.', 'success');
     return true;
   }
@@ -1092,6 +1073,97 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarPedidosAdmin(state.pedidos, { highlightId: pedidoId });
     await logAdminAction('pedido_confirmado', 'pedido', pedidoId, { confirmado: true });
     showToast('Pedido confirmado.', 'success');
+    return true;
+  }
+
+  async function registrarPedidoEvento(pedidoId, tipo, payload = {}) {
+    const api = client();
+    if (!api || !pedidoId || orderEventsReady === false) return false;
+    const { error } = await api.from('pedido_eventos').insert({
+      pedido_id: pedidoId,
+      tipo,
+      status_anterior: payload.status_anterior || null,
+      status_novo: payload.status_novo || null,
+      payload,
+      created_by: state.user?.id || null,
+    });
+    if (error) {
+      orderEventsReady = false;
+      console.warn('[Admin] pedido_eventos indisponivel. Aplique a migracao da etapa 7.', error);
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para registrar eventos reais de pedidos.');
+      return false;
+    }
+    return true;
+  }
+
+  async function archiveOrderAdmin(pedidoId) {
+    const api = client();
+    if (!api || !pedidoId) return false;
+    if (!ordersArchiveReady) {
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.');
+      showToast('Aplique a migracao da etapa 7 para arquivar pedidos.', 'error');
+      return false;
+    }
+
+    const archivedAt = new Date().toISOString();
+    const { error } = await api
+      .from('pedidos')
+      .update({
+        archived_at: archivedAt,
+        archived_by: state.user?.id || null,
+        archived_reason: 'Arquivado no painel administrativo',
+      })
+      .eq('id', pedidoId);
+
+    if (error) {
+      ordersArchiveReady = false;
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos no Supabase.');
+      showToast(friendlyDbError(error, 'Nao consegui arquivar o pedido.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    await registrarPedidoEvento(pedidoId, 'pedido_arquivado', { archived_at: archivedAt });
+    state.pedidos = state.pedidos.map((order) =>
+      String(order.id) === String(pedidoId)
+        ? { ...order, archivedAt, archivedBy: state.user?.id || null, archivedReason: 'Arquivado no painel administrativo' }
+        : order,
+    );
+    renderizarPedidosAdmin(state.pedidos);
+    renderFinanceiro();
+    showToast('Pedido guardado no historico.', 'success');
+    return true;
+  }
+
+  async function restoreOrderAdmin(pedidoId) {
+    const api = client();
+    if (!api || !pedidoId) return false;
+    if (!ordersArchiveReady) {
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para restaurar pedidos do historico.');
+      showToast('Aplique a migracao da etapa 7 para restaurar pedidos.', 'error');
+      return false;
+    }
+
+    const { error } = await api
+      .from('pedidos')
+      .update({ archived_at: null, archived_by: null, archived_reason: null })
+      .eq('id', pedidoId);
+
+    if (error) {
+      ordersArchiveReady = false;
+      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para restaurar pedidos no Supabase.');
+      showToast(friendlyDbError(error, 'Nao consegui restaurar o pedido.'), 'error');
+      await carregarPedidosAdmin();
+      return false;
+    }
+
+    await registrarPedidoEvento(pedidoId, 'pedido_restaurado', {});
+    state.pedidos = state.pedidos.map((order) =>
+      String(order.id) === String(pedidoId) ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' } : order,
+    );
+    renderizarPedidosAdmin(state.pedidos);
+    renderFinanceiro();
+    showToast('Pedido voltou para a tela principal.', 'success');
     return true;
   }
 
@@ -1142,7 +1214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.variacoes = [];
     if (!api || !ids.length) return [];
 
-    const { data, error } = await api
+    let { data, error } = await api
       .from('produto_variacoes')
       .select(PRODUCT_VARIATION_SELECT)
       .in('produto_id', ids)
@@ -1151,11 +1223,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error) {
       if (isMissingVariationTableError(error)) {
-        setDatabaseAlert(
-          'Execute supabase/20260522-produto-variacoes.sql para gerenciar variacoes no painel.',
-        );
+        const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+        if (message.includes('preco_promocional') || message.includes('oferta_ativa') || message.includes('oferta_inicio') || message.includes('oferta_fim') || message.includes('estoque_minimo')) {
+          variationsExtendedReady = false;
+          setDatabaseAlert(
+            'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar oferta formal por opcao.',
+          );
+          const fallback = await api
+            .from('produto_variacoes')
+            .select(PRODUCT_VARIATION_BASIC_SELECT)
+            .in('produto_id', ids)
+            .order('ordem', { ascending: true })
+            .order('nome', { ascending: true });
+          data = fallback.data;
+          error = fallback.error;
+        } else {
+          setDatabaseAlert('Execute supabase/20260522-produto-variacoes.sql para gerenciar variacoes no painel.');
+          return [];
+        }
+      } else {
+        showToast(friendlyDbError(error, 'Nao consegui carregar as variacoes.'), 'error');
         return [];
       }
+    }
+
+    if (!error && variationsExtendedReady !== false) variationsExtendedReady = true;
+    if (error) {
       showToast(friendlyDbError(error, 'Nao consegui carregar as variacoes.'), 'error');
       return [];
     }
@@ -1381,11 +1474,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function variationOfferAttrs(variation = {}) {
-    const attrs = variation.atributos && typeof variation.atributos === 'object' ? variation.atributos : {};
-    return attrs.oferta && typeof attrs.oferta === 'object' ? attrs.oferta : attrs;
-  }
-
   function productVariationsEditorHTML(product = {}) {
     const variations = productVariations(product.id);
     return `
@@ -1404,8 +1492,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   .map((variation) => {
                     const active = variation.ativo !== false;
                     const stock = variation.estoque ?? '';
-                    const offer = variationOfferAttrs(variation);
-                    const offerActive = Boolean(offer.oferta_ativa || offer.offerActive);
+                    const offerActive = Boolean(variation.oferta_ativa);
                     return `
                     <article class="admin-variation-row ${active ? '' : 'is-inactive'}">
                       <div class="admin-variation-media">
@@ -1436,13 +1523,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             </select>
                           </label>
                           <label>Preco de oferta
-                            <input type="number" min="0" step="0.01" value="${offer.preco_promocional ? Number(offer.preco_promocional).toFixed(2) : ''}" data-admin-variation-field="preco_promocional" data-variation-id="${escapeHTML(variation.id)}">
+                            <input type="number" min="0" step="0.01" value="${variation.preco_promocional ? Number(variation.preco_promocional).toFixed(2) : ''}" data-admin-variation-field="preco_promocional" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
                           <label>Oferta comeca
-                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(offer.oferta_inicio || offer.offerStartsAt))}" data-admin-variation-field="oferta_inicio" data-variation-id="${escapeHTML(variation.id)}">
+                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_inicio))}" data-admin-variation-field="oferta_inicio" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
                           <label>Oferta termina
-                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(offer.oferta_fim || offer.offerEndsAt))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
+                            <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_fim))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
                           <label class="admin-variation-image-url">Imagem
                             <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
@@ -1463,9 +1550,9 @@ document.addEventListener('DOMContentLoaded', () => {
                           <i class="fa-solid ${active ? 'fa-eye-slash' : 'fa-eye'}"></i>
                           ${active ? 'Desativar' : 'Ativar'}
                         </button>
-                        <button class="btn btn-secondary" type="button" data-admin-variation-offer-24="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}">
+                        <button class="btn btn-secondary" type="button" data-admin-variation-offer-24="${escapeHTML(variation.id)}" data-product-id="${escapeHTML(product.id)}" ${variationsExtendedReady ? '' : 'disabled'}>
                           <i class="fa-solid fa-bolt"></i>
-                          Oferta 24h
+                          ${variationsExtendedReady ? 'Oferta 24h' : 'Aplique SQL'}
                         </button>
                       </div>
                     </article>
@@ -1654,10 +1741,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function variationPayloadFromEditor(variationId) {
     const field = (name) => variationField(variationId, name);
     const name = field('nome')?.value.trim() || '';
-    const offerActive = field('oferta_ativa')?.value === 'true';
-    const current = state.variacoes.find((variation) => String(variation.id) === String(variationId)) || {};
-    const currentAttrs = current.atributos && typeof current.atributos === 'object' ? current.atributos : {};
-    return {
+    const payload = {
       nome: name,
       slug: safeSlug(name),
       preco: parsePrice(field('preco')?.value || 0),
@@ -1665,14 +1749,15 @@ document.addEventListener('DOMContentLoaded', () => {
         field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
       ativo: field('ativo')?.value !== 'false',
       imagem: ensureSafeProductImageValue(field('imagem')?.value || ''),
-      atributos: {
-        ...currentAttrs,
-        oferta_ativa: offerActive,
-        preco_promocional: offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null,
-        oferta_inicio: offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null,
-        oferta_fim: offerActive ? isoFromLocal(field('oferta_fim')?.value) : null,
-      },
     };
+    if (variationsExtendedReady) {
+      const offerActive = field('oferta_ativa')?.value === 'true';
+      payload.oferta_ativa = offerActive;
+      payload.preco_promocional = offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null;
+      payload.oferta_inicio = offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null;
+      payload.oferta_fim = offerActive ? isoFromLocal(field('oferta_fim')?.value) : null;
+    }
+    return payload;
   }
 
   function setVariationBusy(variationId, busy) {
@@ -1710,7 +1795,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId);
       }
       if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
-      if (!override && payload.atributos?.oferta_ativa && (!payload.atributos.preco_promocional || payload.atributos.preco_promocional <= 0)) {
+      if (!override && payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
         throw new Error('Informe o preco de oferta da opcao.');
       }
       if (payload.imagem) payload.imagem = ensureSafeProductImageValue(payload.imagem);
@@ -1761,7 +1846,6 @@ document.addEventListener('DOMContentLoaded', () => {
           field('estoque')?.value === '' ? null : Math.max(0, Math.round(parsePrice(field('estoque')?.value || 0))),
         ativo: true,
         imagem: ensureSafeProductImageValue(field('imagem')?.value || product.imagem || ''),
-        atributos: {},
         ordem: productVariations(productId).length * 10 + 10,
       };
       const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
@@ -2535,40 +2619,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function executeAdminSql(sql) {
-    const api = client();
-    if (!api?.rpc) {
-      showToast('RPC admin_execute_sql indisponível no cliente.', 'error');
-      return null;
+  async function copyAdminSql(sql) {
+    const textToCopy = text(sql).trim();
+    if (!textToCopy) {
+      showToast('Cole o SQL antes de copiar.', 'error');
+      return false;
     }
     try {
-      const { data, error } = await api.rpc('admin_execute_sql', { p_sql: sql });
-      if (error) {
-        showToast(friendlyDbError(error, 'Erro ao executar SQL.'), 'error');
-        await logAdminAction('sql_failed', 'console', state.user?.id, { error: error?.message || '' });
-        return null;
-      }
-      showToast('SQL executado. Verifique logs.', 'success');
-      await logAdminAction('sql_executed', 'console', state.user?.id, { sql: sql.slice(0, 1200) });
-      // if data is returned, append a lightweight result entry
-      if (Array.isArray(data) && data.length) {
-        const preview = {
-          id: `local-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          action: 'sql_result',
-          actor_email: state.user?.email,
-          entity_type: 'rpc',
-          entity_id: '',
-          metadata: { rows: data.length },
-        };
-        const container = qs('#admin-console-logs');
-        if (container) container.insertAdjacentHTML('afterbegin', renderConsoleLogEntry(preview));
-      }
-      return data;
+      await navigator.clipboard.writeText(textToCopy);
+      showToast('SQL copiado. Execute manualmente no Supabase.', 'success');
+      await logAdminAction('sql_copiado', 'console', state.user?.id, { chars: textToCopy.length });
+      return true;
     } catch (err) {
-      console.warn('[Admin] Execucao SQL falhou', err);
-      showToast('Falha ao executar SQL.', 'error');
-      return null;
+      console.warn('[Admin] Nao consegui copiar SQL.', err);
+      showToast('Nao consegui copiar automaticamente. Selecione o texto e copie manualmente.', 'error');
+      return false;
     }
   }
 
@@ -2724,14 +2789,13 @@ document.addEventListener('DOMContentLoaded', () => {
       renderDeveloperAdmin();
     });
     qs('[data-admin-refresh-console]')?.addEventListener('click', () => carregarLogsConsole());
-    qs('#admin-sql-execute')?.addEventListener('click', async (event) => {
+    qs('#admin-sql-copy')?.addEventListener('click', async (event) => {
       event.preventDefault();
       const btn = event.currentTarget;
       const sql = qs('#admin-sql-console')?.value || '';
-      if (!sql.trim()) return showToast('SQL vazio.', 'error');
       try {
         if (btn) btn.disabled = true;
-        await executeAdminSql(sql);
+        await copyAdminSql(sql);
       } finally {
         if (btn) btn.disabled = false;
       }
@@ -2861,16 +2925,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const variationOffer24 = event.target.closest('[data-admin-variation-offer-24]');
       if (variationOffer24) {
+        if (!variationsExtendedReady) {
+          setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para criar oferta por opcao.');
+          showToast('Aplique a migracao da etapa 7 para usar oferta por opcao.', 'error');
+          return;
+        }
         const variation = state.variacoes.find((item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24));
         const price = Number(variation?.preco || 0);
         salvarVariacaoAdmin(variationOffer24.dataset.adminVariationOffer24, variationOffer24.dataset.productId, {
-          atributos: {
-            ...(variation?.atributos && typeof variation.atributos === 'object' ? variation.atributos : {}),
-            oferta_ativa: true,
-            preco_promocional: Math.max(0, Number((price * 0.9).toFixed(2))),
-            oferta_inicio: new Date().toISOString(),
-            oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          },
+          oferta_ativa: true,
+          preco_promocional: Math.max(0, Number((price * 0.9).toFixed(2))),
+          oferta_inicio: new Date().toISOString(),
+          oferta_fim: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         });
         return;
       }
@@ -2926,12 +2992,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const restoreOrder = event.target.closest('[data-admin-order-restore]');
       if (restoreOrder) {
         restoreOrderAdmin(restoreOrder.dataset.adminOrderRestore);
-        return;
-      }
-
-      const deleteOrder = event.target.closest('[data-admin-order-delete]');
-      if (deleteOrder) {
-        excluirPedidoAdmin(deleteOrder.dataset.adminOrderDelete);
         return;
       }
 
@@ -2993,7 +3053,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.carregarEquipeAdmin = carregarEquipeAdmin;
   window.atualizarCargoUsuario = atualizarCargoUsuario;
   window.carregarLogsConsole = carregarLogsConsole;
-  window.executeAdminSql = executeAdminSql;
+  window.copyAdminSql = copyAdminSql;
   window.renderDevConsole = renderDevConsole;
 
   window.switchTab = renderAdminTab;
