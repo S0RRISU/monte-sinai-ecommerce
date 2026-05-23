@@ -101,9 +101,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyAdminTheme(theme = localStorage.getItem(ADMIN_THEME_KEY) || 'dark') {
     const resolved = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themeMode = resolved;
     document.body.classList.toggle('light-mode', resolved === 'light');
+    document.body.dataset.theme = resolved;
+    document.body.dataset.themeMode = resolved;
+    document.body.dataset.themeResolved = resolved;
     document.body.dataset.adminTheme = resolved;
-    qs('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f4f8ff' : '#00061f');
+    qs('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#eef3f8' : '#091525');
     qsa('[data-admin-theme-toggle]').forEach((button) => {
       button.setAttribute('aria-pressed', String(resolved === 'light'));
       const label = resolved === 'light' ? 'Tema escuro' : 'Tema claro';
@@ -263,8 +268,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toast = document.createElement('div');
     toast.className = `admin-toast admin-toast-${type}`;
-    toast.textContent = message;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    const icon =
+      {
+        success: 'fa-circle-check',
+        error: 'fa-circle-exclamation',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-circle-info',
+      }[type] || 'fa-circle-info';
+    toast.innerHTML = `
+      <span class="admin-toast-icon"><i class="fa-solid ${icon}"></i></span>
+      <span class="admin-toast-message">${escapeHTML(message)}</span>
+      <button class="admin-toast-close" type="button" aria-label="Fechar aviso"><i class="fa-solid fa-xmark"></i></button>
+    `;
     stack.appendChild(toast);
+    qs('.admin-toast-close', toast)?.addEventListener('click', () => {
+      toast.classList.remove('show');
+      window.setTimeout(() => toast.remove(), 180);
+    });
     requestAnimationFrame(() => toast.classList.add('show'));
     window.setTimeout(() => {
       toast.classList.remove('show');
@@ -1334,21 +1355,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="admin-product-badges">${statusBadges}</span>
             </div>
             <div class="admin-product-quick-actions">
-              <button class="btn btn-secondary" type="button" data-admin-product-details="${escapeHTML(product.id)}">
-                <i class="fa-solid fa-eye"></i>
-                Ver detalhes
-              </button>
               <button class="btn btn-secondary" type="button" data-admin-product-edit="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-pen"></i>
                 Editar
               </button>
-              <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
-                <i class="fa-solid fa-ban"></i>
-                Esgotar
+              <button class="btn btn-secondary" type="button" data-admin-product-details="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-eye"></i>
+                Ver detalhes
               </button>
               <button class="btn btn-secondary" type="button" data-admin-product-offer-24="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-bolt"></i>
                 Oferta 24h
+              </button>
+              <button class="btn btn-secondary" type="button" data-admin-product-stock-zero="${escapeHTML(product.id)}">
+                <i class="fa-solid fa-ban"></i>
+                Esgotar
               </button>
               <button class="btn btn-secondary admin-danger" type="button" data-admin-product-delete="${escapeHTML(product.id)}">
                 <i class="fa-solid fa-trash"></i>
@@ -1494,8 +1515,9 @@ document.addEventListener('DOMContentLoaded', () => {
       <section class="admin-product-variations">
         <header>
           <div>
-            <span class="eyebrow">Variacoes</span>
-            <h3>Opcoes deste produto</h3>
+            <span class="eyebrow">Produto principal separado das opcoes</span>
+            <h3>Opcoes/variacoes</h3>
+            <p>Use uma oferta por opcao quando precisar: por exemplo, so Ultragas em promocao.</p>
           </div>
           <small>${variations.length ? `${variations.length} cadastrada${variations.length === 1 ? '' : 's'}` : 'Nenhuma variacao cadastrada'}</small>
         </header>
@@ -1627,9 +1649,26 @@ document.addEventListener('DOMContentLoaded', () => {
         <label class="admin-product-edit-wide">Imagem do produto
           <input type="url" value="${escapeHTML(product.imagem || '')}" data-admin-product-field="imagem" data-product-id="${escapeHTML(product.id)}" placeholder="https://...">
         </label>
-        <label class="admin-product-edit-wide">Enviar nova imagem
-          <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-product-image-file="${escapeHTML(product.id)}">
-        </label>
+        <div class="admin-product-edit-wide admin-product-photo-box">
+          <strong>Foto do produto</strong>
+          <div class="admin-product-photo-actions">
+            <label class="admin-upload-label">
+              <i class="fa-solid fa-camera"></i>
+              Tirar foto
+              <input type="file" accept="image/*" capture="environment" data-admin-product-image-file-camera="${escapeHTML(product.id)}">
+            </label>
+            <label class="admin-upload-label">
+              <i class="fa-solid fa-image"></i>
+              Escolher da galeria
+              <input type="file" accept="image/*" data-admin-product-image-file="${escapeHTML(product.id)}">
+            </label>
+            <button class="btn btn-secondary" type="button" data-admin-product-image-clear="${escapeHTML(product.id)}">
+              <i class="fa-solid fa-xmark"></i>
+              Remover imagem
+            </button>
+          </div>
+          <div class="admin-image-preview admin-edit-image-preview hidden" data-admin-edit-image-preview="${escapeHTML(product.id)}" aria-live="polite"></div>
+        </div>
         <label>Estoque
           <input type="number" min="0" step="1" value="${escapeHTML(stock)}" data-admin-product-field="estoque" data-product-id="${escapeHTML(product.id)}">
         </label>
@@ -1920,7 +1959,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!override) {
-      const file = qs(`[data-admin-product-image-file="${escapeSelector(productId)}"]`)?.files?.[0] || null;
+      const file =
+        qs(`[data-admin-product-image-file-camera="${escapeSelector(productId)}"]`)?.files?.[0] ||
+        qs(`[data-admin-product-image-file="${escapeSelector(productId)}"]`)?.files?.[0] ||
+        null;
       if (file) {
         try {
           showToast('Enviando nova imagem...', 'info');
@@ -2128,6 +2170,29 @@ document.addEventListener('DOMContentLoaded', () => {
       preview.innerHTML = `
         <img src="${escapeHTML(reader.result || '')}" alt="Previa da imagem do produto">
         <span>Imagem escolhida. Voce pode trocar antes de salvar.</span>
+      `;
+    };
+    reader.onerror = () => {
+      preview.classList.add('hidden');
+      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderEditProductImagePreview(productId, file) {
+    const preview = qs(`[data-admin-edit-image-preview="${escapeSelector(productId)}"]`);
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(reader.result || '')}" alt="Previa da nova imagem do produto">
+        <span>Nova imagem escolhida. Ela sera enviada ao salvar.</span>
       `;
     };
     reader.onerror = () => {
@@ -2872,6 +2937,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const payment = event.target.closest('[data-admin-order-payment]');
       if (payment) atualizarPagamentoPedido(payment.dataset.adminOrderPayment, payment.value);
+      const productImageFile = event.target.closest(
+        '[data-admin-product-image-file], [data-admin-product-image-file-camera]',
+      );
+      if (productImageFile) {
+        renderEditProductImagePreview(
+          productImageFile.dataset.adminProductImageFile || productImageFile.dataset.adminProductImageFileCamera,
+          productImageFile.files?.[0] || null,
+        );
+        return;
+      }
       // Mudanca de cargo na aba Gerenciar Equipe
       const teamSelect = event.target.closest('[data-admin-team-role]');
       if (teamSelect) {
@@ -2906,6 +2981,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const edit = event.target.closest('[data-admin-product-edit]');
       if (edit) {
         openProductEditor(edit.dataset.adminProductEdit);
+        return;
+      }
+
+      const imageClear = event.target.closest('[data-admin-product-image-clear]');
+      if (imageClear) {
+        const productId = imageClear.dataset.adminProductImageClear;
+        const imageInput = qs(`[data-admin-product-field="imagem"][data-product-id="${escapeSelector(productId)}"]`);
+        if (imageInput) imageInput.value = '';
+        qsa(
+          `[data-admin-product-image-file="${escapeSelector(productId)}"], [data-admin-product-image-file-camera="${escapeSelector(productId)}"]`,
+        ).forEach((input) => {
+          input.value = '';
+        });
+        renderEditProductImagePreview(productId, null);
+        showToast('Imagem removida. Salve o produto para confirmar.', 'info');
         return;
       }
 

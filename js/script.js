@@ -1008,6 +1008,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function productPriceHTML(product = {}, option = null, unavailable = false) {
+    if (unavailable) return 'Indisponivel';
+    const currentPrice = Number(option?.price ?? product.price ?? 0);
+    const originalPrice = Number(option?.originalPrice ?? product.originalPrice ?? currentPrice);
+    const hasOffer = Boolean(option?.offerActive ?? product.offerActive) && originalPrice > currentPrice;
+    return `${hasOffer ? `<span class="old-price">${formatMoney(originalPrice)}</span> ` : ''}${formatMoney(currentPrice)}`;
+  }
+
   function formatDateTime(value) {
     if (!value) return 'Sem data';
     const date = new Date(value);
@@ -1273,7 +1281,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (normalized.includes('organiz')) return 'organizacao';
     if (normalized.includes('utens')) return 'utensilios';
     if (normalized.includes('limpeza')) return 'limpeza';
-    return normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+    const slug = normalized.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'produtos';
+    return ['recomendado', 'recomendados', 'oferta', 'ofertas', 'promocao', 'promocoes', 'kit', 'kits'].includes(slug)
+      ? 'produtos'
+      : slug;
   }
 
   function categoryOrderIndex(slug) {
@@ -2466,6 +2477,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (['produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) {
+      const catalogInput = qs('[data-catalog-search]') || qs('[data-full-catalog-search]');
+      if (catalogInput) {
+        catalogInput.value = term;
+        if (catalogInput.matches('[data-catalog-search]')) {
+          activateCatalogFilter('all');
+          applyCatalogFilters();
+          scrollCatalogToTop('smooth');
+        } else {
+          qsa('[data-full-catalog-filter]').forEach((button) =>
+            button.classList.toggle('active', button.dataset.fullCatalogFilter === 'all'),
+          );
+          renderFullCatalogPage();
+          qs('[data-full-catalog-list]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+    }
+
     openProductSearchModal(matches[0], matches, term);
   }
 
@@ -2992,6 +3022,57 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(close, Number(config.duration || 3600));
   }
 
+  function confirmDialog({
+    message,
+    title = 'Confirmar ação',
+    confirmLabel = 'Confirmar',
+    cancelLabel = 'Cancelar',
+    danger = false,
+  } = {}) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-dialog';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('aria-labelledby', 'confirm-dialog-title');
+      overlay.innerHTML = `
+        <button class="confirm-dialog-backdrop" type="button" data-confirm-cancel aria-label="${escapeHTML(cancelLabel)}"></button>
+        <article class="confirm-dialog-panel">
+          <div class="confirm-dialog-icon ${danger ? 'is-danger' : ''}">
+            <i class="fa-solid ${danger ? 'fa-trash-can' : 'fa-circle-question'}"></i>
+          </div>
+          <div class="confirm-dialog-copy">
+            <h2 id="confirm-dialog-title">${escapeHTML(title)}</h2>
+            <p>${escapeHTML(message || 'Deseja continuar?')}</p>
+          </div>
+          <div class="confirm-dialog-actions">
+            <button class="btn btn-secondary" type="button" data-confirm-cancel>${escapeHTML(cancelLabel)}</button>
+            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" type="button" data-confirm-accept>${escapeHTML(confirmLabel)}</button>
+          </div>
+        </article>
+      `;
+
+      const finish = (answer) => {
+        overlay.classList.remove('show');
+        window.setTimeout(() => overlay.remove(), 160);
+        document.removeEventListener('keydown', onKeydown);
+        resolve(answer);
+      };
+      const onKeydown = (event) => {
+        if (event.key === 'Escape') finish(false);
+      };
+
+      overlay.addEventListener('click', (event) => {
+        if (event.target.closest('[data-confirm-accept]')) finish(true);
+        if (event.target.closest('[data-confirm-cancel]')) finish(false);
+      });
+      document.addEventListener('keydown', onKeydown);
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('show'));
+      qs('[data-confirm-accept]', overlay)?.focus();
+    });
+  }
+
   function applySavedTheme() {
     if (!localStorage.getItem(STORAGE.theme)) localStorage.removeItem(STORAGE.legacyTheme);
     setThemeMode(currentThemeMode(), false);
@@ -3033,10 +3114,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeMode = THEME_MODES.includes(mode) ? mode : 'system';
     const resolvedTheme = resolveThemeMode(themeMode);
     const isLight = resolvedTheme !== 'dark';
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.dataset.themeMode = themeMode;
     document.body.classList.toggle('light-mode', isLight);
+    document.body.dataset.theme = resolvedTheme;
     document.body.dataset.themeMode = themeMode;
     document.body.dataset.themeResolved = resolvedTheme;
-    qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#f4f9ff' : '#00061f');
+    qs('meta[name="theme-color"]')?.setAttribute('content', isLight ? '#eef3f8' : '#091525');
     if (persist) localStorage.setItem(STORAGE.theme, themeMode);
     updateThemeControls();
   }
@@ -3139,7 +3223,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `
         <a class="hidden nav-admin-link" href="${adminPanelHref()}" data-admin-panel-link="nav">
           <span class="nav-admin-label">Admin</span>
-          <span class="admin-order-badge is-empty" data-admin-order-count aria-label="0 pedidos pendentes">0</span>
         </a>
       `,
       );
@@ -3587,8 +3670,11 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-client-orders-link]').forEach((link) => {
       if (!(link instanceof HTMLAnchorElement)) return;
       link.href = ordersHref();
+      const badge = count > 0
+        ? `<span class="admin-order-badge" data-client-order-count>${count}</span>`
+        : '<span class="admin-order-badge is-empty" data-client-order-count hidden aria-hidden="true"></span>';
       link.innerHTML = admin
-        ? `<span class="nav-orders-label">Controle</span><span class="admin-order-badge ${count ? '' : 'is-empty'}" data-client-order-count>${count}</span>`
+        ? `<span class="nav-orders-label">Controle</span>${badge}`
         : 'Pedidos';
       link.classList.toggle('nav-orders-link', admin);
       link.classList.toggle('has-pending-orders', admin && count > 0);
@@ -3616,10 +3702,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const anyVisible = qsa('[data-admin-orders-link]').some((link) => !link.classList.contains('hidden'));
     const shouldShow = visible ?? anyVisible;
     setAdminOrderLinksVisible(Boolean(shouldShow));
-    qsa('[data-admin-order-count], [data-client-order-count]').forEach((badge) => {
-      badge.textContent = String(count);
-      badge.classList.toggle('is-empty', count === 0);
-      badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
+    qsa('[data-client-order-count]').forEach((badge) => {
+      const empty = count === 0;
+      badge.textContent = empty ? '' : String(count);
+      badge.classList.toggle('is-empty', empty);
+      badge.hidden = empty;
+      badge.setAttribute('aria-hidden', String(empty));
+      if (empty) {
+        badge.style.setProperty('display', 'none', 'important');
+        badge.removeAttribute('aria-label');
+      } else {
+        badge.style.removeProperty('display');
+        badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
+      }
     });
     qsa('[data-admin-orders-link]').forEach((link) => {
       link.classList.toggle('has-pending-orders', count > 0);
@@ -3823,12 +3918,14 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (link.hasAttribute('data-admin-orders-link')) {
         active = page === 'painel.html' && adminOrderHashes.includes(location.hash);
       } else if (link.hasAttribute('data-admin-panel-link')) {
-        active = page === 'painel.html' && !(link.closest('.mobile-menu') && adminOrderHashes.includes(location.hash));
+        active = page === 'painel.html' && !adminOrderHashes.includes(location.hash);
       } else if (href.includes('#') && page === 'painel.html') {
         active = linkPage === page && location.hash === `#${href.split('#')[1]}`;
       }
 
       link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
     });
     updateDockActive();
   }
@@ -3907,6 +4004,14 @@ document.addEventListener('DOMContentLoaded', () => {
         qsa('.search-suggestions').forEach(hideSearchSuggestions);
       }
     });
+
+    if (document.body.dataset.searchOutsideBound !== 'true') {
+      document.body.dataset.searchOutsideBound = 'true';
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-site-search-form]') || event.target.closest('[data-nav-search-toggle]')) return;
+        qsa('.search-suggestions').forEach(hideSearchSuggestions);
+      });
+    }
 
     qsa('[data-mobile-search]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -4109,7 +4214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const preferredWidth = Math.max(300, Math.min(440, rect.width < 260 ? 360 : rect.width));
     const width = Math.min(preferredWidth, window.innerWidth - margin * 2);
     const left = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin);
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const top = rect.bottom + 12;
     const maxHeight = Math.max(180, window.innerHeight - top - margin);
 
     suggestions.classList.add('is-positioned');
@@ -4337,8 +4442,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function productStockText(product = {}) {
     const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Esgotado';
-    return 'Disponivel';
+    if (normalized.stockState === 'out') return 'Indisponivel no momento';
+    return '';
   }
 
   function customerAvailabilityText(product = {}, option = null) {
@@ -4348,8 +4453,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function optionStockText(option = {}, product = {}) {
-    if (optionOutOfStock(option)) return 'Esgotado';
-    return 'Disponivel';
+    if (optionOutOfStock(option)) return 'Indisponivel no momento';
+    return '';
   }
 
   function optionOutOfStock(option = {}) {
@@ -4372,7 +4477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4403,11 +4508,13 @@ document.addEventListener('DOMContentLoaded', () => {
       variationId,
       name,
       price: Number.isFinite(price) ? price : 0,
+      originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
+      offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
       stock: null,
       image,
       out,
       stockText: out ? 'Indisponivel no momento' : '',
-      statusText: out ? 'Indisponivel' : 'Disponivel',
+      statusText: out ? 'Indisponivel no momento' : '',
     };
   }
 
@@ -4428,7 +4535,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const stockBadge = productCard?.querySelector('.stock-badge');
 
     if (priceEl) {
-      priceEl.textContent = state.out ? 'Indisponivel' : formatMoney(state.price);
+      priceEl.innerHTML = productPriceHTML(
+        { price: state.price, originalPrice: state.originalPrice, offerActive: state.offerActive },
+        null,
+        state.out,
+      );
       priceEl.classList.toggle('product-unavailable', state.out);
     }
     if (stockLine) {
@@ -4450,11 +4561,13 @@ document.addEventListener('DOMContentLoaded', () => {
       statusBadge.classList.toggle('is-out', state.out);
       statusBadge.classList.toggle('is-ok', !state.out);
       statusBadge.classList.toggle('is-low', false);
+      statusBadge.classList.toggle('hidden', !state.statusText);
     }
     productCard?.classList.toggle('is-out-of-stock', state.out);
     fullCatalogItem?.classList.toggle('is-out-of-stock', state.out);
     if (stockBadge) {
-      stockBadge.textContent = state.out ? 'Esgotado' : 'Disponivel';
+      stockBadge.textContent = state.out ? 'Indisponivel' : '';
+      stockBadge.classList.toggle('hidden', !state.out);
     }
     if (button) {
       button.dataset.price = String(state.price);
@@ -4467,7 +4580,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.setAttribute('aria-disabled', String(state.out));
       button.classList.toggle('btn-primary', !state.out);
       button.classList.toggle('btn-esgotado', state.out);
-      button.innerHTML = state.out ? 'Esgotado' : 'Adicionar';
+      button.innerHTML = state.out ? 'Indisponivel' : 'Adicionar';
     }
   }
 
@@ -4489,7 +4602,6 @@ document.addEventListener('DOMContentLoaded', () => {
       normalized.offerActive ? 'is-offer-product' : '',
       normalized.isKit ? 'is-kit-product' : '',
       outOfStock ? 'is-out-of-stock' : '',
-      lowStock ? 'is-low-stock' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -4498,10 +4610,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
         ${
           outOfStock
-            ? '<span class="recommended-badge stock-badge">Esgotado</span>'
-            : lowStock
-              ? '<span class="recommended-badge stock-badge">Poucas unidades</span>'
-              : normalized.offerActive
+            ? '<span class="recommended-badge stock-badge">Indisponivel</span>'
+            : normalized.offerActive
                 ? `<span class="recommended-badge offer-badge">${escapeHTML(offerCountdownText(normalized.offerEndsAt))}</span>`
                 : normalized.isKit
                   ? '<span class="recommended-badge kit-badge">Kit especial</span>'
@@ -4525,13 +4635,13 @@ document.addEventListener('DOMContentLoaded', () => {
         `
             : ''
         }
-        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
         <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
           customerAvailabilityText(normalized, hasOptions ? firstOption : null),
         )}</small>
         <div class="product-card-actions">
           ${
-            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Esgotado' : 'Adicionar'}</button>`
+            `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`
           }
           <button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">
             Ver detalhes
@@ -4674,7 +4784,8 @@ document.addEventListener('DOMContentLoaded', () => {
           originalPrice: optionOffers[0].originalPrice || optionOffers[0].price,
           promotionalPrice: optionOffers[0].promotionalPrice || optionOffers[0].price,
           offerEndsAt: optionOffers[0].offerEndsAt,
-          options: [...optionOffers, ...normalized.options.filter((option) => !optionOffers.includes(option))],
+          options: optionOffers,
+          hasVariations: true,
         };
       })
       .filter((product) => normalizeProduct(product).offerActive && normalizeProduct(product).stockState !== 'out');
@@ -4691,14 +4802,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function fullCatalogStatusText(product) {
     const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Fora da loja agora';
-    if (normalized.stock === null) return 'Disponivel';
-    return 'Disponivel';
+    if (normalized.stockState === 'out') return 'Indisponivel no momento';
+    return '';
   }
 
   function fullCatalogMatchesFilter(product, filter) {
     const normalized = normalizeProduct(product);
-    if (filter === 'available') return normalized.stockState !== 'out';
     if (filter === 'out') return normalized.stockState === 'out';
     if (filter === 'low') return normalized.stockState === 'low';
     if (filter === 'offers') return normalized.offerActive;
@@ -4710,7 +4819,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const key = normalized.id || normalized.name;
@@ -4721,13 +4829,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayImage = (hasOptions && firstOption.image) || image;
 
     return `
-      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''} ${lowStock ? 'is-low-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
+      <article class="full-catalog-item ${outOfStock ? 'is-out-of-stock' : ''}" data-full-catalog-product data-catalog-product-key="${escapeHTML(key)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}">
         <div class="full-catalog-media">
           ${productMediaHTML(normalized, displayImage)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
-            <span class="catalog-status-badge ${outOfStock ? 'is-out' : lowStock ? 'is-low' : 'is-ok'}">${escapeHTML(statusText)}</span>
+            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
@@ -4751,18 +4859,11 @@ document.addEventListener('DOMContentLoaded', () => {
           `
               : ''
           }
-          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
-          ${
-            outOfStock
-              ? `<button disabled class="btn btn-esgotado" type="button">
-                <i class="fa-solid fa-ban"></i>
-                Esgotado
-              </button>`
-              : `<span class="catalog-availability-note">
-                <i class="fa-solid fa-circle-check"></i>
-                Pronto para pedir
-              </span>`
-          }
+          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
+          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
+            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
+          </button>
           <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
             <i class="fa-solid fa-circle-info"></i>
             Ver detalhes
@@ -4795,10 +4896,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
-    const availableCount = products.filter((product) => normalizeProduct(product).stockState !== 'out').length;
+    const categoryCount = new Set(products.map((product) => normalizeProduct(product).categorySlug)).size;
     const outCount = products.filter((product) => normalizeProduct(product).stockState === 'out').length;
     setText('[data-full-catalog-total]', String(products.length));
-    setText('[data-full-catalog-available]', String(availableCount));
+    setText('[data-full-catalog-available]', String(categoryCount));
     setText('[data-full-catalog-out]', String(outCount));
 
     const grouped = orderedCategoryEntries(visible)
@@ -4882,7 +4983,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = qs('[data-catalog-detail-body]', modal);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const lowStock = normalized.stockState === 'low';
     const statusText = fullCatalogStatusText(normalized);
     const stockText = fullCatalogStockText(normalized);
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
@@ -4891,7 +4991,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const displayImage = (hasOptions && firstOption.image) || image;
-    const catalogOnly = currentPage() === 'catalogo.html';
 
     if (body) {
       body.innerHTML = `
@@ -4900,7 +4999,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
-            <span class="catalog-status-badge ${outOfStock ? 'is-out' : lowStock ? 'is-low' : 'is-ok'}">${escapeHTML(statusText)}</span>
+            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
@@ -4909,11 +5008,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
-            <div><span>Disponibilidade</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
+            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
+            <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
               hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
             )}</strong></div>
-            <div><span>Status</span><strong>${escapeHTML(statusText)}</strong></div>
+            <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
           ${
             hasOptions
@@ -4929,14 +5028,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           <div class="catalog-detail-actions">
             ${
-              catalogOnly
-                  ? `<span class="catalog-availability-note catalog-detail-note">
-              <i class="fa-solid fa-circle-check"></i>
-              ${selectedOutOfStock ? 'Indisponivel no momento' : 'Pronto para pedir'}
-            </span>`
-                  : `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
-              ${selectedOutOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
+              ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
             </button>`
             }
             <a class="btn btn-secondary" href="${productHref(normalized.name)}">
@@ -5037,7 +5131,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const rawTerm = qs('[data-catalog-search]')?.value || '';
     const term = normalizeText(rawTerm);
     const searchProducts = term ? catalogSearchProducts(rawTerm, 8) : [];
-    const activeChip = qs('.filter-chips [data-filter].active', catalogRoot);
+    const activeChip =
+      qs('.products-page .filter-chips [data-filter].active') ||
+      qs('.filter-chips [data-filter].active', catalogRoot) ||
+      qs('.filter-chips [data-filter].active');
     const filter = activeChip?.dataset.filter || 'all';
     let visible = 0;
 
@@ -5339,7 +5436,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function bindCartActions() {
-    document.body.addEventListener('click', (event) => {
+    document.body.addEventListener('click', async (event) => {
       const open = event.target.closest('[data-open-cart]');
       const close = event.target.closest('[data-close-cart]');
       const action = event.target.closest('[data-cart-action]');
@@ -5369,7 +5466,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (clearCart) {
-        clearCartItems();
+        await clearCartItems();
         return;
       }
 
@@ -5417,13 +5514,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (action.dataset.cartAction === 'increase') {
         if (item.stock !== null && item.stock !== undefined && item.quantity >= Number(item.stock)) {
-          showToast('Quantidade maxima em estoque no carrinho.');
+          showToast('Limite de quantidade atingido para este item.');
           return;
         }
         item.quantity += 1;
       }
       if (action.dataset.cartAction === 'decrease') item.quantity = Math.max(1, item.quantity - 1);
-      if (action.dataset.cartAction === 'remove') cart = cart.filter((entry) => entry.id !== id);
+      if (action.dataset.cartAction === 'remove') {
+        const confirmed = await confirmDialog({
+          title: 'Remover produto',
+          message: 'Remover este produto do carrinho?',
+          confirmLabel: 'Remover',
+          cancelLabel: 'Cancelar',
+          danger: true,
+        });
+        if (!confirmed) return;
+        cart = cart.filter((entry) => entry.id !== id);
+        showToast('Produto removido do carrinho.', { type: 'success' });
+      }
 
       saveCart();
       renderCart();
@@ -5463,13 +5571,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function clearCartItems(showMessage = true) {
+  async function clearCartItems(showMessage = true) {
     if (!cart.length) {
       if (showMessage) showToast('O carrinho já está vazio.');
       return;
     }
 
-    if (showMessage && !confirm('Deseja remover todos os produtos do carrinho?')) return;
+    if (showMessage) {
+      const confirmed = await confirmDialog({
+        title: 'Limpar carrinho',
+        message: 'Deseja remover todos os produtos do carrinho?',
+        confirmLabel: 'Limpar carrinho',
+        cancelLabel: 'Cancelar',
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
     cart = [];
     saveAppliedCoupon(null);
     saveCart();
@@ -5584,6 +5701,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('[data-cart-count], #cart-count').forEach((el) => {
       el.textContent = String(cartCount());
+      el.classList.toggle('is-empty', !hasItems);
     });
     qsa('[data-profile-cart-count]').forEach((el) => {
       el.textContent = String(cartCount());
@@ -5596,9 +5714,37 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('.cart-float, .nav-cart-link, .mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach(
       (button) => {
         button.classList.toggle('has-items', hasItems);
+        button.classList.toggle('cart-visible-items', hasItems);
         button.classList.toggle('is-empty', !hasItems);
       },
     );
+    qsa('.mobile-quick-dock .dock-cart, .mobile-menu-button[data-open-cart]').forEach((button) => {
+      const icon = button.querySelector('i');
+      const label = button.querySelector('span:not([data-cart-count])');
+      if (hasItems) {
+        button.style.setProperty('border-color', '#facc15', 'important');
+        button.style.setProperty('background', '#facc15', 'important');
+        button.style.setProperty(
+          'background-image',
+          'linear-gradient(145deg, #fff27a 0%, #facc15 56%, #d99a00 100%)',
+          'important',
+        );
+        button.style.setProperty('color', '#0f172a', 'important');
+        button.style.setProperty(
+          'box-shadow',
+          'inset 0 6px 11px rgba(255,255,255,.44), inset 0 -12px 18px rgba(118,77,0,.22), 0 8px 0 rgba(132,93,0,.78), 0 18px 30px rgba(0,0,0,.3), 0 0 0 8px rgba(250,204,21,.28)',
+          'important',
+        );
+        icon?.style.setProperty('color', '#0b3b86', 'important');
+        label?.style.setProperty('color', '#0f172a', 'important');
+      } else {
+        ['border-color', 'background', 'background-image', 'color', 'box-shadow'].forEach((property) =>
+          button.style.removeProperty(property),
+        );
+        icon?.style.removeProperty('color');
+        label?.style.removeProperty('color');
+      }
+    });
 
     const pageItems = qs('#cart-items');
     const modalItems = qs('[data-modal-cart-items]');
@@ -6929,7 +7075,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '#profile-provider',
       signed ? currentUser.provider || 'Supabase Auth' : 'Entre ou cadastre-se para salvar seus dados',
     );
-    setText('#profile-email', signed ? currentUser.email || 'Não informado' : 'Disponível após entrar ou cadastrar');
+    setText('#profile-email', signed ? currentUser.email || 'Não informado' : 'Aparece após entrar ou cadastrar');
     setText(
       '#profile-phone',
       signed ? currentUser.phone || 'Complete seu WhatsApp' : 'Salve seu WhatsApp em uma conta',
