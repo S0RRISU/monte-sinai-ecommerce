@@ -269,8 +269,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const toast = document.createElement('div');
     toast.className = `admin-toast admin-toast-${type}`;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    const icon =
+      {
+        success: 'fa-circle-check',
+        error: 'fa-circle-exclamation',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-circle-info',
+      }[type] || 'fa-circle-info';
     toast.innerHTML = `
-      <span class="admin-toast-icon"><i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}"></i></span>
+      <span class="admin-toast-icon"><i class="fa-solid ${icon}"></i></span>
       <span class="admin-toast-message">${escapeHTML(message)}</span>
       <button class="admin-toast-close" type="button" aria-label="Fechar aviso"><i class="fa-solid fa-xmark"></i></button>
     `;

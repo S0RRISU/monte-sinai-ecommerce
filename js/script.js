@@ -1008,6 +1008,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function productPriceHTML(product = {}, option = null, unavailable = false) {
+    if (unavailable) return 'Indisponivel';
+    const currentPrice = Number(option?.price ?? product.price ?? 0);
+    const originalPrice = Number(option?.originalPrice ?? product.originalPrice ?? currentPrice);
+    const hasOffer = Boolean(option?.offerActive ?? product.offerActive) && originalPrice > currentPrice;
+    return `${hasOffer ? `<span class="old-price">${formatMoney(originalPrice)}</span> ` : ''}${formatMoney(currentPrice)}`;
+  }
+
   function formatDateTime(value) {
     if (!value) return 'Sem data';
     const date = new Date(value);
@@ -3898,7 +3906,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (link.hasAttribute('data-admin-orders-link')) {
         active = page === 'painel.html' && adminOrderHashes.includes(location.hash);
       } else if (link.hasAttribute('data-admin-panel-link')) {
-        active = page === 'painel.html' && !(link.closest('.mobile-menu') && adminOrderHashes.includes(location.hash));
+        active = page === 'painel.html' && !adminOrderHashes.includes(location.hash);
       } else if (href.includes('#') && page === 'painel.html') {
         active = linkPage === page && location.hash === `#${href.split('#')[1]}`;
       }
@@ -4457,7 +4465,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return options
       .map((option) => {
         const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4488,6 +4496,8 @@ document.addEventListener('DOMContentLoaded', () => {
       variationId,
       name,
       price: Number.isFinite(price) ? price : 0,
+      originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
+      offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
       stock: null,
       image,
       out,
@@ -4513,7 +4523,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const stockBadge = productCard?.querySelector('.stock-badge');
 
     if (priceEl) {
-      priceEl.textContent = state.out ? 'Indisponivel' : formatMoney(state.price);
+      priceEl.innerHTML = productPriceHTML(
+        { price: state.price, originalPrice: state.originalPrice, offerActive: state.offerActive },
+        null,
+        state.out,
+      );
       priceEl.classList.toggle('product-unavailable', state.out);
     }
     if (stockLine) {
@@ -4609,7 +4623,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `
             : ''
         }
-        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+        <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
         <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
           customerAvailabilityText(normalized, hasOptions ? firstOption : null),
         )}</small>
@@ -4833,7 +4847,7 @@ document.addEventListener('DOMContentLoaded', () => {
           `
               : ''
           }
-          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong>
+          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
           <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
             <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
             ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
@@ -4982,7 +4996,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${selectedOutOfStock ? 'Indisponivel' : `${normalized.offerActive && normalized.originalPrice > normalized.price ? `<span class="old-price">${formatMoney(normalized.originalPrice)}</span> ` : ''}${formatMoney(firstOption.price || normalized.price)}`}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
             <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
               hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
             )}</strong></div>

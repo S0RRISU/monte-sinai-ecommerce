@@ -31240,3 +31240,676 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-search .searc
   background: #ef4444 !important;
   color: #ffffff !important;
 }
+
+/* Mobile cart dock: three-button contour with raised 3D cart. */
+@media (max-width: 760px) {
+  :root {
+    --mobile-dock-height: 108px;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+    --dock-bg-final: rgba(9, 22, 44, 0.96);
+    --dock-border-final: rgba(125, 169, 226, 0.44);
+    --dock-item-bg-final: rgba(19, 62, 104, 0.82);
+    --dock-item-text-final: #eef6ff;
+    --dock-icon-final: #1db4ff;
+    --dock-active-icon-final: #ffd21e;
+    --dock-cart-bg-final: linear-gradient(145deg, #173b7b 0%, #0b2452 58%, #07193f 100%);
+    --dock-cart-border-final: rgba(99, 161, 255, 0.96);
+    --dock-cart-shadow-final:
+      inset 0 6px 10px rgba(255, 255, 255, 0.13),
+      inset 0 -12px 18px rgba(0, 7, 28, 0.44),
+      0 8px 0 rgba(2, 12, 31, 0.82),
+      0 18px 28px rgba(0, 0, 0, 0.38),
+      0 0 0 8px rgba(65, 139, 255, 0.16);
+    position: fixed !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    z-index: 1200 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    align-items: center !important;
+    width: auto !important;
+    max-width: 584px !important;
+    height: 108px !important;
+    min-height: 108px !important;
+    max-height: 108px !important;
+    margin: 0 auto !important;
+    padding: 14px 14px 14px 14px !important;
+    border: 1px solid var(--dock-border-final) !important;
+    border-radius: 30px !important;
+    background: var(--dock-bg-final) !important;
+    box-shadow:
+      0 -12px 30px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    overflow: visible !important;
+    backdrop-filter: blur(18px) saturate(140%) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+    --dock-bg-final: rgba(247, 251, 255, 0.98);
+    --dock-border-final: rgba(25, 97, 188, 0.2);
+    --dock-item-bg-final: rgba(218, 237, 255, 0.96);
+    --dock-item-text-final: #082d63;
+    --dock-icon-final: #0d78de;
+    --dock-active-icon-final: #f0b900;
+    --dock-cart-bg-final: linear-gradient(145deg, #ffffff 0%, #eaf5ff 52%, #bddcff 100%);
+    --dock-cart-border-final: rgba(34, 118, 226, 0.92);
+    --dock-cart-shadow-final:
+      inset 0 7px 10px rgba(255, 255, 255, 0.96),
+      inset 0 -12px 18px rgba(19, 95, 202, 0.18),
+      0 7px 0 rgba(123, 174, 235, 0.88),
+      0 18px 28px rgba(12, 77, 166, 0.2),
+      0 0 0 8px rgba(34, 118, 226, 0.1);
+    box-shadow:
+      0 -12px 28px rgba(15, 83, 172, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock::before,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock::after,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock::before,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart),
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-link,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart),
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-link {
+    display: grid !important;
+    grid-template-rows: 32px auto !important;
+    place-items: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 78px !important;
+    min-height: 78px !important;
+    margin: 0 !important;
+    padding: 10px 6px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    color: var(--dock-item-text-final) !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart),
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart) {
+    border: 1px solid rgba(150, 198, 255, 0.78) !important;
+    background: var(--dock-item-bg-final) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 10px 18px rgba(0, 0, 0, 0.16) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-account-avatar,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a i,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) i,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-account-avatar {
+    display: grid !important;
+    width: 30px !important;
+    height: 30px !important;
+    place-items: center !important;
+    color: var(--dock-icon-final) !important;
+    font-size: 1.35rem !important;
+    line-height: 1 !important;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.12)) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart) i,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active i,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart) i {
+    color: var(--dock-active-icon-final) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a > span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) > span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-label,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a > span,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) > span,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-label {
+    max-width: 100% !important;
+    color: currentColor !important;
+    font-size: 0.73rem !important;
+    font-weight: 950 !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+    overflow: hidden !important;
+    text-align: center !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty {
+    position: relative !important;
+    display: grid !important;
+    grid-template-rows: 28px auto !important;
+    place-items: center !important;
+    justify-self: end !important;
+    align-self: center !important;
+    gap: 5px !important;
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
+    height: 88px !important;
+    min-height: 88px !important;
+    max-height: 88px !important;
+    margin: 0 -2px 0 0 !important;
+    padding: 22px 9px 16px !important;
+    border: 3px solid var(--dock-cart-border-final) !important;
+    border-radius: 999px !important;
+    outline: 2px solid rgba(91, 150, 235, 0.26) !important;
+    background: var(--dock-cart-bg-final) !important;
+    color: #eef7ff !important;
+    box-shadow: var(--dock-cart-shadow-final) !important;
+    transform: translateY(-16px) perspective(120px) rotateX(4deg) !important;
+    transform-origin: center bottom !important;
+    transition:
+      transform 0.16s ease,
+      box-shadow 0.16s ease,
+      filter 0.16s ease !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    color: #07366f !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart:active,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart:active {
+    transform: translateY(-12px) perspective(120px) rotateX(0deg) scale(0.98) !important;
+    filter: brightness(1.04) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart i,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart i {
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 !important;
+    color: #28b8ff !important;
+    font-size: 1.18rem !important;
+    line-height: 1 !important;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.22) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span {
+    position: static !important;
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    color: currentColor !important;
+    font-size: 0.7rem !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    overflow: hidden !important;
+    text-align: center !important;
+    text-overflow: ellipsis !important;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.24) !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count],
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count] {
+    position: absolute !important;
+    top: 3px !important;
+    right: 5px !important;
+    display: grid !important;
+    min-width: 25px !important;
+    width: 25px !important;
+    height: 25px !important;
+    place-items: center !important;
+    padding: 0 !important;
+    border: 2px solid #ffffff !important;
+    border-radius: 999px !important;
+    background: linear-gradient(180deg, #ffe45c 0%, #f5bd00 100%) !important;
+    color: #ffffff !important;
+    font-size: 0.76rem !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+    box-shadow:
+      0 3px 0 rgba(144, 94, 0, 0.3),
+      0 7px 12px rgba(0, 0, 0, 0.2) !important;
+    transform: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    outline-color: rgba(255, 210, 30, 0.26) !important;
+    filter: saturate(1.08) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-link .dock-account-avatar img,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-profile-link .dock-account-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: inherit !important;
+    object-fit: cover !important;
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --mobile-dock-height: 102px;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 84px minmax(0, 1fr) minmax(0, 1fr) !important;
+    height: 102px !important;
+    min-height: 102px !important;
+    max-height: 102px !important;
+    padding: 12px 12px 12px 10px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart),
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) {
+    padding-inline: 2px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+    height: 80px !important;
+    min-height: 80px !important;
+    max-height: 80px !important;
+    padding: 19px 7px 14px !important;
+  }
+}
+
+/* Etapa 8 final: active states, badges, compact toasts and button alignment. */
+.btn,
+button.btn,
+a.btn,
+.admin-upload-label,
+.admin-variation-upload,
+.mobile-menu-button,
+.nav-icon,
+.nav-pill,
+.icon-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 42px !important;
+  border-radius: 8px !important;
+  font-weight: 850 !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.product-card-actions,
+.full-catalog-actions,
+.settings-actions,
+.admin-product-quick-actions,
+.admin-variation-actions,
+.admin-product-photo-actions,
+.confirm-dialog-actions {
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+.product-card-actions .btn,
+.full-catalog-actions .btn,
+.admin-product-quick-actions .btn,
+.settings-actions .btn,
+.admin-variation-actions .btn,
+.admin-product-photo-actions .btn,
+.confirm-dialog-actions .btn {
+  width: 100% !important;
+  min-height: 44px !important;
+}
+
+@media (min-width: 1024px) {
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-inner,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-inner {
+    display: grid !important;
+    grid-template-columns: minmax(168px, 210px) minmax(560px, 1fr) minmax(240px, 320px) max-content !important;
+    gap: 14px !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu {
+    display: flex !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu a,
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu .nav-orders-link,
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu .nav-admin-link,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu .nav-orders-link,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu .nav-admin-link {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    padding: 9px 12px !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    font-size: 0.86rem !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .nav-admin-label,
+  body:not(.admin-shell-body):not(.auth-body) .nav-orders-label,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-admin-label,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-orders-label {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1179px) {
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-inner,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-inner {
+    grid-template-columns: minmax(150px, 180px) minmax(500px, 1fr) minmax(220px, 280px) max-content !important;
+    gap: 10px !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .navbar .nav-menu a {
+    padding-inline: 9px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu a.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-only-link.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button.active {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--line)) !important;
+  background: var(--accent) !important;
+  color: #0f172a !important;
+  box-shadow: 0 8px 18px rgba(250, 204, 21, 0.18) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu .nav-orders-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu .nav-admin-link:not(.active) {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--text-soft) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-admin-link .admin-order-badge {
+  display: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-orders-link .admin-order-badge {
+  display: inline-grid !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-cart-link.has-items,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .nav-cart-link,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].has-items,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-menu-button[data-open-cart] {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line)) !important;
+  background: var(--accent) !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 22px rgba(250, 204, 21, 0.18) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-cart-link.has-items i,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .nav-cart-link i,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu-button[data-open-cart].has-items i,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-menu-button[data-open-cart] i {
+  color: #0f172a !important;
+}
+
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
+    border-radius: 30px !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart) {
+    border: 1px solid rgba(255, 210, 30, 0.58) !important;
+    background: color-mix(in srgb, var(--accent) 18%, var(--dock-item-bg-final)) !important;
+    color: var(--dock-item-text-final) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 8px 18px rgba(0, 0, 0, 0.14) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button.active:not(.dock-cart) i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a.active .dock-account-avatar {
+    color: var(--dock-active-icon-final) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active {
+    border-color: var(--accent) !important;
+    background:
+      radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.2), transparent 30%),
+      linear-gradient(145deg, #ffd84d 0%, #facc15 44%, #0b4f9e 45%, #07356f 100%) !important;
+    color: #0f172a !important;
+    box-shadow:
+      inset 0 6px 10px rgba(255, 255, 255, 0.24),
+      inset 0 -12px 18px rgba(5, 32, 80, 0.26),
+      0 8px 0 rgba(102, 77, 0, 0.56),
+      0 18px 28px rgba(0, 0, 0, 0.28),
+      0 0 0 8px rgba(250, 204, 21, 0.16) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active i {
+    color: #0b65d8 !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart:not(.active):not(.has-items) {
+    filter: none !important;
+  }
+
+  .toast-stack {
+    bottom: calc(var(--mobile-dock-height, 108px) + 18px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .admin-toast-stack {
+    bottom: calc(var(--admin-bottom-nav-height, 66px) + 18px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+.toast-modern,
+.toast,
+.admin-toast {
+  max-width: 360px !important;
+  min-height: 0 !important;
+  border-radius: 14px !important;
+  padding: 10px !important;
+}
+
+.toast-copy span,
+.admin-toast-message {
+  overflow-wrap: anywhere !important;
+}
+
+.toast-success .toast-icon,
+.admin-toast-success .admin-toast-icon {
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-soft)) !important;
+  color: var(--success) !important;
+}
+
+.toast-error .toast-icon,
+.admin-toast-error .admin-toast-icon {
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-soft)) !important;
+  color: var(--danger) !important;
+}
+
+.toast-warning .toast-icon,
+.admin-toast-warning .admin-toast-icon {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-soft)) !important;
+  color: var(--accent) !important;
+}
+
+.admin-shell-body [data-admin-product-edit],
+.admin-shell-body [data-admin-product-save],
+.admin-shell-body [data-admin-variation-save],
+.admin-shell-body [data-admin-variation-add],
+.admin-shell-body [data-admin-team-save] {
+  border-color: color-mix(in srgb, var(--primary) 74%, var(--line)) !important;
+  background: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.admin-shell-body [data-admin-product-details] {
+  border-color: var(--line-strong) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-product-offer-24],
+.admin-shell-body [data-admin-variation-offer-24] {
+  border-color: #facc15 !important;
+  background: #facc15 !important;
+  color: #0f172a !important;
+}
+
+.admin-shell-body [data-admin-product-offer-end] {
+  border-color: color-mix(in srgb, #f59e0b 70%, var(--line)) !important;
+  background: color-mix(in srgb, #f59e0b 18%, var(--surface)) !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-product-stock-zero],
+.admin-shell-body [data-admin-variation-toggle][data-variation-active='true'] {
+  border-color: color-mix(in srgb, #f59e0b 64%, var(--line)) !important;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface)) !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-variation-toggle][data-variation-active='false'] {
+  border-color: color-mix(in srgb, var(--success) 64%, var(--line)) !important;
+  background: color-mix(in srgb, var(--success) 16%, var(--surface)) !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-product-delete],
+.admin-shell-body [data-admin-product-image-clear],
+.admin-shell-body .admin-danger {
+  border-color: #ef4444 !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.admin-shell-body .admin-upload-label,
+.admin-shell-body .admin-variation-upload {
+  border-color: var(--line-strong) !important;
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface)) !important;
+  color: var(--text) !important;
+}
+
+/* Final cart contrast fix: keep the mobile cart vivid and readable. */
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty {
+    border-color: rgba(98, 176, 255, 0.98) !important;
+    background:
+      radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.22), transparent 32%),
+      linear-gradient(145deg, #115aa8 0%, #0a3e87 48%, #05275f 100%) !important;
+    color: #ffffff !important;
+    box-shadow:
+      inset 0 6px 12px rgba(255, 255, 255, 0.2),
+      inset 0 -12px 18px rgba(0, 9, 35, 0.34),
+      0 8px 0 rgba(2, 21, 58, 0.86),
+      0 18px 28px rgba(0, 0, 0, 0.34),
+      0 0 0 8px rgba(40, 184, 255, 0.15) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    border-color: rgba(19, 106, 218, 0.95) !important;
+    background:
+      radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.96), transparent 34%),
+      linear-gradient(145deg, #ffffff 0%, #d8ecff 48%, #6aaef7 100%) !important;
+    color: #062a5d !important;
+    box-shadow:
+      inset 0 7px 10px rgba(255, 255, 255, 0.96),
+      inset 0 -12px 18px rgba(12, 92, 196, 0.2),
+      0 7px 0 rgba(88, 147, 218, 0.88),
+      0 18px 28px rgba(12, 77, 166, 0.22),
+      0 0 0 8px rgba(19, 106, 218, 0.1) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart,
+  body.cart-has-items:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart {
+    border-color: #facc15 !important;
+    background:
+      radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.32), transparent 32%),
+      linear-gradient(145deg, #ffe164 0%, #facc15 42%, #0d72db 43%, #07428b 100%) !important;
+    color: #071b3f !important;
+    box-shadow:
+      inset 0 6px 12px rgba(255, 255, 255, 0.28),
+      inset 0 -12px 18px rgba(4, 45, 105, 0.24),
+      0 8px 0 rgba(121, 88, 0, 0.62),
+      0 18px 28px rgba(0, 0, 0, 0.32),
+      0 0 0 8px rgba(250, 204, 21, 0.2) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart i {
+    color: #30c4ff !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25)) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items i,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-quick-dock .dock-cart i {
+    color: #083f91 !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span {
+    color: currentColor !important;
+    opacity: 1 !important;
+    font-size: 0.72rem !important;
+    font-weight: 1000 !important;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.34) !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span,
+  body.light-mode:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active span,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items span {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+  }
+}
