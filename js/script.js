@@ -1605,9 +1605,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearPublicProductShell() {
     if (!['index.html', 'produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) return;
     productIndex = [];
-    qsa('#todos-produtos .section-head, #todos-produtos .grid-produtos, [data-product-rail] .product-card, [data-promotions-grid] .product-card').forEach((node) =>
-      node.remove(),
-    );
+    qsa(
+      '#todos-produtos .section-head, #todos-produtos .grid-produtos:not([data-public-products-grid]), [data-product-rail] .product-card, [data-promotions-grid] .product-card',
+    ).forEach((node) => node.remove());
   }
 
   function pruneCartUnavailableProducts(products = []) {
@@ -2055,8 +2055,8 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     return {
       name,
-      category: card.dataset.category || match?.category || '',
-      terms: `${card.textContent || ''} ${match?.terms || ''}`,
+      category: card.dataset.categoryLabel || card.dataset.category || match?.category || '',
+      terms: `${card.dataset.terms || ''} ${card.textContent || ''} ${match?.terms || ''}`,
     };
   }
 
@@ -2482,7 +2482,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (catalogInput) {
         catalogInput.value = term;
         if (catalogInput.matches('[data-catalog-search]')) {
-          activateCatalogFilter('all');
           applyCatalogFilters();
           scrollCatalogToTop('smooth');
         } else {
@@ -2590,6 +2589,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = productOptions(activeSearchProduct, card);
     const preferredOption = options.find((option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''));
     const firstOption = preferredOption || options[0] || { price: activeSearchProduct.price || 0 };
+    const selectedUnavailable = activeSearchProduct.hasVariations
+      ? optionOutOfStock(firstOption)
+      : normalizeProduct(activeSearchProduct).stockState === 'out';
     const resultButtons =
       productSearchResults.length > 1
         ? `
@@ -2631,11 +2633,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="product-search-category">${escapeHTML(activeSearchProduct.category || 'Produto encontrado')}</span>
         <p>${escapeHTML(description)}</p>
         <strong data-product-search-price>${formatMoney(firstOption.price || activeSearchProduct.price)}</strong>
-        <small class="product-stock-line ${optionOutOfStock(firstOption) ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-          activeSearchProduct.hasVariations
-            ? customerAvailabilityText(activeSearchProduct, firstOption)
-            : customerAvailabilityText(activeSearchProduct),
-        )}</small>
+        ${
+          selectedUnavailable
+            ? `<small class="product-stock-line is-unavailable">${escapeHTML(customerAvailabilityText(activeSearchProduct, activeSearchProduct.hasVariations ? firstOption : null))}</small>`
+            : ''
+        }
         ${
           activeSearchProduct.hasVariations && options.length
             ? `
@@ -3934,7 +3936,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const page = currentPage();
     const activeSection = (() => {
       if (page === 'index.html') return 'home';
-      if (page === 'produtos.html' || page === 'catalogo.html') return 'store';
+      if (page === 'produtos.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
       if (
         [
@@ -4607,7 +4609,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .join(' ');
 
     return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
         ${
           outOfStock
             ? '<span class="recommended-badge stock-badge">Indisponivel</span>'
@@ -4624,6 +4626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
         <h3>${escapeHTML(normalized.name)}</h3>
+        <span class="product-category-label">${escapeHTML(normalized.category)}</span>
         <p>${escapeHTML(normalized.description || `Produto de ${normalized.category} pronto para adicionar ao pedido.`)}</p>
         ${normalized.kitItems ? `<p class="kit-items">${escapeHTML(normalized.kitItems)}</p>` : ''}
         ${
@@ -4636,9 +4639,11 @@ document.addEventListener('DOMContentLoaded', () => {
             : ''
         }
         <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
-        <small class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-          customerAvailabilityText(normalized, hasOptions ? firstOption : null),
-        )}</small>
+        ${
+          selectedOutOfStock
+            ? `<small class="product-stock-line is-unavailable">${escapeHTML(customerAvailabilityText(normalized, hasOptions ? firstOption : null))}</small>`
+            : ''
+        }
         <div class="product-card-actions">
           ${
             `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`
@@ -4695,9 +4700,35 @@ document.addEventListener('DOMContentLoaded', () => {
     return groups;
   }
 
+  function publicStoreProducts() {
+    return storeProducts().sort(compareCatalogProducts);
+  }
+
+  function renderPublicProductsPage() {
+    const grid = qs('[data-public-products-grid]');
+    if (!grid) return false;
+
+    renderDynamicFilters();
+    grid.innerHTML = publicStoreProducts().map((product) => productCardHTML(product, 'catalog')).join('');
+
+    let empty = qs('#catalog-empty');
+    if (!empty) {
+      empty = document.createElement('p');
+      empty.id = 'catalog-empty';
+      empty.className = 'empty-cart hidden';
+      empty.textContent = 'Nenhum produto encontrado com esse filtro.';
+      grid.insertAdjacentElement('afterend', empty);
+    }
+
+    applyCatalogFilters();
+    return true;
+  }
+
   function renderDynamicCatalog() {
     const catalog = qs('#todos-produtos > div');
     if (!catalog) return;
+
+    if (renderPublicProductsPage()) return;
 
     renderDynamicFilters();
 
@@ -4796,16 +4827,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function fullCatalogStockText(product) {
-    return customerAvailabilityText(product);
-  }
-
-  function fullCatalogStatusText(product) {
-    const normalized = normalizeProduct(product);
-    if (normalized.stockState === 'out') return 'Indisponivel no momento';
-    return '';
-  }
-
   function fullCatalogMatchesFilter(product, filter) {
     const normalized = normalizeProduct(product);
     if (filter === 'out') return normalized.stockState === 'out';
@@ -4819,8 +4840,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
     const key = normalized.id || normalized.name;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
@@ -4835,18 +4854,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
-            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+            ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
           </div>
           <h3>${escapeHTML(normalized.name)}</h3>
           <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
           ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
         </div>
-        <div class="full-catalog-stock">
-          <strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-            hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-          )}</strong>
+        <div class="full-catalog-stock public-catalog-category">
           <span>${escapeHTML(normalized.category)}</span>
         </div>
         <div class="full-catalog-action">
@@ -4897,10 +4913,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const categoryCount = new Set(products.map((product) => normalizeProduct(product).categorySlug)).size;
-    const outCount = products.filter((product) => normalizeProduct(product).stockState === 'out').length;
+    const offerCount = products.filter((product) => normalizeProduct(product).offerActive).length;
     setText('[data-full-catalog-total]', String(products.length));
     setText('[data-full-catalog-available]', String(categoryCount));
-    setText('[data-full-catalog-out]', String(outCount));
+    setText('[data-full-catalog-out]', String(offerCount));
 
     const grouped = orderedCategoryEntries(visible)
       .map(([slug, label]) => {
@@ -4983,8 +4999,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = qs('[data-catalog-detail-body]', modal);
     const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
-    const statusText = fullCatalogStatusText(normalized);
-    const stockText = fullCatalogStockText(normalized);
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
     const firstOption = options[0] || { price: normalized.price };
@@ -4999,9 +5013,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="catalog-detail-copy">
           <div class="full-catalog-badges">
-            ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+            ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
           </div>
           <span class="eyebrow">${escapeHTML(normalized.category)}</span>
           <h2 id="catalog-detail-title">${escapeHTML(normalized.name)}</h2>
@@ -5009,9 +5023,6 @@ document.addEventListener('DOMContentLoaded', () => {
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
             <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
-            <div><span>Situação</span><strong class="product-stock-line ${selectedOutOfStock ? 'is-unavailable' : 'is-empty'}">${escapeHTML(
-              hasOptions ? customerAvailabilityText(normalized, firstOption) : stockText,
-            )}</strong></div>
             <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
           ${
@@ -5097,7 +5108,6 @@ document.addEventListener('DOMContentLoaded', () => {
     else applyCatalogHashFilter(false);
 
     input?.addEventListener('input', () => {
-      if (input.value.trim()) activateCatalogFilter('all');
       applyCatalogFilters();
     });
 
