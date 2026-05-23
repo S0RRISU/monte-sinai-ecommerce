@@ -7302,8 +7302,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setProfileActionCard('personal', {
       href: signed ? 'editar-perfil.html' : loginHref({ mode: 'register', redirect: 'perfil.html' }),
       text: profileActionText(signed, 'personal'),
-      cta: signed ? (profileComplete() ? 'Atualizar dados' : 'Completar perfil') : 'Entrar ou cadastrar',
-      label: signed ? 'Editar dados pessoais' : 'Entrar ou cadastrar para salvar dados',
+      cta: signed ? 'Ver dados' : 'Entrar ou cadastrar',
+      label: signed ? 'Ver dados pessoais' : 'Entrar ou cadastrar para salvar dados',
     });
 
     setProfileActionCard('orders', {
@@ -7326,6 +7326,122 @@ document.addEventListener('DOMContentLoaded', () => {
       cta: 'Chamar no WhatsApp',
       label: 'Abrir suporte direto no WhatsApp',
       external: true,
+    });
+  }
+
+  function personalFieldHTML(label, value, icon) {
+    return `
+      <div class="profile-popup-field">
+        <i class="fa-solid ${escapeHTML(icon)}"></i>
+        <span>
+          <small>${escapeHTML(label)}</small>
+          <strong>${escapeHTML(value || 'Nao informado')}</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  function ensureProfilePersonalModal() {
+    let modal = qs('#profile-personal-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-personal-modal';
+    modal.className = 'profile-popup-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'profile-personal-title');
+    modal.innerHTML = `
+      <button class="profile-popup-backdrop" type="button" data-close-profile-popup aria-label="Fechar dados pessoais"></button>
+      <div class="profile-popup-panel">
+        <div class="profile-popup-head">
+          <span>
+            <small class="eyebrow">Dados pessoais</small>
+            <h2 id="profile-personal-title">Resumo do perfil</h2>
+          </span>
+          <button class="icon-button" type="button" data-close-profile-popup aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="profile-popup-fields" data-profile-personal-fields></div>
+        <div class="profile-popup-actions">
+          <a class="btn btn-secondary" href="editar-perfil.html">
+            <i class="fa-solid fa-pen"></i>
+            Editar perfil
+          </a>
+          <button class="btn btn-primary" type="button" data-close-profile-popup>Concluir</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openProfilePersonalModal() {
+    if (!currentUser?.email) {
+      window.location.href = loginHref({ mode: 'register', redirect: 'perfil.html' });
+      return;
+    }
+
+    const modal = ensureProfilePersonalModal();
+    const fields = qs('[data-profile-personal-fields]', modal);
+    if (fields) {
+      fields.innerHTML = [
+        personalFieldHTML('Nome', currentUser.name || 'Cliente Monte Sinai', 'fa-user'),
+        personalFieldHTML('Email', currentUser.email, 'fa-envelope'),
+        personalFieldHTML('WhatsApp', currentUser.phone, 'fa-phone'),
+        personalFieldHTML('Endereco', currentUser.address, 'fa-location-dot'),
+      ].join('');
+    }
+    modal.classList.remove('hidden');
+    document.body.classList.add('profile-popup-open');
+  }
+
+  function closeProfilePersonalModal() {
+    qs('#profile-personal-modal')?.classList.add('hidden');
+    document.body.classList.remove('profile-popup-open');
+  }
+
+  function ensureProfileOrdersModalControls(panel) {
+    if (!panel || qs('.profile-orders-modal-head', panel)) return;
+    panel.insertAdjacentHTML(
+      'afterbegin',
+      `
+      <button class="profile-orders-backdrop" type="button" data-close-profile-orders aria-label="Fechar historico de pedidos"></button>
+      <div class="profile-orders-modal-head">
+        <span>
+          <small class="eyebrow">Historico de pedidos</small>
+          <strong>Todos os pedidos</strong>
+        </span>
+        <button class="icon-button" type="button" data-close-profile-orders aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      `,
+    );
+  }
+
+  async function openProfileOrdersModal() {
+    const panel = qs('#profile-orders');
+    if (!panel) return;
+    await renderOrdersEverywhere({ force: true });
+    panel.classList.remove('hidden');
+    panel.classList.add('profile-orders-modal', 'is-open');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', 'Historico de pedidos');
+    ensureProfileOrdersModalControls(panel);
+    document.body.classList.add('profile-orders-open');
+  }
+
+  function closeProfileOrdersModal() {
+    const panel = qs('#profile-orders');
+    panel?.classList.add('hidden');
+    panel?.classList.remove('is-open');
+    document.body.classList.remove('profile-orders-open');
+    qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item.dataset.profileTab === 'details'));
+    qsa('[data-profile-panel]').forEach((item) => {
+      if (item.id !== 'profile-orders') item.classList.toggle('hidden', item.dataset.profilePanel !== 'details');
     });
   }
 
@@ -7393,8 +7509,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (firstBind) {
       qsa('[data-profile-tab]').forEach((tab) => {
-        tab.addEventListener('click', () => {
+        tab.addEventListener('click', async () => {
           const target = tab.dataset.profileTab || 'details';
+          if (target === 'history') {
+            qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item === tab));
+            await openProfileOrdersModal();
+            return;
+          }
           qsa('[data-profile-tab]').forEach((item) => item.classList.toggle('active', item === tab));
           qsa('[data-profile-panel]').forEach((panel) => {
             panel.classList.toggle('hidden', panel.dataset.profilePanel !== target);
@@ -7415,11 +7536,36 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       document.body.addEventListener('click', async (event) => {
+        const personalCard = event.target.closest('[data-profile-action-card="personal"]');
+        if (personalCard && qs('#profile-page')) {
+          event.preventDefault();
+          openProfilePersonalModal();
+          return;
+        }
+
+        const closeProfilePopup = event.target.closest('[data-close-profile-popup]');
+        if (closeProfilePopup) {
+          closeProfilePersonalModal();
+          return;
+        }
+
+        const closeOrders = event.target.closest('[data-close-profile-orders]');
+        if (closeOrders) {
+          closeProfileOrdersModal();
+          return;
+        }
+
         const button = event.target.closest('[data-order-whatsapp]');
         if (!button) return;
         const orders = await loadOrdersFromSupabase();
         const order = orders.find((item) => item.id === button.dataset.orderWhatsapp);
         if (order) openWhatsAppOrder(order);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        closeProfilePersonalModal();
+        closeProfileOrdersModal();
       });
 
       document.body.dataset.profilePageBound = 'true';
@@ -10133,8 +10279,9 @@ document.addEventListener('DOMContentLoaded', () => {
             Limpar cache e histórico
           </button>
         </div>
-      `,
+        `,
       );
+      if (container.classList.contains('profile-orders-modal')) ensureProfileOrdersModalControls(container);
     }
 
     let visibleOrders = orders;
