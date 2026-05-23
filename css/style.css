@@ -29909,6 +29909,65 @@ html[data-theme] body.admin-shell-body textarea {
   }
 }
 
+/* Cart with items is not the current page: keep only the badge unless cart is open. */
+@media (max-width: 760px) {
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-menu-button[data-open-cart].has-items,
+  body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-menu-button[data-open-cart].has-items {
+    border-color: var(--line) !important;
+    background: var(--surface-soft) !important;
+    color: var(--text) !important;
+    box-shadow: none !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-menu-button[data-open-cart].has-items i,
+  body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-menu-button[data-open-cart].has-items i {
+    color: var(--primary) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active),
+  body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) {
+    border-color: rgba(98, 176, 255, 0.98) !important;
+    outline-color: rgba(40, 184, 255, 0.18) !important;
+    background:
+      radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.22), transparent 32%),
+      linear-gradient(145deg, #115aa8 0%, #0a3e87 48%, #05275f 100%) !important;
+    color: #ffffff !important;
+    box-shadow:
+      inset 0 6px 12px rgba(255, 255, 255, 0.2),
+      inset 0 -12px 18px rgba(0, 9, 35, 0.34),
+      0 8px 0 rgba(2, 21, 58, 0.86),
+      0 18px 28px rgba(0, 0, 0, 0.34),
+      0 0 0 8px rgba(40, 184, 255, 0.15) !important;
+    filter: none !important;
+  }
+
+  html[data-theme='light'] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active),
+  body.light-mode:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) {
+    border-color: rgba(19, 106, 218, 0.95) !important;
+    background:
+      radial-gradient(circle at 32% 20%, rgba(255, 255, 255, 0.96), transparent 34%),
+      linear-gradient(145deg, #ffffff 0%, #d8ecff 48%, #6aaef7 100%) !important;
+    color: #062a5d !important;
+    box-shadow:
+      inset 0 7px 10px rgba(255, 255, 255, 0.96),
+      inset 0 -12px 18px rgba(12, 92, 196, 0.2),
+      0 7px 0 rgba(88, 147, 218, 0.88),
+      0 18px 28px rgba(12, 77, 166, 0.22),
+      0 0 0 8px rgba(19, 106, 218, 0.1) !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) i,
+  body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) i {
+    color: #30c4ff !important;
+  }
+
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) span,
+  body:not(.admin-shell-body):not(.auth-body):not(.cart-open) .mobile-quick-dock .dock-cart.has-items:not(.active) span {
+    color: currentColor !important;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, 0.34) !important;
+  }
+}
+
 /* Etapa 8.1 - refinamento visual dos temas claro/noturno. */
 html[data-theme='light'],
 body.light-mode {
