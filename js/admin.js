@@ -339,6 +339,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function friendlyDbError(error, fallback) {
     const message = normalize(error?.message || error?.details || '');
+    if (
+      message.includes('falha no storage') ||
+      message.includes('sem permissao para enviar imagem') ||
+      message.includes('formato de imagem') ||
+      message.includes('imagem preparada') ||
+      message.includes('usuario admin nao autenticado') ||
+      message.includes('bucket produtos nao encontrado')
+    ) {
+      return error?.message || fallback;
+    }
     if (message.includes('produto_variacoes')) {
       return 'Execute supabase/20260522-produto-variacoes.sql para liberar variacoes.';
     }
@@ -1570,14 +1580,29 @@ document.addEventListener('DOMContentLoaded', () => {
                           <label>Oferta termina
                             <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_fim))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
-                          <label class="admin-variation-image-url">Imagem
-                            <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
-                          </label>
-                          <label class="admin-variation-upload">
-                            <i class="fa-solid fa-image"></i>
-                            <span>Enviar imagem</span>
-                            <input type="file" accept="image/*" data-admin-variation-image-file="${escapeHTML(variation.id)}">
-                          </label>
+                          <div class="admin-variation-photo-box">
+                            <label class="admin-variation-image-url">Imagem
+                              <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
+                            </label>
+                            <div class="admin-variation-photo-actions">
+                              <label class="admin-upload-label">
+                                <i class="fa-solid fa-camera"></i>
+                                Tirar foto
+                                <input type="file" accept="image/*" capture="environment" data-admin-variation-image-file-camera="${escapeHTML(variation.id)}">
+                              </label>
+                              <label class="admin-upload-label">
+                                <i class="fa-solid fa-image"></i>
+                                Escolher da galeria
+                                <input type="file" accept="image/*" data-admin-variation-image-file="${escapeHTML(variation.id)}">
+                              </label>
+                              <button class="btn btn-secondary" type="button" data-admin-variation-image-clear="${escapeHTML(variation.id)}">
+                                <i class="fa-solid fa-xmark"></i>
+                                Remover imagem
+                              </button>
+                            </div>
+                            <div class="admin-image-preview admin-variation-image-preview hidden" data-admin-variation-image-preview="${escapeHTML(variation.id)}" aria-live="polite"></div>
+                            <small class="admin-image-feedback" data-admin-variation-image-feedback="${escapeHTML(variation.id)}"></small>
+                          </div>
                         </div>
                       </div>
                       <div class="admin-variation-actions">
@@ -1611,14 +1636,29 @@ document.addEventListener('DOMContentLoaded', () => {
           <label>Estoque
             <input type="number" min="0" step="1" data-admin-variation-new="estoque" placeholder="Livre">
           </label>
-          <label class="admin-variation-image-url">Imagem
-            <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
-          </label>
-          <label class="admin-variation-upload">
-            <i class="fa-solid fa-image"></i>
-            <span>Enviar imagem</span>
-            <input type="file" accept="image/*" data-admin-variation-new-file>
-          </label>
+          <div class="admin-variation-photo-box">
+            <label class="admin-variation-image-url">Imagem
+              <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
+            </label>
+            <div class="admin-variation-photo-actions">
+              <label class="admin-upload-label">
+                <i class="fa-solid fa-camera"></i>
+                Tirar foto
+                <input type="file" accept="image/*" capture="environment" data-admin-variation-new-file-camera>
+              </label>
+              <label class="admin-upload-label">
+                <i class="fa-solid fa-image"></i>
+                Escolher da galeria
+                <input type="file" accept="image/*" data-admin-variation-new-file>
+              </label>
+              <button class="btn btn-secondary" type="button" data-admin-variation-new-image-clear>
+                <i class="fa-solid fa-xmark"></i>
+                Remover imagem
+              </button>
+            </div>
+            <div class="admin-image-preview admin-variation-image-preview hidden" data-admin-variation-new-image-preview aria-live="polite"></div>
+            <small class="admin-image-feedback" data-admin-variation-new-image-feedback></small>
+          </div>
           <button class="btn btn-primary" type="button" data-admin-variation-add="${escapeHTML(product.id)}">
             <i class="fa-solid fa-plus"></i>
             Adicionar variacao
@@ -1848,8 +1888,17 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       payload = override || variationPayloadFromEditor(variationId);
       if (!override) {
-        const file = qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] || null;
-        if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId, { productId });
+        const file =
+          qs(`[data-admin-variation-image-file-camera="${escapeSelector(variationId)}"]`)?.files?.[0] ||
+          qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] ||
+          null;
+        if (file) {
+          payload.imagem = await resolveProductImage(file, payload.nome || variationId, {
+            productId,
+            context: 'variacao',
+            feedbackTarget: `[data-admin-variation-image-feedback="${escapeSelector(variationId)}"]`,
+          });
+        }
       }
       if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
       if (!override && payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
@@ -1868,7 +1917,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setVariationBusy(variationId, false);
 
     if (error) {
-      showToast(friendlyDbError(error, 'Nao consegui salvar a variacao.'), 'error');
+      showToast(
+        friendlyDbError(
+          error,
+          payload.imagem ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.' : 'Nao consegui salvar a variacao.',
+        ),
+        'error',
+      );
       return false;
     }
 
@@ -1905,8 +1960,17 @@ document.addEventListener('DOMContentLoaded', () => {
         imagem: ensureSafeProductImageValue(field('imagem')?.value || product.imagem || ''),
         ordem: productVariations(productId).length * 10 + 10,
       };
-      const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
-      if (file) payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId, { productId });
+      const file =
+        qs('[data-admin-variation-new-file-camera]', box)?.files?.[0] ||
+        qs('[data-admin-variation-new-file]', box)?.files?.[0] ||
+        null;
+      if (file) {
+        payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId, {
+          productId,
+          context: 'nova-variacao',
+          feedbackTarget: '[data-admin-variation-new-image-feedback]',
+        });
+      }
       if (!payload.nome) throw new Error('Informe o nome da variacao.');
     } catch (error) {
       variationSaveLocks.delete(`new-${productId}`);
@@ -1920,7 +1984,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setVariationAddBusy(productId, false);
 
     if (error) {
-      showToast(friendlyDbError(error, 'Nao consegui adicionar a variacao.'), 'error');
+      showToast(
+        friendlyDbError(
+          error,
+          payload.imagem
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL da nova variacao.'
+            : 'Nao consegui adicionar a variacao.',
+        ),
+        'error',
+      );
       return false;
     }
 
@@ -2022,13 +2094,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     } catch (requestError) {
       unlockProductSave(productId);
-      showToast(friendlyDbError(requestError, 'Nao consegui alterar o produto.'), 'error');
+      showToast(
+        friendlyDbError(
+          requestError,
+          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+        ),
+        'error',
+      );
       return false;
     }
 
     if (error || !data) {
       unlockProductSave(productId);
-      showToast(friendlyDbError(error, 'Nao consegui alterar o produto.'), 'error');
+      showToast(
+        friendlyDbError(
+          error,
+          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+        ),
+        'error',
+      );
       return false;
     }
 
@@ -2113,13 +2197,87 @@ document.addEventListener('DOMContentLoaded', () => {
     return image;
   }
 
-  function setAdminImageFeedback(message = '', productId = '') {
-    const targets = productId
-      ? qsa(`[data-admin-edit-image-feedback="${escapeSelector(productId)}"]`)
-      : [qs('#admin-product-upload-feedback')].filter(Boolean);
+  function adminImageFeedbackTargets(target = '') {
+    if (!target) return [qs('#admin-product-upload-feedback')].filter(Boolean);
+    if (text(target).startsWith('[')) return qsa(target);
+    return qsa(`[data-admin-edit-image-feedback="${escapeSelector(target)}"]`);
+  }
+
+  function setAdminImageFeedback(message = '', target = '') {
+    const targets = adminImageFeedbackTargets(target);
     targets.forEach((target) => {
       target.textContent = message;
     });
+  }
+
+  function fileDiagnostic(file) {
+    if (!file) return null;
+    return {
+      name: file.name || '',
+      type: file.type || '',
+      size: file.size || 0,
+      sizeMb: Number(((file.size || 0) / 1024 / 1024).toFixed(2)),
+    };
+  }
+
+  function storageErrorDiagnostic(error) {
+    if (!error) return null;
+    return {
+      name: error.name || '',
+      message: error.message || '',
+      code: error.code || '',
+      status: error.status || error.statusCode || '',
+      details: error.details || '',
+      hint: error.hint || '',
+    };
+  }
+
+  function logImageUploadDiagnostic(stage, details = {}) {
+    const payload = {
+      stage,
+      bucket: PRODUCT_IMAGE_BUCKET,
+      ...details,
+    };
+    if (console.groupCollapsed) {
+      console.groupCollapsed(`[Admin Upload] ${stage}`);
+      console.info(payload);
+      console.groupEnd();
+      return;
+    }
+    console.info('[Admin Upload]', payload);
+  }
+
+  function friendlyStorageUploadError(error, fallback = 'Nao consegui enviar essa imagem.') {
+    const message = normalize(
+      `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''} ${
+        error?.status || error?.statusCode || ''
+      }`,
+    );
+    if (
+      message.includes('bucket') &&
+      (message.includes('not found') || message.includes('does not exist') || message.includes('nao encontrado'))
+    ) {
+      return 'Falha no Storage: bucket produtos nao encontrado.';
+    }
+    if (
+      message.includes('row-level security') ||
+      message.includes('permission') ||
+      message.includes('unauthorized') ||
+      message.includes('not authorized') ||
+      message.includes('403')
+    ) {
+      return 'Sem permissao para enviar imagem no Storage.';
+    }
+    if (message.includes('mime') || message.includes('invalid') || message.includes('unsupported')) {
+      return 'Formato de imagem nao aceito pelo Storage.';
+    }
+    if (message.includes('too large') || message.includes('payload') || message.includes('413')) {
+      return 'Imagem preparada, mas ainda ficou grande para envio.';
+    }
+    if (message.includes('storage') || message.includes('bucket')) {
+      return 'O armazenamento de imagens nao esta configurado corretamente.';
+    }
+    return error?.message || fallback;
   }
 
   function imageSourceSize(source) {
@@ -2220,45 +2378,125 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function resolveProductImage(file, productNameOverride = '', options = {}) {
     if (!file) return '';
-    const productId = options.productId || '';
+    const feedbackTarget = options.feedbackTarget || options.productId || '';
+    const context = options.context || 'produto';
+    const originalFile = fileDiagnostic(file);
     validateProductImageFile(file);
     try {
-      setAdminImageFeedback('Preparando imagem...', productId);
-      setAdminImageFeedback('Comprimindo imagem...', productId);
+      logImageUploadDiagnostic('leitura', { context, originalFile });
+      setAdminImageFeedback('Preparando imagem...', feedbackTarget);
+      setAdminImageFeedback('Comprimindo imagem...', feedbackTarget);
       const preparedFile = await compressProductImage(file);
-      setAdminImageFeedback('Enviando imagem...', productId);
+      logImageUploadDiagnostic('compressao', {
+        context,
+        originalFile,
+        finalFile: fileDiagnostic(preparedFile),
+      });
+      setAdminImageFeedback('Enviando imagem...', feedbackTarget);
       validateProductImageFile(preparedFile);
-      return await uploadImagemProduto(preparedFile, productNameOverride);
+      return await uploadImagemProduto(preparedFile, productNameOverride, {
+        ...options,
+        context,
+        originalFile,
+      });
     } catch (error) {
-      console.warn('[Admin] Upload no Storage falhou.', error);
-      throw new Error(
-        friendlyDbError(
-          error,
-          'Nao consegui enviar essa imagem. Tente tirar outra foto ou escolher outra imagem.',
-        ),
-      );
+      logImageUploadDiagnostic('falha', {
+        context,
+        originalFile,
+        error: storageErrorDiagnostic(error),
+      });
+      throw new Error(friendlyStorageUploadError(error, 'Imagem preparada, mas upload falhou.'));
     }
   }
 
-  async function uploadImagemProduto(file, productNameOverride = '') {
+  async function uploadImagemProduto(file, productNameOverride = '', diagnostic = {}) {
     const api = client();
-    if (!api?.storage) throw new Error('Storage do Supabase indisponível.');
+    if (!api?.storage) throw new Error('Storage do Supabase indisponivel.');
     if (!file) return '';
     validateProductImageFile(file);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(text(file.type).toLowerCase())) {
+      throw new Error('Formato de imagem nao aceito.');
+    }
+    if (file.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
+      throw new Error(`Imagem final grande demais (${fileDiagnostic(file).sizeMb} MB).`);
+    }
+
+    try {
+      const { data, error } = await api.auth.getUser();
+      if (error) throw error;
+      if (!data?.user) throw new Error('Usuario admin nao autenticado para enviar imagem.');
+      logImageUploadDiagnostic('autenticacao', {
+        context: diagnostic.context || 'produto',
+        userId: data.user.id,
+      });
+    } catch (error) {
+      logImageUploadDiagnostic('autenticacao-falhou', {
+        context: diagnostic.context || 'produto',
+        error: storageErrorDiagnostic(error),
+      });
+      throw new Error('Usuario admin nao autenticado para enviar imagem.');
+    }
 
     const extension = imageExtension(file);
     const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
     const baseName = safeFileName(text(file.name).replace(/\.[^.]+$/, '') || productName || 'produto');
     const path = `${safeFileName(productName)}/${Date.now()}-${baseName}.${extension}`;
+    if (!/^[a-z0-9-]+\/[0-9]+-[a-z0-9-]+\.(jpg|png|webp)$/.test(path)) {
+      throw new Error('Caminho de upload invalido.');
+    }
+
+    if (api.storage.listBuckets) {
+      try {
+        const { data: buckets, error: bucketError } = await api.storage.listBuckets();
+        if (bucketError) {
+          logImageUploadDiagnostic('bucket-nao-validado', {
+            context: diagnostic.context || 'produto',
+            error: storageErrorDiagnostic(bucketError),
+          });
+        } else if (Array.isArray(buckets) && !buckets.some((bucket) => bucket.name === PRODUCT_IMAGE_BUCKET)) {
+          const error = new Error('Bucket produtos nao encontrado.');
+          error.code = 'bucket_not_found';
+          throw error;
+        }
+      } catch (error) {
+        if (error?.code === 'bucket_not_found') throw error;
+        logImageUploadDiagnostic('bucket-nao-validado', {
+          context: diagnostic.context || 'produto',
+          error: storageErrorDiagnostic(error),
+        });
+      }
+    }
+
+    logImageUploadDiagnostic('upload', {
+      context: diagnostic.context || 'produto',
+      originalFile: diagnostic.originalFile || null,
+      finalFile: fileDiagnostic(file),
+      path,
+      contentType: file.type || `image/${extension}`,
+    });
+
     const { error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
       cacheControl: '3600',
       contentType: file.type || `image/${extension}`,
       upsert: false,
     });
 
-    if (error) throw error;
+    if (error) {
+      logImageUploadDiagnostic('upload-falhou', {
+        context: diagnostic.context || 'produto',
+        path,
+        error: storageErrorDiagnostic(error),
+      });
+      throw error;
+    }
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
-    return data?.publicUrl || '';
+    if (!data?.publicUrl) throw new Error('Upload concluido, mas nao consegui gerar URL publica.');
+    logImageUploadDiagnostic('public-url', {
+      context: diagnostic.context || 'produto',
+      path,
+      publicUrl: data.publicUrl,
+    });
+    return data.publicUrl;
   }
 
   function renderCreateProductImagePreview(file) {
@@ -2309,6 +2547,60 @@ document.addEventListener('DOMContentLoaded', () => {
       preview.classList.add('hidden');
       preview.innerHTML = '';
       setAdminImageFeedback('', productId);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
+  }
+
+  function renderVariationImagePreview(variationId, file) {
+    const selector = `[data-admin-variation-image-feedback="${escapeSelector(variationId)}"]`;
+    const preview = qs(`[data-admin-variation-image-preview="${escapeSelector(variationId)}"]`);
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      return;
+    }
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', selector);
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(url)}" alt="Previa da imagem da variacao">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
+      `;
+    } catch (error) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
+  }
+
+  function renderNewVariationImagePreview(file) {
+    const selector = '[data-admin-variation-new-image-feedback]';
+    const preview = qs('[data-admin-variation-new-image-preview]');
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      return;
+    }
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', selector);
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(url)}" alt="Previa da imagem da nova variacao">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
+      `;
+    } catch (error) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
       showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
     }
   }
@@ -3058,6 +3350,26 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         return;
       }
+
+      const variationImageFile = event.target.closest(
+        '[data-admin-variation-image-file], [data-admin-variation-image-file-camera]',
+      );
+      if (variationImageFile) {
+        renderVariationImagePreview(
+          variationImageFile.dataset.adminVariationImageFile ||
+            variationImageFile.dataset.adminVariationImageFileCamera,
+          variationImageFile.files?.[0] || null,
+        );
+        return;
+      }
+
+      const newVariationImageFile = event.target.closest(
+        '[data-admin-variation-new-file], [data-admin-variation-new-file-camera]',
+      );
+      if (newVariationImageFile) {
+        renderNewVariationImagePreview(newVariationImageFile.files?.[0] || null);
+        return;
+      }
       // Mudanca de cargo na aba Gerenciar Equipe
       const teamSelect = event.target.closest('[data-admin-team-role]');
       if (teamSelect) {
@@ -3117,6 +3429,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderCreateProductImagePreview(null);
         showToast('Imagem removida do novo produto.', 'info');
+        return;
+      }
+
+      const variationImageClear = event.target.closest('[data-admin-variation-image-clear]');
+      if (variationImageClear) {
+        const variationId = variationImageClear.dataset.adminVariationImageClear;
+        const imageInput = variationField(variationId, 'imagem');
+        if (imageInput) imageInput.value = '';
+        qsa(
+          `[data-admin-variation-image-file="${escapeSelector(variationId)}"], [data-admin-variation-image-file-camera="${escapeSelector(variationId)}"]`,
+        ).forEach((input) => {
+          input.value = '';
+        });
+        renderVariationImagePreview(variationId, null);
+        showToast('Imagem removida da variacao. Salve para confirmar.', 'info');
+        return;
+      }
+
+      const newVariationImageClear = event.target.closest('[data-admin-variation-new-image-clear]');
+      if (newVariationImageClear) {
+        const box = newVariationImageClear.closest('[data-admin-variation-create]');
+        const imageInput = qs('[data-admin-variation-new="imagem"]', box);
+        if (imageInput) imageInput.value = '';
+        qsa('[data-admin-variation-new-file], [data-admin-variation-new-file-camera]', box).forEach((input) => {
+          input.value = '';
+        });
+        renderNewVariationImagePreview(null);
+        showToast('Imagem removida da nova variacao.', 'info');
         return;
       }
 
