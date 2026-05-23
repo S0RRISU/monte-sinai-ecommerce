@@ -268,8 +268,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toast = document.createElement('div');
     toast.className = `admin-toast admin-toast-${type}`;
-    toast.textContent = message;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.innerHTML = `
+      <span class="admin-toast-icon"><i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : type === 'success' ? 'fa-circle-check' : 'fa-circle-info'}"></i></span>
+      <span class="admin-toast-message">${escapeHTML(message)}</span>
+      <button class="admin-toast-close" type="button" aria-label="Fechar aviso"><i class="fa-solid fa-xmark"></i></button>
+    `;
     stack.appendChild(toast);
+    qs('.admin-toast-close', toast)?.addEventListener('click', () => {
+      toast.classList.remove('show');
+      window.setTimeout(() => toast.remove(), 180);
+    });
     requestAnimationFrame(() => toast.classList.add('show'));
     window.setTimeout(() => {
       toast.classList.remove('show');

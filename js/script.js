@@ -3014,6 +3014,57 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(close, Number(config.duration || 3600));
   }
 
+  function confirmDialog({
+    message,
+    title = 'Confirmar ação',
+    confirmLabel = 'Confirmar',
+    cancelLabel = 'Cancelar',
+    danger = false,
+  } = {}) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-dialog';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('aria-labelledby', 'confirm-dialog-title');
+      overlay.innerHTML = `
+        <button class="confirm-dialog-backdrop" type="button" data-confirm-cancel aria-label="${escapeHTML(cancelLabel)}"></button>
+        <article class="confirm-dialog-panel">
+          <div class="confirm-dialog-icon ${danger ? 'is-danger' : ''}">
+            <i class="fa-solid ${danger ? 'fa-trash-can' : 'fa-circle-question'}"></i>
+          </div>
+          <div class="confirm-dialog-copy">
+            <h2 id="confirm-dialog-title">${escapeHTML(title)}</h2>
+            <p>${escapeHTML(message || 'Deseja continuar?')}</p>
+          </div>
+          <div class="confirm-dialog-actions">
+            <button class="btn btn-secondary" type="button" data-confirm-cancel>${escapeHTML(cancelLabel)}</button>
+            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" type="button" data-confirm-accept>${escapeHTML(confirmLabel)}</button>
+          </div>
+        </article>
+      `;
+
+      const finish = (answer) => {
+        overlay.classList.remove('show');
+        window.setTimeout(() => overlay.remove(), 160);
+        document.removeEventListener('keydown', onKeydown);
+        resolve(answer);
+      };
+      const onKeydown = (event) => {
+        if (event.key === 'Escape') finish(false);
+      };
+
+      overlay.addEventListener('click', (event) => {
+        if (event.target.closest('[data-confirm-accept]')) finish(true);
+        if (event.target.closest('[data-confirm-cancel]')) finish(false);
+      });
+      document.addEventListener('keydown', onKeydown);
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('show'));
+      qs('[data-confirm-accept]', overlay)?.focus();
+    });
+  }
+
   function applySavedTheme() {
     if (!localStorage.getItem(STORAGE.theme)) localStorage.removeItem(STORAGE.legacyTheme);
     setThemeMode(currentThemeMode(), false);
@@ -3164,7 +3215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `
         <a class="hidden nav-admin-link" href="${adminPanelHref()}" data-admin-panel-link="nav">
           <span class="nav-admin-label">Admin</span>
-          <span class="admin-order-badge is-empty" data-admin-order-count aria-label="0 pedidos pendentes">0</span>
         </a>
       `,
       );
@@ -3641,7 +3691,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const anyVisible = qsa('[data-admin-orders-link]').some((link) => !link.classList.contains('hidden'));
     const shouldShow = visible ?? anyVisible;
     setAdminOrderLinksVisible(Boolean(shouldShow));
-    qsa('[data-admin-order-count], [data-client-order-count]').forEach((badge) => {
+    qsa('[data-client-order-count]').forEach((badge) => {
       badge.textContent = String(count);
       badge.classList.toggle('is-empty', count === 0);
       badge.setAttribute('aria-label', `${count} pedido${count === 1 ? '' : 's'} nao lido${count === 1 ? '' : 's'}`);
@@ -3854,6 +3904,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
     });
     updateDockActive();
   }
@@ -3932,6 +3984,14 @@ document.addEventListener('DOMContentLoaded', () => {
         qsa('.search-suggestions').forEach(hideSearchSuggestions);
       }
     });
+
+    if (document.body.dataset.searchOutsideBound !== 'true') {
+      document.body.dataset.searchOutsideBound = 'true';
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-site-search-form]') || event.target.closest('[data-nav-search-toggle]')) return;
+        qsa('.search-suggestions').forEach(hideSearchSuggestions);
+      });
+    }
 
     qsa('[data-mobile-search]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -4134,7 +4194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const preferredWidth = Math.max(300, Math.min(440, rect.width < 260 ? 360 : rect.width));
     const width = Math.min(preferredWidth, window.innerWidth - margin * 2);
     const left = Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin);
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 180);
+    const top = rect.bottom + 12;
     const maxHeight = Math.max(180, window.innerHeight - top - margin);
 
     suggestions.classList.add('is-positioned');
@@ -5350,7 +5410,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function bindCartActions() {
-    document.body.addEventListener('click', (event) => {
+    document.body.addEventListener('click', async (event) => {
       const open = event.target.closest('[data-open-cart]');
       const close = event.target.closest('[data-close-cart]');
       const action = event.target.closest('[data-cart-action]');
@@ -5380,7 +5440,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (clearCart) {
-        clearCartItems();
+        await clearCartItems();
         return;
       }
 
@@ -5434,7 +5494,18 @@ document.addEventListener('DOMContentLoaded', () => {
         item.quantity += 1;
       }
       if (action.dataset.cartAction === 'decrease') item.quantity = Math.max(1, item.quantity - 1);
-      if (action.dataset.cartAction === 'remove') cart = cart.filter((entry) => entry.id !== id);
+      if (action.dataset.cartAction === 'remove') {
+        const confirmed = await confirmDialog({
+          title: 'Remover produto',
+          message: 'Remover este produto do carrinho?',
+          confirmLabel: 'Remover',
+          cancelLabel: 'Cancelar',
+          danger: true,
+        });
+        if (!confirmed) return;
+        cart = cart.filter((entry) => entry.id !== id);
+        showToast('Produto removido do carrinho.', { type: 'success' });
+      }
 
       saveCart();
       renderCart();
@@ -5474,13 +5545,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function clearCartItems(showMessage = true) {
+  async function clearCartItems(showMessage = true) {
     if (!cart.length) {
       if (showMessage) showToast('O carrinho já está vazio.');
       return;
     }
 
-    if (showMessage && !confirm('Deseja remover todos os produtos do carrinho?')) return;
+    if (showMessage) {
+      const confirmed = await confirmDialog({
+        title: 'Limpar carrinho',
+        message: 'Deseja remover todos os produtos do carrinho?',
+        confirmLabel: 'Limpar carrinho',
+        cancelLabel: 'Cancelar',
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
     cart = [];
     saveAppliedCoupon(null);
     saveCart();

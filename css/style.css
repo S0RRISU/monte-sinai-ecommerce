@@ -30973,3 +30973,270 @@ html[data-theme='dark'] body.auth-body .auth-actions .btn-primary:hover {
     background: var(--surface) !important;
   }
 }
+
+/* Etapa 8.7 - busca, estados ativos, toasts compactos e acoes seguras. */
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-orders-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu .nav-admin-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu .nav-orders-link:not(.active),
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu .nav-admin-link:not(.active) {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--text-soft) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-menu a.active,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a.active {
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .nav-menu a.active,
+html[data-theme='dark'] body:not(.admin-shell-body):not(.auth-body) .mobile-menu a.active {
+  color: #0f172a !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-admin-link .admin-order-badge {
+  display: none !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-orders-link .admin-order-badge {
+  display: inline-grid !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-search .search-suggestions.is-positioned,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .nav-search .search-suggestions.is-positioned,
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .catalog-search-form .search-suggestions.is-positioned {
+  top: var(--suggestions-top) !important;
+  z-index: 1450 !important;
+  width: min(var(--suggestions-width), calc(100vw - 24px)) !important;
+}
+
+html[data-theme] body:not(.admin-shell-body):not(.auth-body) .hero-search .search-suggestions.is-positioned {
+  max-width: min(520px, calc(100vw - 24px)) !important;
+}
+
+.toast-stack {
+  right: max(16px, env(safe-area-inset-right)) !important;
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)) !important;
+  width: min(360px, calc(100vw - 28px)) !important;
+  gap: 8px !important;
+}
+
+.toast-modern,
+.toast {
+  width: 100% !important;
+  max-width: 360px !important;
+  min-height: 0 !important;
+  grid-template-columns: 34px minmax(0, 1fr) 30px !important;
+  gap: 10px !important;
+  border-radius: 14px !important;
+  padding: 10px !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22) !important;
+}
+
+.toast-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+}
+
+.toast-copy {
+  gap: 1px !important;
+  font-size: 0.88rem !important;
+}
+
+.toast-copy strong,
+.toast-copy span {
+  color: var(--text) !important;
+}
+
+.toast-close {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+@media (max-width: 760px) {
+  .toast-stack {
+    right: 14px !important;
+    bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+    width: calc(100vw - 28px) !important;
+  }
+}
+
+.admin-toast-stack {
+  right: max(14px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  top: auto !important;
+  width: min(360px, calc(100vw - 28px)) !important;
+  gap: 8px !important;
+  pointer-events: none !important;
+}
+
+.admin-toast {
+  display: grid !important;
+  grid-template-columns: 32px minmax(0, 1fr) 30px !important;
+  gap: 10px !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 360px !important;
+  min-height: 0 !important;
+  border-radius: 14px !important;
+  padding: 10px !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22) !important;
+  pointer-events: auto !important;
+}
+
+.admin-toast-icon {
+  display: grid !important;
+  width: 32px !important;
+  height: 32px !important;
+  place-items: center !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface-soft)) !important;
+  color: var(--primary) !important;
+}
+
+.admin-toast-message {
+  min-width: 0 !important;
+  color: var(--text) !important;
+  font-size: 0.9rem !important;
+  font-weight: 850 !important;
+  line-height: 1.3 !important;
+}
+
+.admin-toast-close {
+  display: grid !important;
+  width: 30px !important;
+  height: 30px !important;
+  place-items: center !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+}
+
+@media (max-width: 760px) {
+  .admin-toast-stack {
+    bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.confirm-dialog.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.confirm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 8, 23, 0.56);
+}
+
+.confirm-dialog-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  padding: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+}
+
+.confirm-dialog-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface-soft));
+  color: var(--primary);
+}
+
+.confirm-dialog-icon.is-danger {
+  background: color-mix(in srgb, #ef4444 14%, var(--surface-soft));
+  color: #ef4444;
+}
+
+.confirm-dialog-copy h2,
+.confirm-dialog-copy p {
+  margin: 0;
+}
+
+.confirm-dialog-copy h2 {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.confirm-dialog-copy p {
+  margin-top: 5px;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.confirm-dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.confirm-dialog .btn {
+  min-height: 44px;
+}
+
+.confirm-dialog .btn-danger {
+  border-color: #ef4444 !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.admin-shell-body [data-admin-product-edit],
+.admin-shell-body [data-admin-product-save] {
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--line)) !important;
+  background: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.admin-shell-body [data-admin-product-details] {
+  border-color: var(--line-strong) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-product-offer-24],
+.admin-shell-body [data-admin-product-offer-end] {
+  border-color: #facc15 !important;
+  background: #facc15 !important;
+  color: #0f172a !important;
+}
+
+.admin-shell-body [data-admin-product-stock-zero] {
+  border-color: color-mix(in srgb, #f59e0b 64%, var(--line)) !important;
+  background: color-mix(in srgb, #f59e0b 14%, var(--surface)) !important;
+  color: var(--text) !important;
+}
+
+.admin-shell-body [data-admin-product-delete],
+.admin-shell-body .admin-danger {
+  border-color: #ef4444 !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
