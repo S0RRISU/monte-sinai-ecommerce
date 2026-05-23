@@ -5689,6 +5689,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     qsa('[data-cart-count], #cart-count').forEach((el) => {
       el.textContent = String(cartCount());
+      el.classList.toggle('is-empty', !hasItems);
     });
     qsa('[data-profile-cart-count]').forEach((el) => {
       el.textContent = String(cartCount());
