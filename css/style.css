@@ -34176,3 +34176,93 @@ body.profile-orders-open {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Historico de pedidos usa o mesmo popup de dados do perfil. */
+.profile-orders-popup .profile-orders-popup-panel {
+  width: min(860px, 100%) !important;
+  max-height: min(760px, calc(100svh - 32px)) !important;
+  overflow: hidden !important;
+}
+
+.profile-orders-popup .profile-orders-popup-head {
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.profile-orders-popup .profile-orders-popup-head h2 {
+  margin: 0 !important;
+  font-size: 1.25rem !important;
+  line-height: 1.1 !important;
+}
+
+.profile-orders-popup .profile-orders-popup-body {
+  min-height: 0 !important;
+  max-height: calc(min(760px, 100svh - 32px) - 92px) !important;
+  overflow-y: auto !important;
+  padding-right: 2px !important;
+}
+
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open {
+  position: static !important;
+  inset: auto !important;
+  display: grid !important;
+  width: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+  isolation: auto !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text) !important;
+}
+
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open .profile-orders-backdrop,
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open .profile-orders-modal-head {
+  display: none !important;
+}
+
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open .settings-actions.profile-history-actions {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin: 0 0 12px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open .order-card {
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+}
+
+.profile-orders-popup .profile-orders.profile-orders-modal.is-open .order-card:first-of-type {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 767px) {
+  .profile-orders-popup {
+    padding: max(10px, env(safe-area-inset-top)) 10px calc(var(--mobile-dock-height, 116px) + 14px) !important;
+    align-items: start !important;
+    place-items: start center !important;
+  }
+
+  .profile-orders-popup .profile-orders-popup-panel {
+    width: 100% !important;
+    max-height: calc(100svh - var(--mobile-dock-height, 116px) - 28px) !important;
+    padding: 14px !important;
+  }
+
+  .profile-orders-popup .profile-orders-popup-body {
+    max-height: calc(100svh - var(--mobile-dock-height, 116px) - 118px) !important;
+  }
+
+  .profile-orders-popup .profile-orders.profile-orders-modal.is-open .settings-actions.profile-history-actions {
+    grid-template-columns: 1fr !important;
+  }
+}

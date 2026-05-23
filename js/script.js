@@ -7402,39 +7402,53 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('profile-popup-open');
   }
 
-  function ensureProfileOrdersModalControls(panel) {
-    if (!panel || qs('.profile-orders-modal-head', panel)) return;
-    panel.insertAdjacentHTML(
-      'afterbegin',
-      `
-      <button class="profile-orders-backdrop" type="button" data-close-profile-orders aria-label="Fechar historico de pedidos"></button>
-      <div class="profile-orders-modal-head">
-        <span>
-          <small class="eyebrow">Historico de pedidos</small>
-          <strong>Todos os pedidos</strong>
-        </span>
-        <button class="icon-button" type="button" data-close-profile-orders aria-label="Fechar">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+  function ensureProfileOrdersPopupModal() {
+    let modal = qs('#profile-orders-popup-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'profile-orders-popup-modal';
+    modal.className = 'profile-popup-modal profile-orders-popup hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'profile-orders-popup-title');
+    modal.innerHTML = `
+      <button class="profile-popup-backdrop" type="button" data-close-profile-orders aria-label="Fechar historico de pedidos"></button>
+      <div class="profile-popup-panel profile-orders-popup-panel">
+        <div class="profile-popup-head profile-orders-popup-head">
+          <span>
+            <small class="eyebrow">Historico de pedidos</small>
+            <h2 id="profile-orders-popup-title">Todos os pedidos</h2>
+          </span>
+          <button class="icon-button" type="button" data-close-profile-orders aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="profile-orders-popup-body" data-profile-orders-popup-host></div>
       </div>
-      `,
-    );
+    `;
+    document.body.appendChild(modal);
+    return modal;
   }
 
   async function openProfileOrdersModal() {
     const panel = qs('#profile-orders');
     if (!panel) return;
-    await renderOrdersEverywhere({ force: true });
+    const modal = ensureProfileOrdersPopupModal();
+    const host = qs('[data-profile-orders-popup-host]', modal);
+    if (host && panel.parentElement !== host) host.appendChild(panel);
     panel.classList.remove('hidden');
     panel.classList.add('profile-orders-modal', 'is-open');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', 'Historico de pedidos');
-    ensureProfileOrdersModalControls(panel);
+    await renderOrdersEverywhere({ force: true });
+    modal.classList.remove('hidden');
     document.body.classList.add('profile-orders-open');
   }
 
   function closeProfileOrdersModal() {
+    qs('#profile-orders-popup-modal')?.classList.add('hidden');
     const panel = qs('#profile-orders');
     panel?.classList.add('hidden');
     panel?.classList.remove('is-open');
@@ -10281,7 +10295,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         `,
       );
-      if (container.classList.contains('profile-orders-modal')) ensureProfileOrdersModalControls(container);
     }
 
     let visibleOrders = orders;
