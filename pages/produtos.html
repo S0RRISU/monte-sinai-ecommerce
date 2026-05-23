@@ -69,27 +69,19 @@
     <a href="contato.html">Contato</a>
   </div>
 
-  <main class="products-page">
-    <section class="hero container hero-small">
-      <div class="hero-copy">
-        <span class="eyebrow">Catálogo completo</span>
-        <h1>Todos os produtos para comprar com poucos cliques</h1>
-        <p>Use a busca, filtre por categoria e finalize pelo carrinho. Água e gás ficam destacados como recomendados.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+comprar+produtos" target="_blank" rel="noreferrer">
-            <i class="fa-brands fa-whatsapp"></i>
-            Pedir no WhatsApp
-          </a>
-          <a class="btn btn-secondary" href="#todos-produtos">
+  <main class="products-page products-public-page">
+    <section class="section container grid-shop-layout products-public-layout" id="todos-produtos">
+      <div class="public-products-panel">
+        <div class="public-products-head">
+          <div>
+            <span class="eyebrow">Loja</span>
+            <h1>Produtos</h1>
+          </div>
+          <a class="btn btn-secondary" href="catalogo.html">
             <i class="fa-solid fa-list"></i>
-            Ver catálogo
+            Catálogo
           </a>
         </div>
-      </div>
-    </section>
-
-    <section class="section container grid-shop-layout" id="todos-produtos">
-      <div class="public-products-panel">
         <div class="catalog-tools" aria-label="Ferramentas da loja">
           <form class="search-field catalog-search-form" role="search" data-site-search-form>
             <i class="fa-solid fa-magnifying-glass"></i>
@@ -112,7 +104,7 @@
             <button class="filter-chip" type="button" data-filter="limpeza-pesada">Limpeza pesada</button>
           </div>
         </div>
-        <p class="catalog-results" data-catalog-results>Carregando produtos...</p>
+        <p class="catalog-results" data-catalog-results data-products-count>Carregando produtos...</p>
         <div class="grid-produtos public-products-grid" data-public-products-grid></div>
         <p id="catalog-empty" class="empty-cart hidden">Nenhum produto encontrado com esse filtro.</p>
       </div>

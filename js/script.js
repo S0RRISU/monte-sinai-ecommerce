@@ -4081,7 +4081,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSearchSuggestions(form, suggestions, query) {
     const term = query.trim();
-    if (term.length < 1) {
+    if (term.length < 2) {
       suggestions.innerHTML = '';
       hideSearchSuggestions(suggestions);
       return;
@@ -4660,11 +4660,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterBar = qs('.filter-chips');
     if (!filterBar) return;
 
+    const current = qs('[data-filter].active', filterBar)?.dataset.filter || 'all';
+    const activeFilter = PUBLIC_CATEGORY_FILTERS.some(([slug]) => slug === current) ? current : 'all';
     filterBar.innerHTML = [
-      '<button class="filter-chip active" type="button" data-filter="all">Todos</button>',
+      `<button class="filter-chip ${activeFilter === 'all' ? 'active' : ''}" type="button" data-filter="all">Todos</button>`,
       ...PUBLIC_CATEGORY_FILTERS.map(
         ([slug, label]) =>
-          `<button class="filter-chip" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
+          `<button class="filter-chip ${activeFilter === slug ? 'active' : ''}" type="button" data-filter="${escapeHTML(slug)}">${escapeHTML(label)}</button>`,
       ),
     ].join('');
   }
@@ -4704,12 +4706,63 @@ document.addEventListener('DOMContentLoaded', () => {
     return storeProducts().sort(compareCatalogProducts);
   }
 
+  function publicProductCardHTML(product) {
+    const normalized = normalizeProduct(product);
+    const image = productAssetPath(normalized);
+    const outOfStock = normalized.stockState === 'out';
+    const key = normalized.id || normalized.name;
+    const options = productOptions(normalized);
+    const firstOption = options[0] || { price: normalized.price };
+    const hasOptions = normalized.hasVariations && options.length > 0;
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
+    const displayImage = (hasOptions && firstOption.image) || image;
+
+    return `
+      <article class="full-catalog-item public-product-item catalog-product ${outOfStock ? 'is-out-of-stock' : ''}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(key)}">
+        <div class="full-catalog-media">
+          ${productMediaHTML(normalized, displayImage)}
+        </div>
+        <div class="full-catalog-copy">
+          <div class="full-catalog-badges">
+            <span class="catalog-status-badge is-category">${escapeHTML(normalized.category)}</span>
+            ${normalized.offerActive ? '<span class="catalog-status-badge is-offer">Oferta</span>' : ''}
+            ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
+            ${selectedOutOfStock ? '<span class="catalog-status-badge is-out">Indisponivel no momento</span>' : ''}
+          </div>
+          <h3>${escapeHTML(normalized.name)}</h3>
+          <p>${escapeHTML(normalized.description || `Produto de ${normalized.category}.`)}</p>
+          ${normalized.kitItems ? `<small>${escapeHTML(normalized.kitItems)}</small>` : ''}
+        </div>
+        <div class="full-catalog-action">
+          ${
+            hasOptions
+              ? `
+            <select class="product-option product-option-compact" aria-label="Escolher opcao do produto">
+              ${productOptionsHTML(options, normalized)}
+            </select>
+          `
+              : ''
+          }
+          <strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>
+          <button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+            <i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>
+            ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}
+          </button>
+          <button class="btn btn-secondary" type="button" data-catalog-detail="${escapeHTML(key)}">
+            <i class="fa-solid fa-circle-info"></i>
+            Ver detalhes
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
   function renderPublicProductsPage() {
     const grid = qs('[data-public-products-grid]');
     if (!grid) return false;
 
     renderDynamicFilters();
-    grid.innerHTML = publicStoreProducts().map((product) => productCardHTML(product, 'catalog')).join('');
+    grid.innerHTML = publicStoreProducts().map(publicProductCardHTML).join('');
 
     let empty = qs('#catalog-empty');
     if (!empty) {
