@@ -208,6 +208,8 @@ as $$
   );
 $$;
 
+drop function if exists public.current_profile_for_app();
+
 create or replace function public.current_profile_for_app()
 returns table (
   id uuid,
@@ -219,20 +221,28 @@ returns table (
 language sql
 security definer
 stable
-set search_path = public
+set search_path = public, auth
 as $$
   select
-    p.id,
-    p.email,
-    p.nome,
-    case
-      when p.role in ('cliente', 'equipe', 'motoboy', 'admin', 'developer') then p.role
-      when coalesce(p.is_admin, false) then 'admin'
-      else 'cliente'
-    end as role,
-    coalesce(p.is_admin, false) or p.role in ('admin', 'developer') as is_admin
-  from public.profiles p
-  where p.id = auth.uid()
+    au.id::uuid as id,
+    au.email::text as email,
+    coalesce(
+      nullif(p.nome, ''),
+      nullif(au.raw_user_meta_data->>'nome', ''),
+      nullif(au.raw_user_meta_data->>'name', ''),
+      au.email
+    )::text as nome,
+    coalesce(
+      nullif(p.role, ''),
+      case
+        when p.is_admin is true then 'admin'
+        else 'cliente'
+      end
+    )::text as role,
+    coalesce(p.is_admin, false)::boolean as is_admin
+  from auth.users au
+  left join public.profiles p on p.id = au.id
+  where au.id = auth.uid()
   limit 1;
 $$;
 
