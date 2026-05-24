@@ -208,6 +208,34 @@ as $$
   );
 $$;
 
+create or replace function public.current_profile_for_app()
+returns table (
+  id uuid,
+  email text,
+  nome text,
+  role text,
+  is_admin boolean
+)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select
+    p.id,
+    p.email,
+    p.nome,
+    case
+      when p.role in ('cliente', 'equipe', 'motoboy', 'admin', 'developer') then p.role
+      when coalesce(p.is_admin, false) then 'admin'
+      else 'cliente'
+    end as role,
+    coalesce(p.is_admin, false) or p.role in ('admin', 'developer') as is_admin
+  from public.profiles p
+  where p.id = auth.uid()
+  limit 1;
+$$;
+
 create or replace function public.is_developer()
 returns boolean
 language sql
@@ -339,6 +367,7 @@ end;
 $$;
 
 revoke all on function public.current_user_role() from public;
+revoke all on function public.current_profile_for_app() from public;
 revoke all on function public.is_developer() from public;
 revoke all on function public.is_admin() from public;
 revoke all on function public.is_staff() from public;
@@ -349,6 +378,7 @@ revoke all on function public.admin_can_write() from public;
 revoke all on function public.admin_set_user_role(uuid, text) from public;
 
 grant execute on function public.current_user_role() to authenticated;
+grant execute on function public.current_profile_for_app() to authenticated;
 grant execute on function public.is_developer() to authenticated;
 grant execute on function public.is_admin() to anon, authenticated;
 grant execute on function public.is_staff() to authenticated;

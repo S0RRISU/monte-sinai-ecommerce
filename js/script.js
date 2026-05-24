@@ -1128,6 +1128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function adminRole(profile = adminProfileCache) {
     const role = normalizeText(profile?.role || '');
+    if (!ADMIN_ROLES.includes(role) && profile?.is_admin === true) return 'admin';
     return ADMIN_ROLES.includes(role) ? role : 'cliente';
   }
 
@@ -1810,61 +1811,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id || !isUUID(authUser.id)) return null;
 
-    // Read role directly from public.profiles with layered fallbacks
     try {
-      const tryFields = ['id, email, nome, role, is_admin', 'id, email, nome, is_admin', 'id, email, nome'];
-
-      let profile = null;
-      let tried = [];
-      let lastError = null;
-
-      for (const fields of tryFields) {
-        tried.push(fields);
-        const { data, error } = await client
-          .from('profiles')
-          .select(fields)
-          .eq('id', authUser.id)
-          .limit(1)
-          .maybeSingle();
-        if (error) {
-          lastError = error;
-          console.warn('[Supabase] profiles select failed for fields:', fields, error);
-          continue;
-        }
-        profile = data;
-        // annotate which fields we successfully retrieved
-        profile = { ...(profile || {}), _fields: fields.split(',').map((s) => s.trim()) };
-        break;
-      }
-
-      if (!profile) {
-        console.warn('[Supabase] nao conseguiu ler profile com nenhum fallback.', { tried, lastError });
+      if (typeof client.rpc !== 'function') return null;
+      const { data, error } = await client.rpc('current_profile_for_app').maybeSingle();
+      if (error) {
+        console.warn('[Supabase] current_profile_for_app falhou. Link admin sera ocultado.', error);
         return null;
       }
+      if (!data?.id) return null;
 
-      const hasRoleField = Array.isArray(profile._fields) && profile._fields.includes('role');
-      const hasIsAdminField = Array.isArray(profile._fields) && profile._fields.includes('is_admin');
-
-      let role = 'cliente';
-      if (hasRoleField && profile.role && ADMIN_ROLES.includes(normalizeText(profile.role))) {
-        role = normalizeText(profile.role);
-      } else if (hasIsAdminField && profile.is_admin) {
-        role = 'admin';
-      } else if (!hasRoleField && !hasIsAdminField) {
-        // only id/email/nome available -> default to cliente for public pages
-        role = 'cliente';
-      }
+      const role = adminRole(data);
 
       adminProfileCache = {
-        id: authUser.id,
-        email: profile.email || authUser.email || '',
-        nome: profile.nome || authMetadata(authUser).name || authUser.email || '',
+        id: data.id || authUser.id,
+        email: data.email || authUser.email || '',
+        nome: data.nome || authMetadata(authUser).name || authUser.email || '',
         role,
-        _fields: profile._fields,
+        is_admin: data.is_admin === true || role === 'admin' || role === 'developer',
       };
       return adminProfileCache;
     } catch (err) {
-      console.warn('[Supabase] erro inesperado ao consultar profiles para role.', err);
+      console.warn('[Supabase] erro inesperado ao validar perfil via RPC.', err);
       return null;
     }
   }

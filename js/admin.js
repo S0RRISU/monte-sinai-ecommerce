@@ -163,14 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const isUuid = (value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
-  // Local helper to obtain current admin profile directly from public.profiles
-  // This avoids depending on currentAdminProfile() from script.js which
-  // is not loaded on pages that include only admin.js (painel.html).
-  async function getCurrentAdminProfileFromProfiles({ force = false } = {}) {
+  // Local helper for painel.html: admin.js is loaded without script.js here.
+  async function getCurrentProfileForApp({ force = false } = {}) {
     if (state.profile && !force) return state.profile;
 
     const api = client();
-    if (!api?.auth) return null;
+    if (!api?.auth || typeof api.rpc !== 'function') return null;
 
     try {
       const { data: sessionData, error: sessionError } = await api.auth.getUser();
@@ -181,49 +179,30 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
 
-      const tryFields = ['id, email, nome, role, is_admin', 'id, email, nome, is_admin', 'id, email, nome'];
-      let profile = null;
-      let tried = [];
-      let lastError = null;
-      for (const fields of tryFields) {
-        tried.push(fields);
-        const { data, error } = await api.from('profiles').select(fields).eq('id', user.id).limit(1).maybeSingle();
-        if (error) {
-          lastError = error;
-          console.warn('[Admin] profiles select failed for fields:', fields, error);
-          continue;
-        }
-        profile = { ...(data || {}), _fields: fields.split(',').map((s) => s.trim()) };
-        break;
-      }
-
-      if (!profile) {
-        console.warn('[Admin] nao conseguiu ler profile com nenhum fallback.', { tried, lastError });
+      const { data, error } = await api.rpc('current_profile_for_app').maybeSingle();
+      if (error) {
+        console.warn('[Admin] current_profile_for_app falhou.', error);
         return null;
       }
-
-      const hasRoleField = Array.isArray(profile._fields) && profile._fields.includes('role');
-      const hasIsAdminField = Array.isArray(profile._fields) && profile._fields.includes('is_admin');
+      if (!data?.id) return null;
 
       let role = 'cliente';
-      if (hasRoleField && profile.role && ADMIN_ROLES.includes(normalize(profile.role))) {
-        role = normalize(profile.role);
-      } else if (hasIsAdminField && profile.is_admin) {
-        role = 'admin';
-      }
+      const normalizedRole = normalize(data.role || '');
+      if (ADMIN_ROLES.includes(normalizedRole)) role = normalizedRole;
+      else if (data.is_admin === true) role = 'admin';
 
       const result = {
-        id: user.id,
-        email: profile.email || user.email || '',
-        nome: profile.nome || user.user_metadata?.name || user.email || '',
+        id: data.id || user.id,
+        email: data.email || user.email || '',
+        nome: data.nome || user.user_metadata?.name || user.email || '',
         role,
-        _fields: profile._fields,
+        is_admin: data.is_admin === true || role === 'admin' || role === 'developer',
       };
 
       state.profile = result;
       return result;
     } catch (err) {
-      console.warn('[Admin] erro ao obter perfil do profiles.', err);
+      console.warn('[Admin] erro ao obter perfil via current_profile_for_app.', err);
       return null;
     }
   }
@@ -602,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function currentAdminRole() {
     const role = normalize(state.profile?.role || '');
+    if (!ADMIN_ROLES.includes(role) && state.profile?.is_admin === true) return 'admin';
     return ADMIN_ROLES.includes(role) ? role : 'cliente';
   }
 
@@ -684,9 +664,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.user = user;
 
-    // Use local helper that reads profiles directly (does not depend on script.js)
-    const profile = await getCurrentAdminProfileFromProfiles({ force: true }).catch((e) => {
-      console.warn('[Admin] falha ao obter perfil via profiles.', e);
+    const profile = await getCurrentProfileForApp({ force: true }).catch((e) => {
+      console.warn('[Admin] falha ao obter perfil via current_profile_for_app.', e);
       return null;
     });
 

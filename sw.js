@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260524-image-hotfix';
+const CACHE_VERSION = 'monte-sinai-20260524-profile-rpc';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_MANIFEST_URL = '/assets/generated/v2/manifest.json';
@@ -12,7 +12,7 @@ const STATIC_ASSETS = [
   '/sobre',
   '/contato',
   '/css/style.css?v=20260522-6',
-  '/js/script.js?v=20260524-image-hotfix',
+  '/js/script.js?v=20260524-profile-rpc',
   '/js/supabase.js?v=20260520-4',
   '/site.webmanifest',
   ASSET_MANIFEST_URL,
