@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productImageHTML(product = {}) {
-    const src = text(product.imagem || '').trim();
+    const src = adminImageRenderSrc(product.imagem || '');
     const placeholder = productPlaceholderHTML(product);
     if (!src) return placeholder;
     return `<img src="${escapeHTML(src)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
@@ -427,6 +427,78 @@ document.addEventListener('DOMContentLoaded', () => {
   function client() {
     if (!state.client) state.client = window.monteSinaiSupabase || window.supabaseClient || null;
     return state.client;
+  }
+
+  function productStoragePathFromValue(value = '') {
+    const raw = text(value).trim();
+    if (!raw) return '';
+    let clean = raw.replaceAll('\\', '/').trim();
+
+    const publicMarker = '/storage/v1/object/public/';
+    const markerIndex = clean.indexOf(publicMarker);
+    if (markerIndex >= 0) {
+      clean = clean.slice(markerIndex + publicMarker.length);
+    }
+
+    clean = clean
+      .replace(/^https?:\/\/[^/]+\/?/i, '')
+      .replace(/^storage\/v1\/object\/public\//i, '')
+      .replace(/^object\/public\//i, '')
+      .replace(/^public\//i, '')
+      .replace(/^\/+/, '')
+      .split(/[?#]/)[0];
+
+    while (clean.toLowerCase().startsWith(`${PRODUCT_IMAGE_BUCKET.toLowerCase()}/`)) {
+      clean = clean.slice(PRODUCT_IMAGE_BUCKET.length + 1);
+    }
+
+    return /^(produto|variacao)\/[a-z0-9-]+\/[a-z0-9.-]+$/i.test(clean) ? clean : '';
+  }
+
+  function publicProductStorageUrl(path = '') {
+    const cleanPath = productStoragePathFromValue(path);
+    if (!cleanPath) return '';
+    const api = client();
+    const { data } = api?.storage?.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(cleanPath) || {};
+    return data?.publicUrl || '';
+  }
+
+  function normalizeProductImageUrl(value = '') {
+    const image = text(value).trim();
+    if (!image) return '';
+    if (/^data:/i.test(image) || /^blob:/i.test(image)) {
+      throw new Error('Imagem temporaria nao pode ser salva no produto. Envie pelo Storage ou use uma URL publica.');
+    }
+
+    const storagePath = productStoragePathFromValue(image);
+    if (storagePath) return publicProductStorageUrl(storagePath) || image;
+
+    if (/^https?:\/\//i.test(image)) return image;
+    return image.replaceAll('\\', '/').replace(/^\/+/, '');
+  }
+
+  function normalizeProductImageUrlForDisplay(value = '') {
+    try {
+      return normalizeProductImageUrl(value);
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function adminImageRenderSrc(value = '') {
+    const src = normalizeProductImageUrlForDisplay(value);
+    if (!src || /^(https?:|data:|blob:)/i.test(src)) return src;
+    return location.pathname.includes('/pages/') ? `../${src.replace(/^\.?\//, '')}` : src;
+  }
+
+  function savedImageMatches(expected = '', saved = '') {
+    return normalizeProductImageUrlForDisplay(expected) === normalizeProductImageUrlForDisplay(saved);
+  }
+
+  function assertImagePersisted(expected = '', saved = '', label = 'produto') {
+    if (!savedImageMatches(expected, saved)) {
+      throw new Error(`Imagem enviada, mas a URL salva no ${label} nao confere com o retorno do banco.`);
+    }
   }
 
   async function rpcAtualizarPedido(pedidoId, payload = {}) {
@@ -2114,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .from('produto_variacoes')
       .update(payload)
       .eq('id', variationId)
-      .select('id, imagem')
+      .select('id, imagem, updated_at')
       .maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
@@ -2130,6 +2202,15 @@ document.addEventListener('DOMContentLoaded', () => {
         'error',
       );
       return false;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+      try {
+        assertImagePersisted(payload.imagem, data.imagem, 'variacao');
+      } catch (imageError) {
+        showToast(friendlyDbError(imageError, imageError.message), 'error');
+        return false;
+      }
     }
 
     await logAdminAction(
@@ -2190,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem').maybeSingle();
+    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem, updated_at').maybeSingle();
     variationSaveLocks.delete(`new-${productId}`);
     setVariationAddBusy(productId, false);
 
@@ -2204,6 +2285,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ),
         'error',
       );
+      return false;
+    }
+
+    try {
+      assertImagePersisted(payload.imagem, data?.imagem, 'nova variacao');
+    } catch (imageError) {
+      showToast(friendlyDbError(imageError, imageError.message), 'error');
       return false;
     }
 
@@ -2286,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .from('produtos')
         .update(payload)
         .eq('id', productId)
-        .select('id, imagem')
+        .select('id, imagem, updated_at')
         .maybeSingle());
 
       if (error || !data) {
@@ -2313,7 +2401,7 @@ document.addEventListener('DOMContentLoaded', () => {
           .from('produtos')
           .update(basePayload)
           .eq('id', productId)
-          .select('id, imagem')
+          .select('id, imagem, updated_at')
           .maybeSingle();
         data = fallback.data;
         error = fallback.error;
@@ -2346,8 +2434,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
+    if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+      try {
+        assertImagePersisted(payload.imagem, data.imagem, 'produto');
+      } catch (imageError) {
+        unlockProductSave(productId);
+        showToast(friendlyDbError(imageError, imageError.message), 'error');
+        return false;
+      }
+    }
+
     state.produtos = state.produtos.map((product) =>
-      product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product,
+      product.id === productId
+        ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem, updated_at: data?.updated_at ?? product.updated_at }
+        : product,
     );
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
@@ -2423,13 +2523,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ensureSafeProductImageValue(value = '') {
-    const image = text(value).trim();
-    if (/^data:/i.test(image)) {
-      throw new Error(
-        'Imagem em base64/DataURL nao pode ser salva no produto. Envie a imagem pelo Storage ou use uma URL.',
-      );
-    }
-    return image;
+    return normalizeProductImageUrl(value);
   }
 
   function adminImageFeedbackTargets(target = '') {
@@ -2512,7 +2606,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const prefix = uploadLogPrefix(stage, details.context || '');
     const isErrorStage =
-      /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
+      /erro|falha|inacessivel|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(
+        stage,
+      );
     if (!isErrorStage) return;
     if (console.groupCollapsed) {
       console.groupCollapsed(`${prefix} ${stage}`);
@@ -2554,6 +2650,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Imagem preparada, mas ainda ficou grande para envio.';
     }
     return error?.message || fallback;
+  }
+
+  async function assertUploadedImageIsPublic(publicUrl = '', diagnostic = {}) {
+    const storagePath = productStoragePathFromValue(publicUrl);
+    if (!storagePath || typeof fetch !== 'function') return;
+    try {
+      const response = await fetch(publicUrl, { method: 'HEAD', cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Storage retornou ${response.status} ao abrir a imagem enviada.`);
+      }
+    } catch (error) {
+      logImageUploadDiagnostic('public-url-inacessivel', {
+        context: diagnostic.context || 'produto',
+        path: storagePath,
+        publicUrl,
+        error: storageErrorDiagnostic(error),
+      });
+      throw error;
+    }
   }
 
   async function diagnoseAdminCanWrite(api, context = 'produto') {
@@ -2858,12 +2973,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('Upload concluido, mas nao consegui gerar URL publica.');
+    const publicUrl = normalizeProductImageUrl(data.publicUrl);
     logImageUploadDiagnostic('public-url', {
       context: diagnostic.context || 'produto',
       path,
-      publicUrl: data.publicUrl,
+      publicUrl,
     });
-    return data.publicUrl;
+    await assertUploadedImageIsPublic(publicUrl, diagnostic);
+    return publicUrl;
   }
 
   function renderCreateProductImagePreview(file) {
@@ -3027,7 +3144,11 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Informe o preco promocional para ativar a oferta.');
       }
 
-      let { data: insertedProduct, error } = await api.from('produtos').insert(payload).select('id').maybeSingle();
+      let { data: insertedProduct, error } = await api
+        .from('produtos')
+        .insert(payload)
+        .select('id, imagem, updated_at')
+        .maybeSingle();
       if (
         error &&
         normalize(error.message || error.details || '').match(
@@ -3043,11 +3164,12 @@ document.addEventListener('DOMContentLoaded', () => {
           ativo: payload.ativo,
         };
         if (estoqueValue !== '') basePayload.estoque = payload.estoque;
-        const fallback = await api.from('produtos').insert(basePayload).select('id').maybeSingle();
+        const fallback = await api.from('produtos').insert(basePayload).select('id, imagem, updated_at').maybeSingle();
         insertedProduct = fallback.data;
         error = fallback.error;
       }
       if (error) throw error;
+      assertImagePersisted(payload.imagem, insertedProduct?.imagem, 'produto');
 
       form.reset();
       renderCreateProductImagePreview(null);

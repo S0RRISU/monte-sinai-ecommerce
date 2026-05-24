@@ -3042,8 +3042,44 @@ document.addEventListener('DOMContentLoaded', () => {
     return index >= 0 ? clean.slice(index) : clean.replace(/^\.\.\//, '').replace(/^\.\//, '');
   }
 
+  function productStoragePathFromValue(src = '') {
+    const raw = String(src || '').trim();
+    if (!raw) return '';
+    let clean = raw.replaceAll('\\', '/');
+
+    const publicMarker = '/storage/v1/object/public/';
+    const markerIndex = clean.indexOf(publicMarker);
+    if (markerIndex >= 0) {
+      clean = clean.slice(markerIndex + publicMarker.length);
+    }
+
+    clean = clean
+      .replace(/^https?:\/\/[^/]+\/?/i, '')
+      .replace(/^storage\/v1\/object\/public\//i, '')
+      .replace(/^object\/public\//i, '')
+      .replace(/^public\//i, '')
+      .replace(/^\/+/, '')
+      .split(/[?#]/)[0];
+
+    while (clean.toLowerCase().startsWith(`${PRODUCT_IMAGE_BUCKET.toLowerCase()}/`)) {
+      clean = clean.slice(PRODUCT_IMAGE_BUCKET.length + 1);
+    }
+
+    return /^(produto|variacao)\/[a-z0-9-]+\/[a-z0-9.-]+$/i.test(clean) ? clean : '';
+  }
+
+  function publicProductStorageUrl(path = '') {
+    const cleanPath = productStoragePathFromValue(path);
+    if (!cleanPath) return '';
+    const client = supabaseProductClient();
+    const { data } = client?.storage?.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(cleanPath) || {};
+    return data?.publicUrl || '';
+  }
+
   function resolveProductImagePath(src, productName = '') {
     if (!src) return '';
+    const storagePath = productStoragePathFromValue(src);
+    if (storagePath) return publicProductStorageUrl(storagePath) || src;
     if (/^(https?:|data:|blob:)/.test(src)) return src;
 
     const clean = String(src).trim().replaceAll('\\', '/').replace(/^\/+/, '');
