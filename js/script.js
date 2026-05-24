@@ -4542,10 +4542,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return option.name || option.label || 'Opcao';
   }
 
+  function getImagemProdutoSelecionada(produto = {}, variacaoSelecionada = null) {
+    const normalized = normalizeProduct(produto);
+    const variationImage = resolveProductImagePath(
+      variacaoSelecionada?.image || variacaoSelecionada?.imagem || '',
+      normalized.name || produto.name || produto.nome || '',
+    );
+    if (variationImage) return variationImage;
+    const productImage = resolveProductImagePath(
+      normalized.image || produto.image || produto.imagem || '',
+      normalized.name || produto.name || produto.nome || '',
+    );
+    if (productImage) return productImage;
+    return productAssetFallback(normalized.name || produto.name || produto.nome || '') || '';
+  }
+
   function productOptionsHTML(options = [], product = {}) {
     return options
       .map((option) => {
-        const image = option.image || productAssetPath(product);
+        const image = getImagemProdutoSelecionada(product, option);
         return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
@@ -4563,10 +4578,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const button = card?.querySelector('.btn-add-cart');
     const productId = button?.dataset.productId || card?.dataset.productId || '';
     const variationId = option?.dataset.variationId || button?.dataset.variationId || '';
+    const product = productId
+      ? productIndex.find((item) => String(normalizeProduct(item).id) === String(productId))
+      : null;
+    const normalizedProduct = product ? normalizeProduct(product) : null;
     const current = variationFromProductIndex(productId, variationId);
     const stock = normalizeVariationStockValue(current ? current.stock : option?.dataset.stock);
     const price = Number(current?.price ?? option?.dataset.price ?? button?.dataset.price ?? 0);
-    const image = current?.image || option?.dataset.image || button?.dataset.image || '';
+    const image =
+      getImagemProdutoSelecionada(normalizedProduct || {}, current || null) ||
+      current?.image ||
+      option?.dataset.image ||
+      button?.dataset.image ||
+      '';
     const name = current?.name || option?.dataset.variationName || option?.textContent?.trim() || '';
     const explicitOut = current
       ? optionOutOfStock(current)
@@ -4619,7 +4643,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stockLine.classList.toggle('is-empty', !state.stockText);
       stockLine.classList.toggle('is-unavailable', state.out);
     }
-    if (state.image && imageEl && card.closest('.catalog-detail-panel')) imageEl.src = assetHref(state.image);
+    if (state.image && imageEl) imageEl.src = assetHref(state.image);
     if (availabilityNote) {
       const label = state.out
         ? 'Indisponivel no momento'
@@ -4662,6 +4686,13 @@ document.addEventListener('DOMContentLoaded', () => {
       button.classList.toggle('btn-esgotado', state.out);
       button.innerHTML = state.out ? 'Indisponivel' : 'Adicionar';
     }
+    const detailTrigger =
+      card.querySelector('[data-catalog-detail]') || card.closest('[data-catalog-detail-key], [data-catalog-product-key]');
+    if (detailTrigger && state.variationId) {
+      detailTrigger.dataset.catalogVariationId = state.variationId;
+      detailTrigger.dataset.catalogVariationName = state.name || '';
+      detailTrigger.dataset.catalogVariationImage = state.image || '';
+    }
   }
 
   function publicProductCardHTML(product, options = {}) {
@@ -4674,7 +4705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
-    const image = productAssetPath(normalized);
+    const image = getImagemProdutoSelecionada(normalized, null);
     const cardClass = rail
       ? [
           'product-card',
@@ -4710,11 +4741,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasAnyOffer = selectedOfferActive || productOptionsList.some((option) => option.offerActive);
     const priceHTML = `<strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>`;
     const addButtonHTML = `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${rail ? '' : `<i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>`}${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`;
-    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
+    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(getImagemProdutoSelecionada(normalized, firstOption))}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
 
     if (rail) {
       return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(getImagemProdutoSelecionada(normalized, firstOption))}">
         ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
         ${selectedOutOfStock ? '<span class="recommended-badge stock-badge">Indisponivel</span>' : ''}
         <div class="product-media">
@@ -4738,7 +4769,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return `
-      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(getImagemProdutoSelecionada(normalized, firstOption))}">
         <div class="full-catalog-media">
           ${productMediaHTML(normalized, image)}
         </div>
@@ -5251,7 +5282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function openCatalogDetailModal(key = '') {
+  function openCatalogDetailModal(key = '', selectedVariationId = '') {
     const product = catalogProductByKey(key);
     if (!product) {
       showToast('Produto nao encontrado no catalogo.', { type: 'warning' });
@@ -5267,11 +5298,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
-    const firstOption = options[0] || { price: normalized.price };
+    const selectedOption =
+      (selectedVariationId && options.find((option) => String(option.id) === String(selectedVariationId))) || options[0] || { price: normalized.price };
     const hasOptions = normalized.hasVariations && options.length > 0;
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
-    const displayImage = (hasOptions && firstOption.image) || image;
-    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(selectedOption) : outOfStock;
+    const displayImage = getImagemProdutoSelecionada(normalized, hasOptions ? selectedOption : null);
+    const selectedOfferActive = Boolean(selectedOption.offerActive ?? normalized.offerActive);
     const hasAnyOffer = selectedOfferActive || options.some((option) => option.offerActive);
 
     if (body) {
@@ -5291,7 +5323,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? selectedOption : null, selectedOutOfStock)}</strong></div>
 
             <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
@@ -5317,7 +5349,7 @@ document.addEventListener('DOMContentLoaded', () => {
               Voltar ao catalogo
             </button>
             ${
-              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(selectedOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(selectedOption.id || '')}" data-variation-name="${escapeHTML(selectedOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
               ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
             </button>`
@@ -5325,7 +5357,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
+      const select = qs('.product-option', body);
+      if (select && selectedOption?.id) {
+        const match = [...select.options].find((item) => String(item.dataset.variationId || '') === String(selectedOption.id));
+        if (match) select.value = match.value;
+      }
       refreshOfferCountdowns(body);
+      if (select) updateSelectedVariationUI(select);
     }
 
     modal.classList.remove('hidden');
@@ -5363,7 +5401,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!detailButton && event.target.closest('button, select, input, label, a')) return;
       event.preventDefault();
       const key = trigger.dataset.catalogDetail || trigger.dataset.catalogProductKey;
-      openCatalogDetailModal(key);
+      openCatalogDetailModal(key, trigger.dataset.catalogVariationId || '');
     });
 
     renderFullCatalogPage();
@@ -5378,7 +5416,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const detailButton = event.target.closest('[data-catalog-detail]');
       if (!detailButton) return;
       event.preventDefault();
-      openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+      openCatalogDetailModal(detailButton.dataset.catalogDetail || '', detailButton.dataset.catalogVariationId || '');
     });
 
     renderSimpleCatalogPage();
@@ -5497,7 +5535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailButton = event.target.closest('[data-catalog-detail]');
         if (detailButton) {
           event.preventDefault();
-          openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+          openCatalogDetailModal(detailButton.dataset.catalogDetail || '', detailButton.dataset.catalogVariationId || '');
           return;
         }
 
@@ -5505,6 +5543,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cardDetail || event.target.closest('button, select, input, label, a')) return;
         openCatalogDetailModal(
           cardDetail.dataset.catalogDetailKey || cardDetail.dataset.productId || cardDetail.dataset.name,
+          cardDetail.dataset.catalogVariationId || '',
         );
         return;
       }
@@ -5518,7 +5557,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const variationId = selectedState?.variationId || option?.dataset.variationId || button.dataset.variationId || '';
       const price = Number(selectedState?.price ?? option?.dataset.price ?? button.dataset.price ?? 0);
       const image = canonicalAssetPath(
-        selectedState?.image || card?.querySelector('.product-image')?.getAttribute('src') || button.dataset.image || '',
+        selectedState?.image ||
+          card?.querySelector('.product-image')?.getAttribute('src') ||
+          button.dataset.image ||
+          getImagemProdutoSelecionada(
+            productIndex.find((item) => String(normalizeProduct(item).id) === String(button.dataset.productId || card?.dataset.productId || '')) || {},
+            selectedState || null,
+          ) ||
+          '',
       );
 
       if (!baseName || Number.isNaN(price)) return;
