@@ -828,6 +828,36 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function adminOrderProgressHTML(statusUi = 'pendente') {
+    const currentIndex = Math.max(0, Object.keys(ORDER_STATUS).indexOf(statusUi));
+    const steps = [
+      { key: 'pendente', label: 'Recebido', icon: 'fa-receipt' },
+      { key: 'preparo', label: 'Preparo', icon: 'fa-box-open' },
+      { key: 'entrega', label: 'Entrega', icon: 'fa-truck-fast' },
+      { key: 'entregue', label: 'Entregue', icon: 'fa-circle-check' },
+    ];
+    const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
+    return `
+      <div class="admin-order-progress" style="--order-progress:${progress}%;" aria-label="Progresso do pedido">
+        <div class="admin-order-progress-track" aria-hidden="true"></div>
+        <div class="admin-order-progress-steps">
+          ${steps
+            .map((step, index) => {
+              const done = index <= currentIndex;
+              const current = index === currentIndex;
+              return `
+                <span class="${done ? 'is-done' : ''} ${current ? 'is-current' : ''}" data-order-progress-step="${escapeHTML(step.key)}">
+                  <i class="fa-solid ${step.icon}"></i>
+                  <strong>${escapeHTML(step.label)}</strong>
+                </span>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+  }
+
   function orderCardHTML(order, highlightId = '') {
     const highlighted = highlightId && order.id === highlightId;
     const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
@@ -850,6 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>${escapeHTML(order.pagamento || 'Pagamento a combinar')}</span>
           <strong>${formatMoney(order.totalNumber)}</strong>
         </div>
+        ${adminOrderProgressHTML(order.statusUi)}
         <div class="admin-order-control-grid">
           ${orderStatusSelect(order)}
           ${orderPaymentSelect(order)}

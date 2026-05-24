@@ -10419,12 +10419,25 @@ document.addEventListener('DOMContentLoaded', () => {
   function orderStatusTimelineHTML(status = '') {
     const displayStatus = normalizeOrderStatus(status);
     const canceled = displayStatus === 'Cancelado';
-    const steps = ORDER_STATUS_OPTIONS.map((label) => {
-      const isCanceledStep = label === 'Cancelado';
-      const active = canceled ? isCanceledStep : !isCanceledStep && ORDER_STATUS_OPTIONS.indexOf(label) <= ORDER_STATUS_OPTIONS.indexOf(displayStatus);
-      return `<span class="${active ? 'active' : ''} ${isCanceledStep ? 'is-canceled-step' : ''}">${escapeHTML(label)}</span>`;
-    });
-    return steps.join('');
+    const normalSteps = [
+      { label: 'Recebido', status: 'Recebido', icon: 'fa-receipt' },
+      { label: 'Preparo', status: 'Preparando', icon: 'fa-box-open' },
+      { label: 'Entrega', status: 'Saiu para entrega', icon: 'fa-truck-fast' },
+      { label: 'Entregue', status: 'Entregue', icon: 'fa-circle-check' },
+    ];
+    const steps = canceled ? [...normalSteps, { label: 'Cancelado', status: 'Cancelado', icon: 'fa-circle-xmark' }] : normalSteps;
+    const currentIndex = canceled
+      ? steps.length - 1
+      : Math.max(0, normalSteps.findIndex((step) => step.status === displayStatus));
+    const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
+    return steps
+      .map((step, index) => {
+        const active = index <= currentIndex;
+        const current = index === currentIndex;
+        const isCanceledStep = step.status === 'Cancelado';
+        return `<span class="${active ? 'active is-done' : ''} ${current ? 'is-current' : ''} ${isCanceledStep ? 'is-canceled-step' : ''}" style="--order-progress:${progress}%"><i class="fa-solid ${step.icon}"></i><strong>${escapeHTML(step.label)}</strong></span>`;
+      })
+      .join('');
   }
 
   function notifyLowStock(products = []) {
