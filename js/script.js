@@ -1786,27 +1786,46 @@ document.addEventListener('DOMContentLoaded', () => {
   async function currentAdminProfile({ force = false } = {}) {
     if (adminProfileCache && !force) return adminProfileCache;
 
-    const client = ordersClient();
+    const client = authClient();
     if (!client) return null;
 
     await authReady.catch(() => null);
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id || !isUUID(authUser.id)) return null;
 
-    const { data: roleData, error: roleError } = await client.rpc('current_user_role');
-    if (roleError) {
-      console.warn('[Supabase] current_user_role RPC falhou, retornando fallback de perfil.', roleError);
+    // Read role directly from public.profiles instead of relying on RPC current_user_role
+    try {
+      const { data: profile, error: profileError } = await client
+        .from('profiles')
+        .select('id, email, nome, role, is_admin')
+        .eq('id', authUser.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn('[Supabase] falha ao ler perfil em profiles, usando fallback.', profileError);
+        return null;
+      }
+
+      const rawRole = profile?.role;
+      let role = 'cliente';
+      if (rawRole && ADMIN_ROLES.includes(normalizeText(rawRole))) {
+        role = normalizeText(rawRole);
+      } else if (profile?.is_admin) {
+        role = 'admin';
+      }
+
+      adminProfileCache = {
+        id: authUser.id,
+        email: profile?.email || authUser.email || '',
+        nome: profile?.nome || authMetadata(authUser).name || authUser.email || '',
+        role,
+      };
+      return adminProfileCache;
+    } catch (err) {
+      console.warn('[Supabase] erro ao consultar profiles para role.', err);
       return null;
     }
-
-    const role = ADMIN_ROLES.includes(normalizeText(roleData)) ? normalizeText(roleData) : 'cliente';
-    adminProfileCache = {
-      id: authUser.id,
-      email: authUser.email || '',
-      nome: authMetadata(authUser).name || authMetadata(authUser).full_name || authUser.email || '',
-      role,
-    };
-    return adminProfileCache;
   }
 
   async function isCurrentUserAdmin({ force = true } = {}) {

@@ -547,9 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.user = user;
 
-    const { data: roleData, error: roleError } = await api.rpc('current_user_role');
-    if (roleError) {
-      console.warn('[Admin] Nao foi possivel validar cargo RBAC.', roleError);
+    // Use profiles table directly instead of calling RPC current_user_role
+    const profile = await currentAdminProfile({ force: true }).catch((e) => {
+      console.warn('[Admin] falha ao obter perfil via profiles.', e);
+      return null;
+    });
+
+    if (!profile) {
       setAccessState(
         'Erro ao carregar perfil',
         `Email detectado: ${user.email || 'nao informado'}. Nao foi possivel validar suas permissoes no Supabase agora.`,
@@ -558,13 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const role = ADMIN_ROLES.includes(normalize(roleData)) ? normalize(roleData) : 'cliente';
-    state.profile = {
-      id: user.id,
-      email: user.email || '',
-      nome: user.user_metadata?.name || user.email || '',
-      role,
-    };
+    state.profile = profile;
 
     if (!currentRolePermissions().panel) {
       setAccessState('Acesso negado', 'Voce nao tem permissao para acessar o painel administrativo.', {
