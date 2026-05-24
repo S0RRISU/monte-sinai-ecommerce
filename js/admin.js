@@ -378,6 +378,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return message.includes('admin_role') || message.includes('pgrst204') || message.includes('could not find');
   }
 
+  function logAdminAccess(stage, details = {}) {
+    const payload = {
+      stage,
+      hasSession: Boolean(details.hasSession),
+      email: details.email || '',
+      userId: details.userId || '',
+      profileFound: Boolean(details.profileFound),
+      profileIsAdmin: details.profileIsAdmin ?? null,
+      profileAdminRole: details.profileAdminRole || '',
+      decision: details.decision || '',
+      reason: details.reason || '',
+      error: details.error || '',
+    };
+    console.info('[Admin Access]', payload);
+  }
+
   function setDatabaseAlert(message = '') {
     const alert = qs('#admin-db-alert');
     if (!alert) return;
@@ -437,6 +453,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadCurrentAdminProfile(api, user) {
+    const context = {
+      hasSession: Boolean(user?.id),
+      email: user?.email || '',
+      userId: user?.id || '',
+    };
     let { data: profile, error } = await api
       .from('profiles')
       .select('id, email, nome, is_admin, admin_role')
@@ -444,14 +465,32 @@ document.addEventListener('DOMContentLoaded', () => {
       .maybeSingle();
 
     if (error && isMissingProfileRoleError(error)) {
+      logAdminAccess('profiles-primary-missing-admin-role', {
+        ...context,
+        error: error.message || error.details || error.code || 'admin_role indisponivel',
+      });
       const fallback = await api.from('profiles').select('id, email, nome, is_admin').eq('id', user.id).maybeSingle();
       profile = fallback.data;
       error = fallback.error;
     }
 
-    if (error) throw error;
+    if (error) {
+      logAdminAccess('profiles-error', {
+        ...context,
+        error: error.message || error.details || error.code || 'erro desconhecido',
+        decision: 'blocked',
+        reason: 'profile-query-error',
+      });
+      throw error;
+    }
 
     if (profile) {
+      logAdminAccess('profiles-loaded', {
+        ...context,
+        profileFound: true,
+        profileIsAdmin: profile.is_admin,
+        profileAdminRole: profile.admin_role || '',
+      });
       return {
         ...profile,
         email: profile.email || user.email || '',
@@ -461,6 +500,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const fb = getFallbackRoleForEmail(user.email);
+    logAdminAccess('profiles-empty', {
+      ...context,
+      profileFound: false,
+      profileIsAdmin: false,
+      profileAdminRole: fb || '',
+      reason: 'profile-not-found-for-auth-user',
+    });
     return {
       id: user.id,
       email: user.email,
@@ -474,6 +520,10 @@ document.addEventListener('DOMContentLoaded', () => {
   async function verificarAcessoAdmin() {
     const api = client();
     if (!api?.auth) {
+      logAdminAccess('supabase-client-missing', {
+        decision: 'blocked',
+        reason: 'supabase-client-missing',
+      });
       setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', {
         icon: 'triangle-exclamation',
         retry: true,
@@ -484,7 +534,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const { data: sessionData, error: sessionError } = await api.auth.getUser();
     if (sessionError) console.warn('[Admin] Falha ao ler usuario autenticado.', sessionError);
     const user = sessionData?.user;
+    logAdminAccess('session-loaded', {
+      hasSession: Boolean(user?.id),
+      email: user?.email || '',
+      userId: user?.id || '',
+      error: sessionError?.message || '',
+    });
     if (!user?.id) {
+      logAdminAccess('access-decision', {
+        hasSession: false,
+        decision: 'blocked',
+        reason: 'no-session',
+      });
       setAccessState('Acesso restrito', 'Entre com uma conta administradora para acessar o painel.', {
         icon: 'right-to-bracket',
         login: true,
@@ -498,7 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.profile = await loadCurrentAdminProfile(api, user);
     } catch (error) {
       console.warn('[Admin] Perfil admin nao foi lido.', error);
-      setAccessState('Painel indisponível', 'Não foi possível validar suas permissões no Supabase agora.', {
+      setAccessState('Erro ao carregar perfil', `Email detectado: ${user.email || 'não informado'}. Não foi possível validar suas permissões no Supabase agora.`, {
         icon: 'triangle-exclamation',
         retry: true,
       });
@@ -507,6 +568,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const role = currentAdminRole();
     const admin = Boolean(state.profile?.is_admin === true || role === 'developer');
+    logAdminAccess('access-decision', {
+      hasSession: true,
+      email: user.email || '',
+      userId: user.id || '',
+      profileFound: Boolean(state.profile),
+      profileIsAdmin: state.profile?.is_admin,
+      profileAdminRole: state.profile?.admin_role || '',
+      decision: admin ? 'allowed' : 'blocked',
+      reason: admin ? 'is-admin-or-developer' : state.profile ? 'profile-not-admin' : 'profile-not-found',
+    });
     if (!admin) {
       setAccessState('Acesso negado', 'Você não tem permissão para acessar o painel administrativo.', {
         icon: 'shield-halved',
