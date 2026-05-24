@@ -1944,11 +1944,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    console.info('[Variacao imagem] salvando', {
-      variationId,
-      productId,
-      imagem: payload.imagem || '',
-    });
     const { data, error } = await api.from('produto_variacoes').update(payload).eq('id', variationId).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
@@ -1963,13 +1958,6 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       return false;
     }
-    console.info('[Variacao imagem] salva', {
-      variationId,
-      productId,
-      imagemEnviada: payload.imagem || '',
-      update: data || null,
-      imagemFinal: data?.imagem || payload.imagem || '',
-    });
 
     await logAdminAction(override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada', 'produto_variacao', variationId, {
       produto_id: productId,
@@ -2024,10 +2012,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    console.info('[Variacao imagem] criando', {
-      productId,
-      imagem: payload.imagem || '',
-    });
     const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(`new-${productId}`);
     setVariationAddBusy(productId, false);
@@ -2048,12 +2032,6 @@ document.addEventListener('DOMContentLoaded', () => {
     await logAdminAction('variacao_criada', 'produto_variacao', data?.id || payload.nome, {
       produto_id: productId,
       nome: payload.nome,
-    });
-    console.info('[Variacao imagem] criada', {
-      variationId: data?.id || '',
-      productId,
-      imagemEnviada: payload.imagem || '',
-      imagemFinal: data?.imagem || payload.imagem || '',
     });
     showToast('Variacao adicionada.', 'success');
     await refreshProductEditor(productId);
@@ -2125,10 +2103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const imageInput = productCardField(productId, 'imagem');
         if (imageInput) imageInput.value = payload.imagem || '';
       }
-      console.info('[Produto imagem] salvando', {
-        productId,
-        imagem: payload.imagem || '',
-      });
 
       ({ data, error } = await api
         .from('produtos')
@@ -2184,13 +2158,6 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       return false;
     }
-
-    console.info('[Produto imagem] salvo', {
-      productId,
-      imagemEnviada: payload.imagem || '',
-      update: data || null,
-      imagemFinal: data?.imagem || payload.imagem || '',
-    });
 
     state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product));
     renderizarProdutosAdmin(state.produtos);
@@ -2260,8 +2227,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!acceptedByMime && !acceptedByExtension) {
       throw new Error('Use uma imagem JPG, PNG ou WebP.');
     }
+    // When a large image is provided, it is optimized before upload.
     if (file.size > PRODUCT_IMAGE_TARGET_SIZE) {
-      console.info('[Admin] Imagem grande recebida; preparando versao otimizada antes do envio.');
+      // No console output needed for normal optimization flow.
     }
   }
 
@@ -2352,13 +2320,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ...details,
     };
     const prefix = uploadLogPrefix(stage, details.context || '');
+    const isErrorStage = /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
+    if (!isErrorStage) return;
     if (console.groupCollapsed) {
       console.groupCollapsed(`${prefix} ${stage}`);
-      console.info(payload);
+      console.error(payload);
       console.groupEnd();
       return;
     }
-    console.info(prefix, payload);
+    console.error(prefix, payload);
   }
 
   function friendlyStorageUploadError(error, fallback = 'Nao consegui enviar essa imagem.') {
