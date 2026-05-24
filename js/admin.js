@@ -101,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+  const isUuid = (value) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
   applyAdminTheme();
 
@@ -448,9 +450,9 @@ document.addEventListener('DOMContentLoaded', () => {
       email: user?.email || '',
       userId: user?.id || '',
     };
-    let { data: profile, error } = await api
+    const { data: profile, error } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin')
+      .select('id, email, nome')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -464,17 +466,35 @@ document.addEventListener('DOMContentLoaded', () => {
       throw error;
     }
 
+    const role = getFallbackRoleForEmail(profile?.email || user.email) || '';
+    let isAdmin = role === 'developer';
+    if (!isAdmin) {
+      const { data: rpcAdmin, error: rpcError } = await api.rpc('is_admin');
+      if (rpcError) {
+        logAdminAccess('admin-rpc-error', {
+          ...context,
+          profileFound: Boolean(profile),
+          error: rpcError.message || rpcError.details || rpcError.code || 'erro desconhecido',
+          decision: 'blocked',
+          reason: 'is-admin-rpc-error',
+        });
+        throw new Error('Não foi possível validar permissão administrativa. Verifique coluna/policy `is_admin` em profiles.');
+      }
+      isAdmin = rpcAdmin === true;
+    }
+
     if (profile) {
       logAdminAccess('profiles-loaded', {
         ...context,
         profileFound: true,
-        profileIsAdmin: profile.is_admin,
-        profileAdminRole: getFallbackRoleForEmail(profile.email || user.email) || '',
+        profileIsAdmin: isAdmin,
+        profileAdminRole: role,
       });
       return {
         ...profile,
         email: profile.email || user.email || '',
-        role: getFallbackRoleForEmail(profile.email || user.email) || '',
+        is_admin: isAdmin,
+        role,
       };
     }
 
@@ -482,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     logAdminAccess('profiles-empty', {
       ...context,
       profileFound: false,
-      profileIsAdmin: false,
+      profileIsAdmin: isAdmin,
       profileAdminRole: fb || '',
       reason: 'profile-not-found-for-auth-user',
     });
@@ -490,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id: user.id,
       email: user.email,
       nome: user.user_metadata?.name || user.email,
-      is_admin: false,
+      is_admin: isAdmin,
       role: fb || 'customer',
     };
   }
@@ -518,13 +538,15 @@ document.addEventListener('DOMContentLoaded', () => {
       userId: user?.id || '',
       error: sessionError?.message || '',
     });
-    if (!user?.id) {
+    if (!user?.id || !isUuid(user.id)) {
       logAdminAccess('access-decision', {
         hasSession: false,
+        email: user?.email || '',
+        userId: user?.id || '',
         decision: 'blocked',
-        reason: 'no-session',
+        reason: user?.id ? 'invalid-user-id' : 'no-session',
       });
-      setAccessState('Acesso restrito', 'Entre com uma conta administradora para acessar o painel.', {
+      setAccessState('Acesso restrito', user?.id ? 'Sessão inválida. Entre novamente para acessar o painel.' : 'Entre com uma conta administradora para acessar o painel.', {
         icon: 'right-to-bracket',
         login: true,
       });
@@ -3399,7 +3421,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const { data: profiles, error: profilesErr } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin')
+      .select('id, email, nome')
       .order('email', { ascending: true });
     if (profilesErr) {
       console.warn('[Admin] Falha ao carregar profiles', profilesErr);
@@ -3411,8 +3433,8 @@ document.addEventListener('DOMContentLoaded', () => {
       id: pr.id,
       email: pr.email,
       nome: pr.nome,
-      is_admin: pr.is_admin,
-      role: getFallbackRoleForEmail(pr.email) || (pr.is_admin ? 'staff' : 'customer'),
+      is_admin: false,
+      role: getFallbackRoleForEmail(pr.email) || 'customer',
     }));
 
     const currentRole = currentAdminRole();
@@ -3428,7 +3450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const html = rows
       .map((row) => {
-        const userRole = row.role || (row.is_admin ? 'staff' : 'customer');
+        const userRole = row.role || 'customer';
 
         let selectDisabled = !canEditRoles;
         // Do not allow non-developers to change a developer's role

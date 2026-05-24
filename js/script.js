@@ -1127,6 +1127,12 @@ document.addEventListener('DOMContentLoaded', () => {
       .toLowerCase();
   }
 
+  function isUuid(value = '') {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      String(value || ''),
+    );
+  }
+
   function knownAdminRoleForEmail(email = '') {
     return getFallbackRoleForEmail(email) || '';
   }
@@ -1741,7 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function upsertProfileRecord(user = null, source = currentUser || {}) {
     const client = ordersClient();
     const authUser = user || (await currentAuthUser());
-    if (!client || !authUser?.id) return null;
+    if (!client || !authUser?.id || !isUuid(authUser.id)) return null;
 
     const profile = {
       id: authUser.id,
@@ -1753,7 +1759,7 @@ document.addEventListener('DOMContentLoaded', () => {
       foto: source.photo || '',
     };
 
-    const columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
+    const columns = 'id, email, nome, apelido, telefone, endereco, foto';
     const { data: existing, error: lookupError } = await client
       .from('profiles')
       .select(columns)
@@ -1761,9 +1767,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .maybeSingle();
 
     if (lookupError) throw lookupError;
-    if (existing?.is_admin || isDeveloperProfile({ ...existing, email: existing?.email || authUser.email || '' })) {
-      return existing;
-    }
+    if (isDeveloperProfile({ ...existing, email: existing?.email || authUser.email || '' })) return existing;
 
     const query = existing
       ? client.from('profiles').update(profile).eq('id', authUser.id)
@@ -1820,11 +1824,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await authReady.catch(() => null);
     const authUser = await currentAuthUser().catch(() => null);
-    if (!authUser?.id) return null;
+    if (!authUser?.id || !isUuid(authUser.id)) return fallbackAdminProfileFromAuthUser(authUser);
 
     const { data, error } = await client
       .from('profiles')
-      .select('id, email, nome, is_admin')
+      .select('id, email, nome')
       .eq('id', authUser.id)
       .maybeSingle();
 
@@ -1838,18 +1842,28 @@ document.addEventListener('DOMContentLoaded', () => {
       throw error;
     }
 
+    const role = knownAdminRoleForEmail(data?.email || authUser.email || '');
+    let isAdmin = role === 'developer';
+    if (!isAdmin) {
+      const { data: rpcAdmin, error: rpcError } = await client.rpc('is_admin');
+      if (rpcError) throw rpcError;
+      isAdmin = rpcAdmin === true;
+    }
+
     if (data) {
       adminProfileCache = {
         ...data,
         email: data.email || authUser.email || '',
-        role: knownAdminRoleForEmail(data.email || authUser.email || ''),
+        is_admin: isAdmin,
+        role,
       };
       return adminProfileCache;
     }
 
-    adminProfileCache =
-      (await safeUpsertProfileRecord(authUser, userFromAuthUser(authUser), 'perfil admin')) ||
-      fallbackAdminProfileFromAuthUser(authUser);
+    const syncedProfile = await safeUpsertProfileRecord(authUser, userFromAuthUser(authUser), 'perfil admin');
+    adminProfileCache = syncedProfile
+      ? { ...syncedProfile, email: syncedProfile.email || authUser.email || '', is_admin: isAdmin, role }
+      : fallbackAdminProfileFromAuthUser(authUser);
     return adminProfileCache;
   }
 
