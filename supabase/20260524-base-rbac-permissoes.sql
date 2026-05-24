@@ -1,6 +1,9 @@
 -- Base oficial de cargos/permissoes Monte Sinai.
 -- Seguro para reexecutar. Nao apaga dados.
 
+-- Nota: esta migração é idempotente — droppa constraints antigas,
+-- normaliza valores legados e recria a constraint canônica.
+
 begin;
 
 alter table public.profiles
