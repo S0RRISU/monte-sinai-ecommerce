@@ -250,30 +250,49 @@ security definer
 stable
 set search_path = public, auth
 as $$
-  select jsonb_build_object(
-    'id', auth.uid(),
-    'email', coalesce(
-      nullif(p.email, ''),
-      nullif(auth.jwt() ->> 'email', '')
-    ),
-    'nome', coalesce(
-      nullif(p.nome, ''),
-      nullif(auth.jwt() ->> 'name', ''),
-      nullif(auth.jwt() ->> 'email', ''),
-      p.email
-    ),
-    'role', coalesce(
-      nullif(p.role, ''),
-      case
-        when p.is_admin is true then 'admin'
-        else 'cliente'
-      end
-    ),
-    'is_admin', coalesce(p.is_admin, false)
+  with current_profile as (
+    select
+      p.id,
+      p.email::text as profile_email,
+      p.nome::text as profile_nome,
+      p.role::text as profile_role,
+      coalesce(p.is_admin, false)::boolean as profile_is_admin
+    from public.profiles p
+    where p.id = auth.uid()
+    limit 1
   )
-  from public.profiles p
-  where p.id = auth.uid()
-  limit 1;
+  select
+    case
+      when auth.uid() is null then null
+      when not exists (select 1 from current_profile) then jsonb_build_object(
+        'id', auth.uid(),
+        'email', auth.jwt() ->> 'email',
+        'nome', coalesce(auth.jwt() ->> 'name', auth.jwt() ->> 'email'),
+        'role', 'cliente',
+        'is_admin', false
+      )
+      else (
+        select jsonb_build_object(
+          'id', cp.id,
+          'email', coalesce(
+            case when length(trim(coalesce(cp.profile_email, ''))) > 0 then cp.profile_email end,
+            auth.jwt() ->> 'email'
+          ),
+          'nome', coalesce(
+            case when length(trim(coalesce(cp.profile_nome, ''))) > 0 then cp.profile_nome end,
+            auth.jwt() ->> 'name',
+            auth.jwt() ->> 'email',
+            cp.profile_email
+          ),
+          'role', coalesce(
+            case when length(trim(coalesce(cp.profile_role, ''))) > 0 then cp.profile_role end,
+            case when cp.profile_is_admin is true then 'admin' else 'cliente' end
+          ),
+          'is_admin', cp.profile_is_admin
+        )
+        from current_profile cp
+      )
+    end;
 $$;
 
 create or replace function public.is_developer()
