@@ -8,16 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_OUTPUT_TYPE = 'image/jpeg';
   const PRODUCT_IMAGE_OUTPUT_EXTENSION = 'jpg';
   const IMAGE_COMPRESS_QUALITY = 0.85;
-  // Fallback mapping for admin emails — should NOT be relied on in production.
-  // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
-  const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
-  function getFallbackRoleForEmail(email) {
-    try {
-      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
-    } catch (e) {
-      return '';
-    }
-  }
+  const ADMIN_ROLES = ['cliente', 'equipe', 'motoboy', 'admin', 'developer'];
+  const ADMIN_ROLE_LABELS = {
+    cliente: 'Cliente',
+    equipe: 'Equipe',
+    motoboy: 'Entregas',
+    admin: 'Administrador',
+    developer: 'Desenvolvedor',
+  };
+  const ADMIN_ROLE_PERMISSIONS = {
+    cliente: { panel: false, orders: false, products: false, deliveries: false, finance: false, config: false, team: false, developer: false },
+    equipe: { panel: true, orders: true, products: true, deliveries: true, finance: false, config: false, team: false, developer: false },
+    motoboy: { panel: true, orders: false, products: false, deliveries: true, finance: false, config: false, team: false, developer: false },
+    admin: { panel: true, orders: true, products: true, deliveries: true, finance: true, config: true, team: true, developer: false },
+    developer: { panel: true, orders: true, products: true, deliveries: true, finance: true, config: true, team: true, developer: true },
+  };
   const ORDER_STATUS = {
     pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
     preparo: { label: 'Em Preparo', db: 'Preparando', column: 'lista-preparo' },
@@ -99,6 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+  const isUuid = (value) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
   applyAdminTheme();
 
@@ -401,20 +408,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentAdminRole() {
-    // Prefer explicit role from `profiles.admin_role`; `profile.role` is only a compatibility fallback.
-    const profileRole = normalize(state.profile?.admin_role || state.profile?.role || '');
-    if (profileRole && profileRole !== 'customer') return profileRole;
-    // Only use fallback email mapping when profile is not available (emergency).
-    if (!state.profile) return normalize(getFallbackRoleForEmail(state.user?.email) || '');
-    return '';
+    const role = normalize(state.profile?.role || '');
+    return ADMIN_ROLES.includes(role) ? role : 'cliente';
+  }
+
+  function currentRolePermissions() {
+    return ADMIN_ROLE_PERMISSIONS[currentAdminRole()] || ADMIN_ROLE_PERMISSIONS.cliente;
+  }
+
+  function canAccessTab(tab = '') {
+    const permissions = currentRolePermissions();
+    const tabPermission = {
+      pedidos: 'orders',
+      produtos: 'products',
+      entregas: 'deliveries',
+      perfil: 'panel',
+      financeiro: 'finance',
+      config: 'config',
+      equipe: 'team',
+      developer: 'developer',
+      'dev-console': 'developer',
+    }[tab];
+    return tabPermission ? Boolean(permissions[tabPermission]) : Boolean(permissions.panel);
+  }
+
+  function firstAllowedTab() {
+    return ['pedidos', 'produtos', 'entregas', 'perfil', 'financeiro', 'config'].find((tab) => canAccessTab(tab)) || 'perfil';
   }
 
   function isDeveloperAdmin() {
-    // Primary check: profile role
-    if (currentAdminRole() === 'developer') return true;
-    // Emergency fallback: use injected email map only if profile not loaded
-    if (!state.profile) return getFallbackRoleForEmail(state.user?.email) === 'developer';
-    return false;
+    return currentAdminRole() === 'developer';
   }
 
   function applyDeveloperAccessUI() {
@@ -427,10 +450,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function applyRoleAccessUI() {
+    const role = currentAdminRole();
+    document.body.dataset.adminRole = role;
+    document.body.classList.toggle('admin-owner', role === 'admin' || role === 'developer');
+    applyDeveloperAccessUI();
+    qsa('[data-admin-tab]').forEach((element) => {
+      const tab = element.dataset.adminTab || '';
+      const allowed = canAccessTab(tab);
+      element.classList.toggle('hidden', !allowed);
+      element.hidden = !allowed;
+      element.setAttribute('aria-hidden', String(!allowed));
+    });
+  }
+
   async function verificarAcessoAdmin() {
     const api = client();
     if (!api?.auth) {
-      setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', {
+      setAccessState('Supabase indisponivel', 'O cliente Supabase nao carregou nesta pagina.', {
         icon: 'triangle-exclamation',
       });
       return false;
@@ -439,56 +476,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const { data: sessionData, error: sessionError } = await api.auth.getUser();
     if (sessionError) console.warn('[Admin] Falha ao ler usuario autenticado.', sessionError);
     const user = sessionData?.user;
-    if (!user?.id) {
-      // Redireciona para login se não estiver autenticado
-      window.location.href = 'login.html?redirect=painel.html';
+    if (!user?.id || !isUuid(user.id)) {
+      setAccessState(
+        'Acesso restrito',
+        user?.id ? 'Sessao invalida. Entre novamente para acessar o painel.' : 'Entre com uma conta autorizada para acessar o painel.',
+        { icon: 'right-to-bracket', login: true },
+      );
       return false;
     }
 
     state.user = user;
 
-    const { data: profile, error } = await api
-      .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (error) console.warn('[Admin] Perfil admin nao foi lido.', error);
-    if (profile) {
-      state.profile = { ...profile, role: profile.admin_role || '' };
-    } else {
-      const fb = getFallbackRoleForEmail(user.email);
-      state.profile = {
-        id: user.id,
-        email: user.email,
-        nome: user.user_metadata?.name || user.email,
-        is_admin: Boolean(fb),
-        admin_role: fb || 'customer',
-        role: fb || 'customer',
-      };
+    const { data: roleData, error: roleError } = await api.rpc('current_user_role');
+    if (roleError) {
+      console.warn('[Admin] Nao foi possivel validar cargo RBAC.', roleError);
+      setAccessState(
+        'Erro ao carregar perfil',
+        `Email detectado: ${user.email || 'nao informado'}. Nao foi possivel validar suas permissoes no Supabase agora.`,
+        { icon: 'triangle-exclamation' },
+      );
+      return false;
     }
 
-    const role = currentAdminRole();
-    const validAdminRoles = ['developer', 'owner', 'staff'];
-    const isAdminRole = validAdminRoles.includes(role);
-    const admin = Boolean(state.profile.is_admin || isAdminRole);
-    if (!admin) {
-      // Redireciona para login quando usuário não tem cargo administrativo válido
-      window.location.href = 'login.html?redirect=painel.html';
+    const role = ADMIN_ROLES.includes(normalize(roleData)) ? normalize(roleData) : 'cliente';
+    state.profile = {
+      id: user.id,
+      email: user.email || '',
+      nome: user.user_metadata?.name || user.email || '',
+      role,
+    };
+
+    if (!currentRolePermissions().panel) {
+      setAccessState('Acesso negado', 'Voce nao tem permissao para acessar o painel administrativo.', {
+        icon: 'shield-halved',
+      });
       return false;
     }
 
     qs('#admin-access-state')?.classList.add('hidden');
     qs('[data-admin-workspace]')?.classList.remove('hidden');
     document.body.classList.add('admin-ready');
-    document.body.classList.toggle('admin-owner', role === 'owner');
-    applyDeveloperAccessUI();
-    applyTeamAccessUI();
+    applyRoleAccessUI();
+    const initialTab = location.hash.replace('#', '') || state.activeTab || firstAllowedTab();
+    if (!canAccessTab(initialTab)) state.activeTab = firstAllowedTab();
     return true;
   }
 
   function canManageTeam() {
-    return ['developer', 'owner'].includes(currentAdminRole());
+    return Boolean(currentRolePermissions().team);
   }
 
   function applyTeamAccessUI() {
@@ -501,14 +536,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderAdminTab(tab = 'pedidos') {
-    let nextTab = qs(`[data-admin-panel="${tab}"]`) ? tab : 'pedidos';
-    if ((nextTab === 'developer' || nextTab === 'dev-console') && !isDeveloperAdmin()) {
-      nextTab = 'pedidos';
-      showToast('Área exclusiva do desenvolvedor.', 'error');
-    }
-    if (nextTab === 'equipe' && !canManageTeam()) {
-      nextTab = 'pedidos';
-      showToast('Área exclusiva para desenvolvedor e proprietários.', 'error');
+    let nextTab = qs(`[data-admin-panel="${tab}"]`) ? tab : firstAllowedTab();
+    if (!canAccessTab(nextTab)) {
+      showToast('Area restrita para o seu cargo.', 'error');
+      nextTab = firstAllowedTab();
     }
     state.activeTab = nextTab;
 
@@ -986,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const role = currentAdminRole() || 'admin';
     setText('#admin-profile-name', name);
     setText('#admin-profile-email', email);
-    setText('#admin-profile-role', role === 'developer' ? 'Desenvolvedor' : role === 'owner' ? 'Proprietário' : 'Equipe');
+    setText('#admin-profile-role', ADMIN_ROLE_LABELS[role] || 'Painel');
   }
 
   function assinarPedidosRealtime() {
@@ -3128,7 +3159,7 @@ document.addEventListener('DOMContentLoaded', () => {
       developerCardHTML('Acesso', 'user-shield', [
         { label: 'Conta', value: profile.email || state.user?.email || 'Sem email' },
         { label: 'Cargo', value: currentAdminRole() || 'Sem cargo' },
-        { label: 'Perfil', value: profile.is_admin ? 'Administrador no Supabase' : 'Fallback por email conhecido' },
+        { label: 'Perfil', value: ADMIN_ROLE_LABELS[profile.role] || 'Cliente' },
       ]),
       developerCardHTML('Supabase', 'database', [
         { label: 'Cliente', value: client() ? 'Carregado' : 'Indisponível' },
@@ -3306,15 +3337,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canManageTeam()) {
       container.innerHTML =
         container.tagName && container.tagName.toLowerCase() === 'tbody'
-          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</td></tr>'
-          : '<p class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</p>';
+          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito para gerenciamento de equipe.</td></tr>'
+          : '<p class="admin-empty-state">Acesso restrito para gerenciamento de equipe.</p>';
       return;
     }
-    container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuários...</p>';
+    container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuarios...</p>';
 
     const { data: profiles, error: profilesErr } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
+      .select('id, email, nome, role')
       .order('email', { ascending: true });
     if (profilesErr) {
       console.warn('[Admin] Falha ao carregar profiles', profilesErr);
@@ -3326,47 +3357,44 @@ document.addEventListener('DOMContentLoaded', () => {
       id: pr.id,
       email: pr.email,
       nome: pr.nome,
-      is_admin: pr.is_admin,
-      admin_role: pr.admin_role,
+      role: ADMIN_ROLES.includes(normalize(pr.role)) ? normalize(pr.role) : 'cliente',
     }));
 
     const currentRole = currentAdminRole();
     const isDeveloper = currentRole === 'developer';
-    const isOwner = currentRole === 'owner';
-    const canEditRoles = ['developer', 'owner'].includes(currentRole);
+    const isAdmin = currentRole === 'admin';
+    const canEditRoles = canManageTeam();
     const rolesOptions = [
       { value: 'developer', label: 'Desenvolvedor / Presidente' },
-      { value: 'owner', label: 'Proprietário' },
-      { value: 'staff', label: 'Equipe' },
-      { value: 'customer', label: 'Cliente' },
+      { value: 'admin', label: 'Admin' },
+      { value: 'equipe', label: 'Equipe' },
+      { value: 'motoboy', label: 'Motoboy' },
+      { value: 'cliente', label: 'Cliente' },
     ];
 
     const html = rows
       .map((row) => {
-        const userRole = row.admin_role || (row.is_admin ? 'owner' : 'customer');
+        const userRole = row.role || 'cliente';
 
         let selectDisabled = !canEditRoles;
-        // Do not allow non-developers to change a developer's role
         if (userRole === 'developer' && !isDeveloper) selectDisabled = true;
 
         const optionsHtml = rolesOptions
           .map((opt) => {
             let disableOpt = '';
-            // Only developer can assign another developer
             if (opt.value === 'developer' && !isDeveloper) disableOpt = 'disabled';
-            // Owner cannot create developers
-            if (isOwner && opt.value === 'developer') disableOpt = 'disabled';
+            if (isAdmin && opt.value === 'developer') disableOpt = 'disabled';
             return `<option value="${escapeHTML(opt.value)}" ${opt.value === userRole ? 'selected' : ''} ${disableOpt}>${escapeHTML(opt.label)}</option>`;
           })
           .join('');
 
-        const active = userRole !== 'customer';
+        const active = userRole !== 'cliente';
         const statusHtml = `<span class="team-badge ${active ? 'is-active' : 'is-inactive'}"><span class="team-badge-dot" aria-hidden="true"></span>${active ? 'Ativo' : 'Inativo'}</span>`;
 
         return `
           <tr data-team-row="${escapeHTML(row.id)}">
             <td class="team-user">
-              <div class="team-user-name">${escapeHTML(row.nome || row.email || 'Usuário')}</div>
+              <div class="team-user-name">${escapeHTML(row.nome || row.email || 'Usuario')}</div>
               <div class="team-user-email">${escapeHTML(row.email || '')}</div>
             </td>
             <td class="team-role">
@@ -3378,7 +3406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
             <td class="team-status">${statusHtml}</td>
             <td class="team-actions">
-              <button class="btn btn-ghost team-action-btn" type="button" data-admin-team-save="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} title="Salvar alterações">
+              <button class="btn btn-ghost team-action-btn" type="button" data-admin-team-save="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} title="Salvar alteracoes">
                 <i class="fa-solid fa-floppy-disk"></i>
               </button>
             </td>
@@ -3387,12 +3415,11 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    // Se o container for um <tbody>, inserir tr corretamente; senão, substituir diretamente
     if (container.tagName && container.tagName.toLowerCase() === 'tbody') {
       container.innerHTML =
-        html || '<tr><td colspan="4" class="admin-empty-state">Nenhum usuário encontrado.</td></tr>';
+        html || '<tr><td colspan="4" class="admin-empty-state">Nenhum usuario encontrado.</td></tr>';
     } else {
-      container.innerHTML = html || '<p class="admin-empty-state">Nenhum usuário encontrado.</p>';
+      container.innerHTML = html || '<p class="admin-empty-state">Nenhum usuario encontrado.</p>';
     }
   }
 
@@ -3775,7 +3802,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const initialTab = text(location.hash).replace('#', '') || 'pedidos';
       renderAdminTab(initialTab);
-      const results = await Promise.allSettled([carregarPedidosAdmin(), carregarProdutosAdmin()]);
+      const loaders = [];
+      if (canAccessTab('pedidos') || canAccessTab('entregas')) loaders.push(carregarPedidosAdmin());
+      if (canAccessTab('produtos')) loaders.push(carregarProdutosAdmin());
+      const results = await Promise.allSettled(loaders);
       const failed = results.find((result) => result.status === 'rejected');
       if (failed) {
         console.warn('[Admin] Uma parte do painel nao carregou.', failed.reason);
