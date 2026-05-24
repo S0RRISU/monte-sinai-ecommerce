@@ -1581,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_fim))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
                           <div class="admin-variation-photo-box">
-                            <label class="admin-variation-image-url">Imagem
+                            <label class="admin-variation-image-url">Imagem desta variacao
                               <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
                             </label>
                             <div class="admin-variation-photo-actions">
@@ -1637,8 +1637,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="number" min="0" step="1" data-admin-variation-new="estoque" placeholder="Livre">
           </label>
           <div class="admin-variation-photo-box">
-            <label class="admin-variation-image-url">Imagem
-              <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
+            <label class="admin-variation-image-url">Imagem desta nova variacao
+              <input type="url" data-admin-variation-new="imagem" value="" placeholder="https://...">
             </label>
             <div class="admin-variation-photo-actions">
               <label class="admin-upload-label">
@@ -1689,11 +1689,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <label>Categoria
           <input type="text" value="${escapeHTML(product.categoria || 'Produtos')}" data-admin-product-field="categoria" data-product-id="${escapeHTML(product.id)}">
         </label>
-        <label class="admin-product-edit-wide">Imagem do produto
+        <label class="admin-product-edit-wide">Imagem principal do produto
           <input type="url" value="${escapeHTML(product.imagem || '')}" data-admin-product-field="imagem" data-product-id="${escapeHTML(product.id)}" placeholder="https://...">
         </label>
         <div class="admin-product-edit-wide admin-product-photo-box">
-          <strong>Foto do produto</strong>
+          <strong>Foto principal do produto</strong>
           <div class="admin-product-photo-actions">
             <label class="admin-upload-label">
               <i class="fa-solid fa-camera"></i>

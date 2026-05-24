@@ -34333,6 +34333,115 @@ body:not(.admin-shell-body) .cart-thumb-img {
   object-position: center !important;
 }
 
+/* Etapa 9 - moldura unica para imagem real vs asset/fallback. */
+body:not(.admin-shell-body) .product-media,
+body:not(.admin-shell-body) .full-catalog-media,
+body:not(.admin-shell-body) .catalog-detail-media,
+body:not(.admin-shell-body) .product-search-media,
+body:not(.admin-shell-body) .simple-catalog-thumb,
+body:not(.admin-shell-body) .cart-thumb {
+  isolation: isolate !important;
+}
+
+body:not(.admin-shell-body) .product-media {
+  min-height: clamp(190px, 24vw, 236px) !important;
+}
+
+body:not(.admin-shell-body) .product-media .product-image {
+  height: clamp(190px, 24vw, 236px) !important;
+}
+
+body:not(.admin-shell-body) .full-catalog-media img,
+body:not(.admin-shell-body) .simple-catalog-thumb img,
+body:not(.admin-shell-body) .cart-thumb-img,
+body:not(.admin-shell-body) .product-search-media img,
+body:not(.admin-shell-body) .catalog-detail-media img {
+  object-position: center !important;
+}
+
+body:not(.admin-shell-body) .product-image.product-image-fit-cover,
+body:not(.admin-shell-body) .full-catalog-media img.product-image-fit-cover,
+body:not(.admin-shell-body) .simple-catalog-thumb img.product-image-fit-cover,
+body:not(.admin-shell-body) .cart-thumb-img.product-image-fit-cover,
+body:not(.admin-shell-body) .product-search-media img.product-image-fit-cover,
+body:not(.admin-shell-body) .catalog-detail-media img.product-image-fit-cover {
+  object-fit: cover !important;
+  padding: 0 !important;
+}
+
+body:not(.admin-shell-body) .product-image.product-image-fit-contain,
+body:not(.admin-shell-body) .full-catalog-media img.product-image-fit-contain,
+body:not(.admin-shell-body) .simple-catalog-thumb img.product-image-fit-contain,
+body:not(.admin-shell-body) .cart-thumb-img.product-image-fit-contain,
+body:not(.admin-shell-body) .product-search-media img.product-image-fit-contain,
+body:not(.admin-shell-body) .catalog-detail-media img.product-image-fit-contain {
+  object-fit: contain !important;
+}
+
+body:not(.admin-shell-body) .product-media .product-image-fit-contain {
+  padding: 10px !important;
+}
+
+body:not(.admin-shell-body) .full-catalog-media img.product-image-fit-contain {
+  padding: 5px !important;
+}
+
+body:not(.admin-shell-body) .simple-catalog-thumb img.product-image-fit-contain,
+body:not(.admin-shell-body) .cart-thumb-img.product-image-fit-contain {
+  padding: 3px !important;
+}
+
+body:not(.admin-shell-body) .catalog-detail-media .product-image {
+  width: min(92%, 430px) !important;
+  height: min(78vh, 390px) !important;
+  max-height: 390px !important;
+}
+
+body:not(.admin-shell-body) .catalog-detail-media .product-image-fit-contain {
+  padding: clamp(8px, 1.6vw, 18px) !important;
+}
+
+body:not(.admin-shell-body) .catalog-detail-media .product-image-fit-cover {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-media {
+  position: relative !important;
+}
+
+body:not(.admin-shell-body) .public-product-card .full-catalog-media .product-image {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+}
+
+@media (max-width: 767px) {
+  body:not(.admin-shell-body) .products-page .product-card .product-media,
+  body:not(.admin-shell-body):has(.products-page) .product-card .product-media {
+    min-height: clamp(150px, 42vw, 174px) !important;
+    height: clamp(150px, 42vw, 174px) !important;
+  }
+
+  body:not(.admin-shell-body) .products-page .product-card .product-image,
+  body:not(.admin-shell-body):has(.products-page) .product-card .product-image {
+    min-height: clamp(150px, 42vw, 174px) !important;
+    height: clamp(150px, 42vw, 174px) !important;
+  }
+
+  body:not(.admin-shell-body) .products-page .public-product-card .full-catalog-media .product-image,
+  body:not(.admin-shell-body):has(.products-page) .public-product-card .full-catalog-media .product-image {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+}
+
 @media (max-width: 900px) {
   body.admin-shell-body .admin-image-mobile-actions,
   body.admin-shell-body .admin-product-photo-actions,

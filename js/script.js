@@ -1455,6 +1455,7 @@ document.addEventListener('DOMContentLoaded', () => {
       offerActive: offer.active,
       offerStartsAt: offer.startsAt,
       offerEndsAt: offer.endsAt,
+      updatedAt: raw.updated_at ?? raw.updatedAt ?? '',
       stock,
       canBuy: canBuy === undefined || canBuy === null ? stock === null || stock > 0 : canBuy !== false,
       unavailable: unavailable === true,
@@ -1527,6 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
       offerActive,
       offerStartsAt: raw.oferta_inicio ?? raw.offerStartsAt ?? '',
       offerEndsAt: raw.oferta_fim ?? raw.offerEndsAt ?? '',
+      updatedAt: raw.updated_at ?? raw.updatedAt ?? '',
       kitItems: raw.kit_itens ?? raw.kitItems ?? '',
       stock,
       lowStockLimit,
@@ -2484,6 +2486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         originalPrice: Number(option.originalPrice || option.preco_original || option.price || product.price || 0),
         offerActive: Boolean(option.offerActive || option.oferta_ativa),
         offerEndsAt: option.offerEndsAt || option.oferta_fim || '',
+        updatedAt: option.updatedAt || option.updated_at || product.updatedAt || product.updated_at || '',
         stock: normalizeVariationStockValue(option.stock),
         canBuy: option.canBuy ?? option.pode_comprar,
         unavailable: option.unavailable ?? option.indisponivel,
@@ -2502,6 +2505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         originalPrice: Number(option.dataset.originalPrice || option.dataset.price || product.price || 0),
         offerActive: option.dataset.offerActive === 'true',
         offerEndsAt: option.dataset.offerEndsAt || '',
+        updatedAt: option.dataset.updatedAt || product.updatedAt || product.updated_at || '',
         stock: normalizeVariationStockValue(option.dataset.stock),
         canBuy: option.dataset.available === '' ? undefined : option.dataset.available !== 'false',
         unavailable: option.dataset.available === 'false',
@@ -2689,7 +2693,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     content.innerHTML = `
       <div class="product-search-media">
-        ${productMediaHTML(activeSearchProduct, image)}
+        ${productMediaHTML(activeSearchProduct, image, '', firstOption.updatedAt || activeSearchProduct.updatedAt)}
       </div>
       <div class="product-search-info">
         <span class="eyebrow">Resultado principal</span>
@@ -2732,7 +2736,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (price) price.textContent = formatMoney(selected.price || activeSearchProduct.price);
       const imageEl = qs('.product-image', content);
       const selectedImage = getImagemProdutoSelecionada(activeSearchProduct, selected);
-      if (imageEl && selectedImage) imageEl.src = assetHref(selectedImage);
+      if (imageEl && selectedImage) setProductImageElement(imageEl, selectedImage, selected?.updatedAt || activeSearchProduct.updatedAt);
       if (stockLine) {
         const text = customerAvailabilityText(activeSearchProduct, selected);
         stockLine.textContent = text;
@@ -3032,6 +3036,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!src || /^(https?:|data:|blob:)/.test(src)) return src || '';
     const clean = canonicalAssetPath(src);
     return `${insidePages() ? '../' : ''}${clean}`;
+  }
+
+  function isRemoteProductImage(src = '') {
+    const value = String(src || '').trim();
+    return /^(https?:|blob:)/.test(value) && !value.includes('/assets/');
+  }
+
+  function productImageFitClass(src = '') {
+    return isRemoteProductImage(src) ? 'product-image-fit-cover' : 'product-image-fit-contain';
+  }
+
+  function imageRenderHref(src = '', version = '') {
+    const href = assetHref(src);
+    const stamp = String(version || '').trim();
+    if (!href || !stamp || !isRemoteProductImage(src)) return href;
+    return `${href}${href.includes('?') ? '&' : '?'}v=${encodeURIComponent(stamp)}`;
+  }
+
+  function setProductImageElement(imageEl, src = '', version = '') {
+    if (!imageEl || !src) return;
+    imageEl.src = imageRenderHref(src, version);
+    imageEl.classList.toggle('product-image-fit-cover', isRemoteProductImage(src));
+    imageEl.classList.toggle('product-image-fit-contain', !isRemoteProductImage(src));
   }
 
   function toastIcon(type = 'info') {
@@ -4173,8 +4200,8 @@ document.addEventListener('DOMContentLoaded', () => {
     entries.forEach(({ product, option }) => {
       const item = document.createElement('button');
       const suggestionProduct = option ? { ...product, preferredVariationId: option.id } : product;
-      const image = option?.image || productAssetPath(product);
-      const imageSrc = assetHref(image);
+      const image = getImagemProdutoSelecionada(product, option || null);
+      const imageSrc = imageRenderHref(image, option?.updatedAt || product.updatedAt);
       item.className = 'search-suggestion-item';
       item.type = 'button';
       item.setAttribute('role', 'option');
@@ -4182,7 +4209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="search-suggestion-media">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+              ? `<img class="${productImageFitClass(image)}" src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
               : productPlaceholderHTML(product, 'product-placeholder-compact')
           }
         </span>
@@ -4513,10 +4540,10 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
-  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '') {
+  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '', version = '') {
     const placeholder = productPlaceholderHTML(product, modifier);
     if (!image) return placeholder;
-    return `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
+    return `<img class="product-image ${productImageFitClass(image)}" src="${escapeHTML(imageRenderHref(image, version))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
   }
 
   function productStockText(product = {}) {
@@ -4621,7 +4648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const image = getImagemProdutoSelecionada(product, option);
         const selected =
           selectedVariationId && String(option.id || option.value || '') === String(selectedVariationId) ? ' selected' : '';
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}"${selected}>${escapeHTML(optionSelectLabel(option))}</option>`;
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-updated-at="${escapeHTML(option.updatedAt || product.updatedAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}"${selected}>${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4665,6 +4692,7 @@ document.addEventListener('DOMContentLoaded', () => {
       originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
       offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
       offerEndsAt: current?.offerEndsAt || option?.dataset.offerEndsAt || '',
+      imageVersion: current?.updatedAt || option?.dataset.updatedAt || normalizedProduct?.updatedAt || '',
       stock: null,
       image,
       out,
@@ -4707,7 +4735,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stockLine.classList.toggle('is-empty', !state.stockText);
       stockLine.classList.toggle('is-unavailable', state.out);
     }
-    if (state.image && imageEl) imageEl.src = assetHref(state.image);
+    if (state.image && imageEl) setProductImageElement(imageEl, state.image, state.imageVersion);
     if (availabilityNote) {
       const label = state.out
         ? 'Indisponivel no momento'
@@ -4778,6 +4806,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
     const image = getImagemProdutoSelecionada(normalized, hasOptions ? firstOption : null);
+    const imageVersion = hasOptions ? firstOption.updatedAt || normalized.updatedAt : normalized.updatedAt;
     const cardClass = rail
       ? [
           'product-card',
@@ -4821,7 +4850,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
         ${selectedOutOfStock ? '<span class="recommended-badge stock-badge">Indisponivel</span>' : ''}
         <div class="product-media">
-          ${productMediaHTML(normalized, image)}
+          ${productMediaHTML(normalized, image, '', imageVersion)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
           <h3>${escapeHTML(normalized.name)}</h3>
@@ -4843,7 +4872,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `
       <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(image)}">
         <div class="full-catalog-media">
-          ${productMediaHTML(normalized, image)}
+          ${productMediaHTML(normalized, image, '', imageVersion)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
@@ -5256,17 +5285,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const options = productOptions(normalized);
     const hasOptions = normalized.hasVariations && options.length > 0;
-    const firstOption = options[0] || { price: normalized.price };
+    const firstOption = hasOptions ? selectedVariationForProduct(normalized, options) || options[0] : null;
     const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
-    const image = productAssetPath(normalized);
-    const imageSrc = assetHref(image);
+    const image = getImagemProdutoSelecionada(normalized, hasOptions ? firstOption : null);
+    const imageSrc = imageRenderHref(image, hasOptions ? firstOption?.updatedAt || normalized.updatedAt : normalized.updatedAt);
 
     return `
       <article class="simple-catalog-row catalog-product ${unavailable ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}">
         <div class="simple-catalog-thumb" aria-hidden="true">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+              ? `<img class="${productImageFitClass(image)}" src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
               : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
           }
         </div>
@@ -5379,13 +5408,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(selectedOption) : outOfStock;
     const displayImage = getImagemProdutoSelecionada(normalized, hasOptions ? selectedOption : null);
+    const displayImageVersion = hasOptions ? selectedOption.updatedAt || normalized.updatedAt : normalized.updatedAt;
     const selectedOfferActive = Boolean(selectedOption.offerActive ?? normalized.offerActive);
     const hasAnyOffer = selectedOfferActive || options.some((option) => option.offerActive);
 
     if (body) {
       body.innerHTML = `
         <div class="catalog-detail-media">
-          ${productMediaHTML(normalized, displayImage)}
+          ${productMediaHTML(normalized, displayImage, '', displayImageVersion)}
         </div>
         <div class="catalog-detail-copy" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(productKey)}" data-catalog-variation-id="${escapeHTML(selectedOption.id || '')}" data-catalog-variation-name="${escapeHTML(selectedOption.name || '')}" data-catalog-variation-image="${escapeHTML(displayImage)}">
           <div class="full-catalog-badges">
@@ -5936,7 +5966,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: normalized.name,
           variant: option?.name || '',
           price: Number(option?.price || normalized.price || 0),
-          image: option?.image || productAssetPath(normalized),
+          image: getImagemProdutoSelecionada(normalized, option || null),
           stock: option ? option.stock : normalized.stock,
         });
         return;
@@ -6211,7 +6241,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.innerHTML = `
         <div class="cart-item-left">
           <span class="cart-thumb">
-            ${item.image ? `<img class="cart-thumb-img" src="${assetHref(item.image)}" alt="" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
+            ${item.image ? `<img class="cart-thumb-img ${productImageFitClass(item.image)}" src="${imageRenderHref(item.image)}" alt="" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
           </span>
           <span>
             <span class="cart-item-name">${escapeHTML(item.name)}</span>
