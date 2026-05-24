@@ -8,12 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_OUTPUT_TYPE = 'image/jpeg';
   const PRODUCT_IMAGE_OUTPUT_EXTENSION = 'jpg';
   const IMAGE_COMPRESS_QUALITY = 0.85;
-  // Fallback mapping for admin emails — should NOT be relied on in production.
-  // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
+  const DEVELOPER_EMAILS = new Set(['marcelol527319@gmail.com']);
+  // Optional emergency fallback for roles that do not depend on profile columns.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
   function getFallbackRoleForEmail(email) {
+    const normalized = (email || '').toLowerCase().trim();
+    if (DEVELOPER_EMAILS.has(normalized)) return 'developer';
     try {
-      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
+      return String(FALLBACK_ADMIN_EMAILS[normalized] || '').trim();
     } catch (e) {
       return '';
     }
@@ -373,11 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
-  function isMissingProfileRoleError(error) {
-    const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-    return message.includes('admin_role') || message.includes('pgrst204') || message.includes('could not find');
-  }
-
   function logAdminAccess(stage, details = {}) {
     const payload = {
       stage,
@@ -426,20 +423,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function currentAdminRole() {
-    // Prefer explicit role from `profiles.admin_role`; `profile.role` is only a compatibility fallback.
-    const profileRole = normalize(state.profile?.admin_role || state.profile?.role || '');
-    if (profileRole && profileRole !== 'customer') return profileRole;
-    // Only use fallback email mapping when profile is not available (emergency).
-    if (!state.profile) return normalize(getFallbackRoleForEmail(state.user?.email) || '');
-    return '';
+    const emailRole = normalize(getFallbackRoleForEmail(state.profile?.email || state.user?.email || ''));
+    if (emailRole === 'developer') return 'developer';
+    return state.profile?.is_admin === true ? 'staff' : '';
   }
 
   function isDeveloperAdmin() {
-    // Primary check: profile role
-    if (currentAdminRole() === 'developer') return true;
-    // Emergency fallback: use injected email map only if profile not loaded
-    if (!state.profile) return getFallbackRoleForEmail(state.user?.email) === 'developer';
-    return false;
+    return currentAdminRole() === 'developer';
   }
 
   function applyDeveloperAccessUI() {
@@ -460,19 +450,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     let { data: profile, error } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
+      .select('id, email, nome, is_admin')
       .eq('id', user.id)
       .maybeSingle();
-
-    if (error && isMissingProfileRoleError(error)) {
-      logAdminAccess('profiles-primary-missing-admin-role', {
-        ...context,
-        error: error.message || error.details || error.code || 'admin_role indisponivel',
-      });
-      const fallback = await api.from('profiles').select('id, email, nome, is_admin').eq('id', user.id).maybeSingle();
-      profile = fallback.data;
-      error = fallback.error;
-    }
 
     if (error) {
       logAdminAccess('profiles-error', {
@@ -489,13 +469,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ...context,
         profileFound: true,
         profileIsAdmin: profile.is_admin,
-        profileAdminRole: profile.admin_role || '',
+        profileAdminRole: getFallbackRoleForEmail(profile.email || user.email) || '',
       });
       return {
         ...profile,
         email: profile.email || user.email || '',
-        admin_role: profile.admin_role || '',
-        role: profile.admin_role || '',
+        admin_role: getFallbackRoleForEmail(profile.email || user.email) || '',
+        role: getFallbackRoleForEmail(profile.email || user.email) || '',
       };
     }
 
@@ -567,16 +547,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const role = currentAdminRole();
-    const admin = Boolean(state.profile?.is_admin === true || role === 'developer');
+    const admin = Boolean(state.profile?.is_admin === true || isDeveloperAdmin());
     logAdminAccess('access-decision', {
       hasSession: true,
       email: user.email || '',
       userId: user.id || '',
       profileFound: Boolean(state.profile),
       profileIsAdmin: state.profile?.is_admin,
-      profileAdminRole: state.profile?.admin_role || '',
+      profileAdminRole: role,
       decision: admin ? 'allowed' : 'blocked',
-      reason: admin ? 'is-admin-or-developer' : state.profile ? 'profile-not-admin' : 'profile-not-found',
+      reason: admin ? 'is-admin-or-developer-email' : state.profile ? 'profile-not-admin' : 'profile-not-found',
     });
     if (!admin) {
       setAccessState('Acesso negado', 'Você não tem permissão para acessar o painel administrativo.', {
@@ -3421,7 +3401,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const { data: profiles, error: profilesErr } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
+      .select('id, email, nome, is_admin')
       .order('email', { ascending: true });
     if (profilesErr) {
       console.warn('[Admin] Falha ao carregar profiles', profilesErr);
@@ -3434,7 +3414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       email: pr.email,
       nome: pr.nome,
       is_admin: pr.is_admin,
-      admin_role: pr.admin_role,
+      admin_role: getFallbackRoleForEmail(pr.email) || (pr.is_admin ? 'staff' : 'customer'),
     }));
 
     const currentRole = currentAdminRole();
