@@ -132,11 +132,14 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue', 'Cancelado'];
   const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
-  // Emergency fallback mapping for admin emails. Do NOT rely on this in production.
+  const DEVELOPER_EMAILS = new Set(['marcelol527319@gmail.com']);
+  // Emergency fallback mapping for admin roles that do not depend on profile columns.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
   function getFallbackRoleForEmail(email = '') {
+    const normalized = (email || '').toLowerCase().trim();
+    if (DEVELOPER_EMAILS.has(normalized)) return 'developer';
     try {
-      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
+      return String(FALLBACK_ADMIN_EMAILS[normalized] || '').trim();
     } catch (e) {
       return '';
     }
@@ -1129,10 +1132,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function adminRole(profile = adminProfileCache) {
-    // Prefer explicit profile role
-    const role = normalizeText(profile?.admin_role || profile?.role || '');
+    const role = normalizeText(profile?.role || knownAdminRoleForEmail(profile?.email || currentUser?.email || ''));
     if (role) return role;
-    return profile?.is_admin ? 'owner' : 'customer';
+    return profile?.is_admin ? 'staff' : 'customer';
   }
 
   function isDeveloperProfile(profile = adminProfileCache) {
@@ -1263,11 +1265,6 @@ document.addEventListener('DOMContentLoaded', () => {
       text.includes('could not find') ||
       text.includes('pgrst204')
     );
-  }
-
-  function isMissingProfileRoleError(error) {
-    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-    return text.includes('admin_role') || text.includes('could not find') || text.includes('pgrst204');
   }
 
   function isMissingNotificationTableError(error) {
@@ -1756,22 +1753,17 @@ document.addEventListener('DOMContentLoaded', () => {
       foto: source.photo || '',
     };
 
-    let columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin, admin_role';
-    let { data: existing, error: lookupError } = await client
+    const columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
+    const { data: existing, error: lookupError } = await client
       .from('profiles')
       .select(columns)
       .eq('id', authUser.id)
       .maybeSingle();
 
-    if (lookupError && isMissingProfileRoleError(lookupError)) {
-      columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
-      const fallback = await client.from('profiles').select(columns).eq('id', authUser.id).maybeSingle();
-      existing = fallback.data;
-      lookupError = fallback.error;
-    }
-
     if (lookupError) throw lookupError;
-    if (existing?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(existing))) return existing;
+    if (existing?.is_admin || isDeveloperProfile({ ...existing, email: existing?.email || authUser.email || '' })) {
+      return existing;
+    }
 
     const query = existing
       ? client.from('profiles').update(profile).eq('id', authUser.id)
@@ -1799,7 +1791,7 @@ document.addEventListener('DOMContentLoaded', () => {
       email: authUser.email || '',
       nome: authMetadata(authUser).name || authMetadata(authUser).full_name || '',
       is_admin: true,
-      admin_role: role,
+      role,
       __emailFallback: true,
     };
   }
@@ -1830,21 +1822,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id) return null;
 
-    let { data, error } = await client
+    const { data, error } = await client
       .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
+      .select('id, email, nome, is_admin')
       .eq('id', authUser.id)
       .maybeSingle();
-
-    if (error && isMissingProfileRoleError(error)) {
-      const fallback = await client
-        .from('profiles')
-        .select('id, email, nome, is_admin')
-        .eq('id', authUser.id)
-        .maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-    }
 
     if (error) {
       const fallback = fallbackAdminProfileFromAuthUser(authUser);
@@ -1857,7 +1839,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (data) {
-      adminProfileCache = { ...data, email: data.email || authUser.email || '' };
+      adminProfileCache = {
+        ...data,
+        email: data.email || authUser.email || '',
+        role: knownAdminRoleForEmail(data.email || authUser.email || ''),
+      };
       return adminProfileCache;
     }
 
@@ -1869,7 +1855,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function isCurrentUserAdmin({ force = true } = {}) {
     const profile = await currentAdminProfile({ force });
-    return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
+    return Boolean(profile?.is_admin === true || isDeveloperProfile(profile));
   }
 
   async function loadProductVariations(client, products = []) {

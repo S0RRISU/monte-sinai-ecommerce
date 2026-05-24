@@ -474,7 +474,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return {
         ...profile,
         email: profile.email || user.email || '',
-        admin_role: getFallbackRoleForEmail(profile.email || user.email) || '',
         role: getFallbackRoleForEmail(profile.email || user.email) || '',
       };
     }
@@ -492,7 +491,6 @@ document.addEventListener('DOMContentLoaded', () => {
       email: user.email,
       nome: user.user_metadata?.name || user.email,
       is_admin: false,
-      admin_role: fb || 'customer',
       role: fb || 'customer',
     };
   }
@@ -3414,7 +3412,7 @@ document.addEventListener('DOMContentLoaded', () => {
       email: pr.email,
       nome: pr.nome,
       is_admin: pr.is_admin,
-      admin_role: getFallbackRoleForEmail(pr.email) || (pr.is_admin ? 'staff' : 'customer'),
+      role: getFallbackRoleForEmail(pr.email) || (pr.is_admin ? 'staff' : 'customer'),
     }));
 
     const currentRole = currentAdminRole();
@@ -3430,7 +3428,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const html = rows
       .map((row) => {
-        const userRole = row.admin_role || (row.is_admin ? 'owner' : 'customer');
+        const userRole = row.role || (row.is_admin ? 'staff' : 'customer');
 
         let selectDisabled = !canEditRoles;
         // Do not allow non-developers to change a developer's role
