@@ -2,9 +2,12 @@ document.addEventListener('DOMContentLoaded', () => {
   'use strict';
 
   const PRODUCT_IMAGE_BUCKET = 'produtos';
-  const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
-  const IMAGE_COMPRESS_TARGET = 1800;
-  const IMAGE_COMPRESS_QUALITY = 0.82;
+  const PRODUCT_IMAGE_MAX_SIDE = 1800;
+  const PRODUCT_IMAGE_MIN_SIDE = 900;
+  const PRODUCT_IMAGE_TARGET_SIZE = 2.4 * 1024 * 1024;
+  const PRODUCT_IMAGE_OUTPUT_TYPE = 'image/jpeg';
+  const PRODUCT_IMAGE_OUTPUT_EXTENSION = 'jpg';
+  const IMAGE_COMPRESS_QUALITY = 0.85;
   // Fallback mapping for admin emails — should NOT be relied on in production.
   // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
   const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
@@ -336,6 +339,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function friendlyDbError(error, fallback) {
     const message = normalize(error?.message || error?.details || '');
+    if (
+      message.includes('falha no storage') ||
+      message.includes('sem permissao para enviar imagem') ||
+      message.includes('formato de imagem') ||
+      message.includes('imagem preparada') ||
+      message.includes('usuario admin nao autenticado') ||
+      message.includes('bucket produtos nao encontrado')
+    ) {
+      return error?.message || fallback;
+    }
     if (message.includes('produto_variacoes')) {
       return 'Execute supabase/20260522-produto-variacoes.sql para liberar variacoes.';
     }
@@ -815,6 +828,36 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function adminOrderProgressHTML(statusUi = 'pendente') {
+    const currentIndex = Math.max(0, Object.keys(ORDER_STATUS).indexOf(statusUi));
+    const steps = [
+      { key: 'pendente', label: 'Recebido', icon: 'fa-receipt' },
+      { key: 'preparo', label: 'Preparo', icon: 'fa-box-open' },
+      { key: 'entrega', label: 'Entrega', icon: 'fa-truck-fast' },
+      { key: 'entregue', label: 'Entregue', icon: 'fa-circle-check' },
+    ];
+    const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
+    return `
+      <div class="admin-order-progress" style="--order-progress:${progress}%;" aria-label="Progresso do pedido">
+        <div class="admin-order-progress-track" aria-hidden="true"></div>
+        <div class="admin-order-progress-steps">
+          ${steps
+            .map((step, index) => {
+              const done = index <= currentIndex;
+              const current = index === currentIndex;
+              return `
+                <span class="${done ? 'is-done' : ''} ${current ? 'is-current' : ''}" data-order-progress-step="${escapeHTML(step.key)}">
+                  <i class="fa-solid ${step.icon}"></i>
+                  <strong>${escapeHTML(step.label)}</strong>
+                </span>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+  }
+
   function orderCardHTML(order, highlightId = '') {
     const highlighted = highlightId && order.id === highlightId;
     const payment = PAYMENT_STATUS.includes(order.pagamento_status) ? order.pagamento_status : 'Pendente';
@@ -837,6 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>${escapeHTML(order.pagamento || 'Pagamento a combinar')}</span>
           <strong>${formatMoney(order.totalNumber)}</strong>
         </div>
+        ${adminOrderProgressHTML(order.statusUi)}
         <div class="admin-order-control-grid">
           ${orderStatusSelect(order)}
           ${orderPaymentSelect(order)}
@@ -1567,14 +1611,29 @@ document.addEventListener('DOMContentLoaded', () => {
                           <label>Oferta termina
                             <input type="datetime-local" value="${escapeHTML(formatDateTimeLocal(variation.oferta_fim))}" data-admin-variation-field="oferta_fim" data-variation-id="${escapeHTML(variation.id)}">
                           </label>
-                          <label class="admin-variation-image-url">Imagem
-                            <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
-                          </label>
-                          <label class="admin-variation-upload">
-                            <i class="fa-solid fa-image"></i>
-                            <span>Enviar imagem</span>
-                            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-image-file="${escapeHTML(variation.id)}">
-                          </label>
+                          <div class="admin-variation-photo-box">
+                            <label class="admin-variation-image-url">Imagem desta variacao
+                              <input type="url" value="${escapeHTML(variation.imagem || '')}" placeholder="https://..." data-admin-variation-field="imagem" data-variation-id="${escapeHTML(variation.id)}">
+                            </label>
+                            <div class="admin-variation-photo-actions">
+                              <label class="admin-upload-label">
+                                <i class="fa-solid fa-camera"></i>
+                                Tirar foto
+                                <input type="file" accept="image/*" capture="environment" data-admin-variation-image-file-camera="${escapeHTML(variation.id)}">
+                              </label>
+                              <label class="admin-upload-label">
+                                <i class="fa-solid fa-image"></i>
+                                Escolher da galeria
+                                <input type="file" accept="image/*" data-admin-variation-image-file="${escapeHTML(variation.id)}">
+                              </label>
+                              <button class="btn btn-secondary" type="button" data-admin-variation-image-clear="${escapeHTML(variation.id)}">
+                                <i class="fa-solid fa-xmark"></i>
+                                Remover imagem
+                              </button>
+                            </div>
+                            <div class="admin-image-preview admin-variation-image-preview hidden" data-admin-variation-image-preview="${escapeHTML(variation.id)}" aria-live="polite"></div>
+                            <small class="admin-image-feedback" data-admin-variation-image-feedback="${escapeHTML(variation.id)}"></small>
+                          </div>
                         </div>
                       </div>
                       <div class="admin-variation-actions">
@@ -1608,14 +1667,29 @@ document.addEventListener('DOMContentLoaded', () => {
           <label>Estoque
             <input type="number" min="0" step="1" data-admin-variation-new="estoque" placeholder="Livre">
           </label>
-          <label class="admin-variation-image-url">Imagem
-            <input type="url" data-admin-variation-new="imagem" value="${escapeHTML(product.imagem || '')}" placeholder="https://...">
-          </label>
-          <label class="admin-variation-upload">
-            <i class="fa-solid fa-image"></i>
-            <span>Enviar imagem</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" data-admin-variation-new-file>
-          </label>
+          <div class="admin-variation-photo-box">
+            <label class="admin-variation-image-url">Imagem desta nova variacao
+              <input type="url" data-admin-variation-new="imagem" value="" placeholder="https://...">
+            </label>
+            <div class="admin-variation-photo-actions">
+              <label class="admin-upload-label">
+                <i class="fa-solid fa-camera"></i>
+                Tirar foto
+                <input type="file" accept="image/*" capture="environment" data-admin-variation-new-file-camera>
+              </label>
+              <label class="admin-upload-label">
+                <i class="fa-solid fa-image"></i>
+                Escolher da galeria
+                <input type="file" accept="image/*" data-admin-variation-new-file>
+              </label>
+              <button class="btn btn-secondary" type="button" data-admin-variation-new-image-clear>
+                <i class="fa-solid fa-xmark"></i>
+                Remover imagem
+              </button>
+            </div>
+            <div class="admin-image-preview admin-variation-image-preview hidden" data-admin-variation-new-image-preview aria-live="polite"></div>
+            <small class="admin-image-feedback" data-admin-variation-new-image-feedback></small>
+          </div>
           <button class="btn btn-primary" type="button" data-admin-variation-add="${escapeHTML(product.id)}">
             <i class="fa-solid fa-plus"></i>
             Adicionar variacao
@@ -1646,11 +1720,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <label>Categoria
           <input type="text" value="${escapeHTML(product.categoria || 'Produtos')}" data-admin-product-field="categoria" data-product-id="${escapeHTML(product.id)}">
         </label>
-        <label class="admin-product-edit-wide">Imagem do produto
+        <label class="admin-product-edit-wide">Imagem principal do produto
           <input type="url" value="${escapeHTML(product.imagem || '')}" data-admin-product-field="imagem" data-product-id="${escapeHTML(product.id)}" placeholder="https://...">
         </label>
         <div class="admin-product-edit-wide admin-product-photo-box">
-          <strong>Foto do produto</strong>
+          <strong>Foto principal do produto</strong>
           <div class="admin-product-photo-actions">
             <label class="admin-upload-label">
               <i class="fa-solid fa-camera"></i>
@@ -1668,6 +1742,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
           </div>
           <div class="admin-image-preview admin-edit-image-preview hidden" data-admin-edit-image-preview="${escapeHTML(product.id)}" aria-live="polite"></div>
+          <small class="admin-image-feedback" data-admin-edit-image-feedback="${escapeHTML(product.id)}"></small>
         </div>
         <label>Estoque
           <input type="number" min="0" step="1" value="${escapeHTML(stock)}" data-admin-product-field="estoque" data-product-id="${escapeHTML(product.id)}">
@@ -1844,8 +1919,18 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       payload = override || variationPayloadFromEditor(variationId);
       if (!override) {
-        const file = qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] || null;
-        if (file) payload.imagem = await resolveProductImage(file, payload.nome || variationId);
+        const file =
+          qs(`[data-admin-variation-image-file-camera="${escapeSelector(variationId)}"]`)?.files?.[0] ||
+          qs(`[data-admin-variation-image-file="${escapeSelector(variationId)}"]`)?.files?.[0] ||
+          null;
+        if (file) {
+          payload.imagem = await resolveProductImage(file, payload.nome || variationId, {
+            productId,
+            recordId: variationId,
+            context: 'variacao',
+            feedbackTarget: `[data-admin-variation-image-feedback="${escapeSelector(variationId)}"]`,
+          });
+        }
       }
       if (!payload.nome && !override) throw new Error('Informe o nome da variacao.');
       if (!override && payload.oferta_ativa && (!payload.preco_promocional || payload.preco_promocional <= 0)) {
@@ -1859,12 +1944,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { error } = await api.from('produto_variacoes').update(payload).eq('id', variationId);
+    const { data, error } = await api.from('produto_variacoes').update(payload).eq('id', variationId).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
 
-    if (error) {
-      showToast(friendlyDbError(error, 'Nao consegui salvar a variacao.'), 'error');
+    if (error || !data) {
+      showToast(
+        friendlyDbError(
+          error,
+          payload.imagem ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.' : 'Nao consegui salvar a variacao.',
+        ),
+        'error',
+      );
       return false;
     }
 
@@ -1901,8 +1992,18 @@ document.addEventListener('DOMContentLoaded', () => {
         imagem: ensureSafeProductImageValue(field('imagem')?.value || product.imagem || ''),
         ordem: productVariations(productId).length * 10 + 10,
       };
-      const file = qs('[data-admin-variation-new-file]', box)?.files?.[0] || null;
-      if (file) payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId);
+      const file =
+        qs('[data-admin-variation-new-file-camera]', box)?.files?.[0] ||
+        qs('[data-admin-variation-new-file]', box)?.files?.[0] ||
+        null;
+      if (file) {
+        payload.imagem = await resolveProductImage(file, payload.nome || product.nome || productId, {
+          productId,
+          recordId: productId,
+          context: 'nova-variacao',
+          feedbackTarget: '[data-admin-variation-new-image-feedback]',
+        });
+      }
       if (!payload.nome) throw new Error('Informe o nome da variacao.');
     } catch (error) {
       variationSaveLocks.delete(`new-${productId}`);
@@ -1911,12 +2012,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id').maybeSingle();
+    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(`new-${productId}`);
     setVariationAddBusy(productId, false);
 
     if (error) {
-      showToast(friendlyDbError(error, 'Nao consegui adicionar a variacao.'), 'error');
+      showToast(
+        friendlyDbError(
+          error,
+          payload.imagem
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL da nova variacao.'
+            : 'Nao consegui adicionar a variacao.',
+        ),
+        'error',
+      );
       return false;
     }
 
@@ -1958,6 +2067,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
+    let uploadedImage = false;
     if (!override) {
       const file =
         qs(`[data-admin-product-image-file-camera="${escapeSelector(productId)}"]`)?.files?.[0] ||
@@ -1966,7 +2076,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (file) {
         try {
           showToast('Enviando nova imagem...', 'info');
-          payload.imagem = await resolveProductImage(file, payload.nome || productId);
+          payload.imagem = await resolveProductImage(file, payload.nome || productId, { productId });
+          uploadedImage = true;
         } catch (error) {
           unlockProductSave(productId);
           showToast(friendlyDbError(error, error.message || 'Nao consegui enviar a imagem.'), 'error');
@@ -1988,7 +2099,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let data;
     let error;
     try {
-      ({ data, error } = await api.from('produtos').update(payload).eq('id', productId).select('id').maybeSingle());
+      if (uploadedImage) {
+        const imageInput = productCardField(productId, 'imagem');
+        if (imageInput) imageInput.value = payload.imagem || '';
+      }
+
+      ({ data, error } = await api
+        .from('produtos')
+        .update(payload)
+        .eq('id', productId)
+        .select('id, imagem')
+        .maybeSingle());
 
     if (error || !data) {
       const rpc = await rpcAtualizarProduto(productId, payload);
@@ -2010,27 +2131,40 @@ document.addEventListener('DOMContentLoaded', () => {
         ativo: payload.ativo,
       };
       if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
-      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id').maybeSingle();
+      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id, imagem').maybeSingle();
       data = fallback.data;
       error = fallback.error;
     }
     } catch (requestError) {
       unlockProductSave(productId);
-      showToast(friendlyDbError(requestError, 'Nao consegui alterar o produto.'), 'error');
+      showToast(
+        friendlyDbError(
+          requestError,
+          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+        ),
+        'error',
+      );
       return false;
     }
 
     if (error || !data) {
       unlockProductSave(productId);
-      showToast(friendlyDbError(error, 'Nao consegui alterar o produto.'), 'error');
+      showToast(
+        friendlyDbError(
+          error,
+          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+        ),
+        'error',
+      );
       return false;
     }
 
-    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload } : product));
+    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product));
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
+    if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
     showToast('Produto atualizado.', 'success');
-    carregarProdutosAdmin();
+    await carregarProdutosAdmin();
     unlockProductSave(productId);
     return true;
   }
@@ -2072,13 +2206,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'png';
   }
 
+  function originalImageExtension(file) {
+    return text(file?.name).split('.').pop()?.toLowerCase() || '';
+  }
+
+  function isUnsupportedPhoneImage(file) {
+    const extension = originalImageExtension(file);
+    const type = text(file?.type).toLowerCase();
+    return ['heic', 'heif'].includes(extension) || ['image/heic', 'image/heif'].includes(type);
+  }
+
   function validateProductImageFile(file) {
     if (!file) return;
-    if (!file.type?.startsWith('image/')) {
+    if (isUnsupportedPhoneImage(file)) {
+      throw new Error('Este formato de foto nao foi aceito. Tente tirar novamente em JPG ou escolher outra imagem.');
+    }
+    const extension = originalImageExtension(file);
+    const acceptedByExtension = ['jpg', 'jpeg', 'png', 'webp'].includes(extension);
+    const acceptedByMime = ['image/jpeg', 'image/png', 'image/webp'].includes(text(file.type).toLowerCase());
+    if (!acceptedByMime && !acceptedByExtension) {
       throw new Error('Use uma imagem JPG, PNG ou WebP.');
     }
-    if (file.size > MAX_IMAGE_SIZE) {
-      console.info('[Admin] Imagem grande recebida; tentando reduzir antes do envio.');
+    // When a large image is provided, it is optimized before upload.
+    if (file.size > PRODUCT_IMAGE_TARGET_SIZE) {
+      // No console output needed for normal optimization flow.
     }
   }
 
@@ -2090,70 +2241,435 @@ document.addEventListener('DOMContentLoaded', () => {
     return image;
   }
 
-  async function compressProductImage(file) {
-    if (!file || typeof createImageBitmap !== 'function') return file;
-    if (file.size <= 900 * 1024 && ['image/jpeg', 'image/webp'].includes(file.type)) return file;
-
-    try {
-      const bitmap = await createImageBitmap(file);
-      const scale = Math.min(1, IMAGE_COMPRESS_TARGET / Math.max(bitmap.width, bitmap.height));
-      const width = Math.max(1, Math.round(bitmap.width * scale));
-      const height = Math.max(1, Math.round(bitmap.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      context.drawImage(bitmap, 0, 0, width, height);
-      const type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, IMAGE_COMPRESS_QUALITY));
-      bitmap.close?.();
-      if (!blob) return file;
-      if (blob.size >= file.size && file.size <= MAX_IMAGE_SIZE) return file;
-      const extension = type === 'image/png' ? 'png' : 'jpg';
-      const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
-      return new File([blob], `${baseName}.${extension}`, { type, lastModified: Date.now() });
-    } catch (error) {
-      console.warn('[Admin] Compressao de imagem falhou; tentando arquivo original.', error);
-      return file;
-    }
+  function adminImageFeedbackTargets(target = '') {
+    if (!target) return [qs('#admin-product-upload-feedback')].filter(Boolean);
+    if (text(target).startsWith('[')) return qsa(target);
+    return qsa(`[data-admin-edit-image-feedback="${escapeSelector(target)}"]`);
   }
 
-  async function resolveProductImage(file, productNameOverride = '') {
-    if (!file) return '';
-    validateProductImageFile(file);
+  function setAdminImageFeedback(message = '', target = '') {
+    const targets = adminImageFeedbackTargets(target);
+    targets.forEach((target) => {
+      target.textContent = message;
+    });
+  }
+
+  function fileDiagnostic(file) {
+    if (!file) return null;
+    return {
+      name: file.name || '',
+      type: file.type || '',
+      size: file.size || 0,
+      sizeMb: Number(((file.size || 0) / 1024 / 1024).toFixed(2)),
+    };
+  }
+
+  function storageErrorDiagnostic(error) {
+    if (!error) return null;
+    return {
+      name: error.name || '',
+      message: error.message || '',
+      code: error.code || '',
+      status: error.status || error.statusCode || '',
+      details: error.details || '',
+      hint: error.hint || '',
+    };
+  }
+
+  function safeStringify(value) {
+    const seen = new WeakSet();
     try {
-      const preparedFile = await compressProductImage(file);
-      validateProductImageFile(preparedFile);
-      return await uploadImagemProduto(preparedFile, productNameOverride);
-    } catch (error) {
-      console.warn('[Admin] Upload no Storage falhou.', error);
-      throw new Error(
-        friendlyDbError(
-          error,
-          'Nao consegui enviar essa imagem. Tente tirar outra foto ou escolher outra imagem.',
-        ),
+      return JSON.stringify(
+        value,
+        (key, item) => {
+          if (item instanceof Error) {
+            return {
+              name: item.name,
+              message: item.message,
+              code: item.code,
+              status: item.status || item.statusCode,
+              details: item.details,
+              hint: item.hint,
+              stack: item.stack,
+            };
+          }
+          if (item && typeof item === 'object') {
+            if (seen.has(item)) return '[Circular]';
+            seen.add(item);
+          }
+          return item;
+        },
+        2,
       );
+    } catch (stringifyError) {
+      return String(value);
     }
   }
 
-  async function uploadImagemProduto(file, productNameOverride = '') {
+  function uploadLogPrefix(stage = '', context = '') {
+    if (stage.includes('erro') || stage.includes('falha')) return '[Storage erro]';
+    if (stage.includes('upload') || stage.includes('public-url')) return '[Storage upload]';
+    if (context.includes('variacao')) return '[Upload variacao]';
+    return '[Upload produto]';
+  }
+
+  function logImageUploadDiagnostic(stage, details = {}) {
+    const payload = {
+      stage,
+      bucket: PRODUCT_IMAGE_BUCKET,
+      ...details,
+    };
+    const prefix = uploadLogPrefix(stage, details.context || '');
+    const isErrorStage = /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
+    if (!isErrorStage) return;
+    if (console.groupCollapsed) {
+      console.groupCollapsed(`${prefix} ${stage}`);
+      console.error(payload);
+      console.groupEnd();
+      return;
+    }
+    console.error(prefix, payload);
+  }
+
+  function friendlyStorageUploadError(error, fallback = 'Nao consegui enviar essa imagem.') {
+    const rawMessage = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''} ${
+      error?.status || error?.statusCode || ''
+    }`;
+    const message = normalize(rawMessage);
+    if (
+      message.includes('row-level security') ||
+      message.includes('rls') ||
+      message.includes('permission') ||
+      message.includes('unauthorized') ||
+      message.includes('not authorized') ||
+      message.includes('403')
+    ) {
+      return 'Sem permissão no Storage para enviar imagem.';
+    }
+    if (message.includes('bucket')) return 'Bucket produtos não encontrado ou inacessível.';
+    if (
+      message.includes('invalid') ||
+      message.includes('path') ||
+      message.includes('key') ||
+      message.includes('object name')
+    ) {
+      return 'Arquivo/path inválido para Storage.';
+    }
+    if (message.includes('mime') || message.includes('unsupported')) {
+      return 'Formato de imagem nao aceito pelo Storage.';
+    }
+    if (message.includes('too large') || message.includes('payload') || message.includes('413')) {
+      return 'Imagem preparada, mas ainda ficou grande para envio.';
+    }
+    return error?.message || fallback;
+  }
+
+  async function diagnoseAdminCanWrite(api, context = 'produto') {
+    try {
+      if (typeof api.rpc !== 'function') {
+        logImageUploadDiagnostic('admin-can-write-indisponivel', {
+          context,
+          error: { message: 'Cliente Supabase sem api.rpc disponivel.' },
+        });
+        return null;
+      }
+      const { data, error } = await api.rpc('admin_can_write');
+      if (error) {
+        logImageUploadDiagnostic('admin-can-write-erro', {
+          context,
+          error: storageErrorDiagnostic(error),
+        });
+        console.error('[Upload produto] admin_can_write erro', error?.message, error);
+        return null;
+      }
+      logImageUploadDiagnostic('admin-can-write', {
+        context,
+        allowed: data === true,
+        rawResult: data,
+      });
+      return data === true;
+    } catch (error) {
+      logImageUploadDiagnostic('admin-can-write-erro', {
+        context,
+        error: storageErrorDiagnostic(error),
+      });
+      console.error('[Upload produto] admin_can_write erro', error?.message, error);
+      return null;
+    }
+  }
+
+  function imageSourceSize(source) {
+    return {
+      width: source.width || source.naturalWidth || 0,
+      height: source.height || source.naturalHeight || 0,
+    };
+  }
+
+  async function loadImageForCompression(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        return await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch (error) {
+        console.info('[Admin] createImageBitmap nao aceitou a imagem, usando fallback.', error);
+      }
+    }
+
+    return await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Nao consegui ler essa foto. Tente tirar novamente ou escolher outra imagem.'));
+      };
+      image.src = url;
+    });
+  }
+
+  function drawImageToCanvas(source, maxSide) {
+    const { width: sourceWidth, height: sourceHeight } = imageSourceSize(source);
+    if (!sourceWidth || !sourceHeight) throw new Error('Nao consegui identificar o tamanho da imagem.');
+    const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('Seu navegador nao conseguiu preparar essa imagem.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(source, 0, 0, width, height);
+    return canvas;
+  }
+
+  function canvasBlob(canvas, quality) {
+    return new Promise((resolve) => canvas.toBlob(resolve, PRODUCT_IMAGE_OUTPUT_TYPE, quality));
+  }
+
+  function randomUploadToken() {
+    const bytes = new Uint32Array(2);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+      return Array.from(bytes, (value) => value.toString(36)).join('-');
+    }
+    return Math.random().toString(36).slice(2, 12);
+  }
+
+  function buildProductImagePath(diagnostic = {}) {
+    const recordId = safeFileName(diagnostic.recordId || diagnostic.productId || 'novo');
+    const contextFolder = diagnostic.context?.includes('variacao') ? 'variacao' : 'produto';
+    const path = `${contextFolder}/${recordId || 'novo'}/${Date.now()}-${randomUploadToken()}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`;
+    if (
+      !path ||
+      path.includes('undefined') ||
+      path.includes('null') ||
+      path.includes('//') ||
+      !/^[a-z0-9-]+\/[a-z0-9-]+\/[0-9]+-[a-z0-9-]+(?:-[a-z0-9-]+)?\.jpg$/.test(path)
+    ) {
+      throw new Error(`Path invalido para upload: ${path || '(vazio)'}`);
+    }
+    return path;
+  }
+
+  async function validateOptimizedProductImage(file) {
+    if (!file) throw new Error('Arquivo final de imagem ausente.');
+    if (!(file instanceof Blob)) throw new Error('Arquivo final nao e Blob/File valido.');
+    if (!file.size || file.size <= 0) throw new Error('Arquivo final vazio.');
+    if (file.type !== PRODUCT_IMAGE_OUTPUT_TYPE) {
+      throw new Error(`ContentType invalido: ${file.type || '(vazio)'}. Esperado image/jpeg.`);
+    }
+    if (file.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
+      throw new Error(`Imagem final grande demais (${fileDiagnostic(file).sizeMb} MB).`);
+    }
+    let source = null;
+    try {
+      source = await loadImageForCompression(file);
+      const dimensions = imageSourceSize(source);
+      if (!dimensions.width || !dimensions.height) throw new Error('Imagem final sem largura/altura validas.');
+      return dimensions;
+    } finally {
+      source?.close?.();
+    }
+  }
+
+  async function compressProductImage(file) {
+    if (!file) return file;
+    validateProductImageFile(file);
+    let source = null;
+
+    try {
+      source = await loadImageForCompression(file);
+      const qualitySteps = [IMAGE_COMPRESS_QUALITY, 0.78, 0.7, 0.62];
+      const dimensionSteps = [PRODUCT_IMAGE_MAX_SIDE, 1600, 1400, 1200, PRODUCT_IMAGE_MIN_SIDE];
+      let bestBlob = null;
+
+      for (const maxSide of dimensionSteps) {
+        const canvas = drawImageToCanvas(source, maxSide);
+        for (const quality of qualitySteps) {
+          const blob = await canvasBlob(canvas, quality);
+          if (!blob) continue;
+          if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+          if (blob.size <= PRODUCT_IMAGE_TARGET_SIZE) {
+            const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
+            return new File([blob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
+              type: PRODUCT_IMAGE_OUTPUT_TYPE,
+              lastModified: Date.now(),
+            });
+          }
+        }
+      }
+
+      if (!bestBlob) throw new Error('Nao consegui comprimir essa imagem.');
+      if (bestBlob.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
+        throw new Error('A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.');
+      }
+      const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
+      return new File([bestBlob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
+        type: PRODUCT_IMAGE_OUTPUT_TYPE,
+        lastModified: Date.now(),
+      });
+    } catch (error) {
+      console.warn('[Admin] Compressao de imagem falhou.', error);
+      throw new Error(error.message || 'Nao consegui preparar essa imagem. Tente outra foto.');
+    } finally {
+      source?.close?.();
+    }
+  }
+
+  async function resolveProductImage(file, productNameOverride = '', options = {}) {
+    if (!file) return '';
+    const feedbackTarget = options.feedbackTarget || options.productId || '';
+    const context = options.context || 'produto';
+    const originalFile = fileDiagnostic(file);
+    validateProductImageFile(file);
+    try {
+      logImageUploadDiagnostic('leitura', { context, originalFile });
+      setAdminImageFeedback('Preparando imagem...', feedbackTarget);
+      setAdminImageFeedback('Comprimindo imagem...', feedbackTarget);
+      const preparedFile = await compressProductImage(file);
+      logImageUploadDiagnostic('compressao', {
+        context,
+        originalFile,
+        finalFile: fileDiagnostic(preparedFile),
+      });
+      setAdminImageFeedback('Enviando imagem...', feedbackTarget);
+      validateProductImageFile(preparedFile);
+      return await uploadImagemProduto(preparedFile, productNameOverride, {
+        ...options,
+        context,
+        originalFile,
+      });
+    } catch (error) {
+      logImageUploadDiagnostic('falha', {
+        context,
+        originalFile,
+        error: storageErrorDiagnostic(error),
+      });
+      throw new Error(friendlyStorageUploadError(error, 'Imagem preparada, mas upload falhou.'));
+    }
+  }
+
+  async function uploadImagemProduto(file, productNameOverride = '', diagnostic = {}) {
     const api = client();
-    if (!api?.storage) throw new Error('Storage do Supabase indisponível.');
+    if (!api?.storage) throw new Error('Storage do Supabase indisponivel.');
     if (!file) return '';
     validateProductImageFile(file);
+    const dimensions = await validateOptimizedProductImage(file);
 
-    const extension = imageExtension(file);
-    const productName = productNameOverride || qs('#prod-nome')?.value || file.name;
-    const path = `${safeFileName(productName)}/${Date.now()}-${safeFileName(file.name)}.${extension}`;
-    const { error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
-      cacheControl: '3600',
-      contentType: file.type || `image/${extension}`,
+    try {
+      const { data, error } = await api.auth.getUser();
+      if (error) throw error;
+      if (!data?.user) throw new Error('Usuario admin nao autenticado para enviar imagem.');
+      logImageUploadDiagnostic('autenticacao', {
+        context: diagnostic.context || 'produto',
+        userId: data.user.id,
+        email: data.user.email || '',
+      });
+    } catch (error) {
+      logImageUploadDiagnostic('autenticacao-falhou', {
+        context: diagnostic.context || 'produto',
+        error: storageErrorDiagnostic(error),
+      });
+      throw new Error('Usuario admin nao autenticado para enviar imagem.');
+    }
+
+    const canWrite = await diagnoseAdminCanWrite(api, diagnostic.context || 'produto');
+    if (canWrite === false) {
+      throw new Error('Seu usuário está logado, mas não tem permissão administrativa para enviar imagens.');
+    }
+
+    const path = buildProductImagePath(diagnostic);
+    const fullObjectPath = `${PRODUCT_IMAGE_BUCKET}/${path}`;
+    const uploadFile = new File([file], path.split('/').pop(), {
+      type: PRODUCT_IMAGE_OUTPUT_TYPE,
+      lastModified: Date.now(),
+    });
+
+    logImageUploadDiagnostic('upload', {
+      context: diagnostic.context || 'produto',
+      originalFile: diagnostic.originalFile || null,
+      finalFile: fileDiagnostic(uploadFile),
+      dimensions,
+      bucket: PRODUCT_IMAGE_BUCKET,
+      path,
+      fullObjectPath,
+      contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+      finalSize: uploadFile.size,
       upsert: false,
     });
 
-    if (error) throw error;
+    const { data: uploadData, error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, uploadFile, {
+      cacheControl: '3600',
+      contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+      upsert: false,
+    });
+
+    if (error) {
+      const detail = {
+        context: diagnostic.context || 'produto',
+        bucket: PRODUCT_IMAGE_BUCKET,
+        path,
+        fullObjectPath,
+        request: {
+          bucket: PRODUCT_IMAGE_BUCKET,
+          path,
+          fullObjectPath,
+          contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
+          cacheControl: '3600',
+          upsert: false,
+          size: uploadFile.size,
+          dimensions,
+        },
+        error: storageErrorDiagnostic(error),
+        rawError: error,
+      };
+      logImageUploadDiagnostic('upload-falhou', detail);
+      console.error('[Storage erro] Supabase retornou erro no upload.', detail);
+      console.error('[Storage erro message]', error?.message);
+      console.error('[Storage erro status]', error?.status || error?.statusCode);
+      console.error('[Storage erro code]', error?.code);
+      console.error('[Storage erro details]', error?.details);
+      console.error('[Storage erro hint]', error?.hint);
+      console.error('[Storage erro json]', safeStringify(error));
+      throw error;
+    }
+    logImageUploadDiagnostic('upload-ok', {
+      context: diagnostic.context || 'produto',
+      path,
+      uploadData,
+    });
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
-    return data?.publicUrl || '';
+    if (!data?.publicUrl) throw new Error('Upload concluido, mas nao consegui gerar URL publica.');
+    logImageUploadDiagnostic('public-url', {
+      context: diagnostic.context || 'produto',
+      path,
+      publicUrl: data.publicUrl,
+    });
+    return data.publicUrl;
   }
 
   function renderCreateProductImagePreview(file) {
@@ -2162,21 +2678,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) {
       preview.classList.add('hidden');
       preview.innerHTML = '';
+      setAdminImageFeedback('');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...');
       preview.classList.remove('hidden');
       preview.innerHTML = `
-        <img src="${escapeHTML(reader.result || '')}" alt="Previa da imagem do produto">
-        <span>Imagem escolhida. Voce pode trocar antes de salvar.</span>
+        <img src="${escapeHTML(url)}" alt="Previa da imagem do produto">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente antes do envio.</span>
       `;
-    };
-    reader.onerror = () => {
+    } catch (error) {
       preview.classList.add('hidden');
-      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
-    };
-    reader.readAsDataURL(file);
+      preview.innerHTML = '';
+      setAdminImageFeedback('');
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
   }
 
   function renderEditProductImagePreview(productId, file) {
@@ -2185,21 +2704,78 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) {
       preview.classList.add('hidden');
       preview.innerHTML = '';
+      setAdminImageFeedback('', productId);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', productId);
       preview.classList.remove('hidden');
       preview.innerHTML = `
-        <img src="${escapeHTML(reader.result || '')}" alt="Previa da nova imagem do produto">
-        <span>Nova imagem escolhida. Ela sera enviada ao salvar.</span>
+        <img src="${escapeHTML(url)}" alt="Previa da nova imagem do produto">
+        <span>Nova imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
       `;
-    };
-    reader.onerror = () => {
+    } catch (error) {
       preview.classList.add('hidden');
-      showToast('Essa imagem nao pode ser usada. Tente outra foto.', 'error');
-    };
-    reader.readAsDataURL(file);
+      preview.innerHTML = '';
+      setAdminImageFeedback('', productId);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
+  }
+
+  function renderVariationImagePreview(variationId, file) {
+    const selector = `[data-admin-variation-image-feedback="${escapeSelector(variationId)}"]`;
+    const preview = qs(`[data-admin-variation-image-preview="${escapeSelector(variationId)}"]`);
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      return;
+    }
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', selector);
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(url)}" alt="Previa da imagem da variacao">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
+      `;
+    } catch (error) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
+  }
+
+  function renderNewVariationImagePreview(file) {
+    const selector = '[data-admin-variation-new-image-feedback]';
+    const preview = qs('[data-admin-variation-new-image-preview]');
+    if (!preview) return;
+    if (!file) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      return;
+    }
+    try {
+      validateProductImageFile(file);
+      const url = URL.createObjectURL(file);
+      setAdminImageFeedback('Preparando imagem...', selector);
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <img src="${escapeHTML(url)}" alt="Previa da imagem da nova variacao">
+        <span>Imagem escolhida. Ela sera reduzida automaticamente ao salvar.</span>
+      `;
+    } catch (error) {
+      preview.classList.add('hidden');
+      preview.innerHTML = '';
+      setAdminImageFeedback('', selector);
+      showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
+    }
   }
 
   function selectedCreateProductImageFile() {
@@ -2947,6 +3523,26 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         return;
       }
+
+      const variationImageFile = event.target.closest(
+        '[data-admin-variation-image-file], [data-admin-variation-image-file-camera]',
+      );
+      if (variationImageFile) {
+        renderVariationImagePreview(
+          variationImageFile.dataset.adminVariationImageFile ||
+            variationImageFile.dataset.adminVariationImageFileCamera,
+          variationImageFile.files?.[0] || null,
+        );
+        return;
+      }
+
+      const newVariationImageFile = event.target.closest(
+        '[data-admin-variation-new-file], [data-admin-variation-new-file-camera]',
+      );
+      if (newVariationImageFile) {
+        renderNewVariationImagePreview(newVariationImageFile.files?.[0] || null);
+        return;
+      }
       // Mudanca de cargo na aba Gerenciar Equipe
       const teamSelect = event.target.closest('[data-admin-team-role]');
       if (teamSelect) {
@@ -2996,6 +3592,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderEditProductImagePreview(productId, null);
         showToast('Imagem removida. Salve o produto para confirmar.', 'info');
+        return;
+      }
+
+      const createImageClear = event.target.closest('[data-admin-create-image-clear]');
+      if (createImageClear) {
+        qsa('#prod-foto, #prod-foto-camera').forEach((input) => {
+          input.value = '';
+        });
+        renderCreateProductImagePreview(null);
+        showToast('Imagem removida do novo produto.', 'info');
+        return;
+      }
+
+      const variationImageClear = event.target.closest('[data-admin-variation-image-clear]');
+      if (variationImageClear) {
+        const variationId = variationImageClear.dataset.adminVariationImageClear;
+        const imageInput = variationField(variationId, 'imagem');
+        if (imageInput) imageInput.value = '';
+        qsa(
+          `[data-admin-variation-image-file="${escapeSelector(variationId)}"], [data-admin-variation-image-file-camera="${escapeSelector(variationId)}"]`,
+        ).forEach((input) => {
+          input.value = '';
+        });
+        renderVariationImagePreview(variationId, null);
+        showToast('Imagem removida da variacao. Salve para confirmar.', 'info');
+        return;
+      }
+
+      const newVariationImageClear = event.target.closest('[data-admin-variation-new-image-clear]');
+      if (newVariationImageClear) {
+        const box = newVariationImageClear.closest('[data-admin-variation-create]');
+        const imageInput = qs('[data-admin-variation-new="imagem"]', box);
+        if (imageInput) imageInput.value = '';
+        qsa('[data-admin-variation-new-file], [data-admin-variation-new-file-camera]', box).forEach((input) => {
+          input.value = '';
+        });
+        renderNewVariationImagePreview(null);
+        showToast('Imagem removida da nova variacao.', 'info');
         return;
       }
 

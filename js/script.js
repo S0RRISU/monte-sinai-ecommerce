@@ -232,10 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let orderNotificationsCache = [];
   let orderNotificationsReady = true;
   let ordersPageAdminMode = false;
+  const selectedVariationByProductKey = Object.create(null);
   const publicProductsState = {
     allProducts: [],
     selectedCategory: 'all',
     searchTerm: '',
+    loaded: false,
+    loading: true,
   };
 
   applySavedTheme();
@@ -1452,6 +1455,7 @@ document.addEventListener('DOMContentLoaded', () => {
       offerActive: offer.active,
       offerStartsAt: offer.startsAt,
       offerEndsAt: offer.endsAt,
+      updatedAt: raw.updated_at ?? raw.updatedAt ?? '',
       stock,
       canBuy: canBuy === undefined || canBuy === null ? stock === null || stock > 0 : canBuy !== false,
       unavailable: unavailable === true,
@@ -1524,6 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
       offerActive,
       offerStartsAt: raw.oferta_inicio ?? raw.offerStartsAt ?? '',
       offerEndsAt: raw.oferta_fim ?? raw.offerEndsAt ?? '',
+      updatedAt: raw.updated_at ?? raw.updatedAt ?? '',
       kitItems: raw.kit_itens ?? raw.kitItems ?? '',
       stock,
       lowStockLimit,
@@ -1907,9 +1912,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
+    publicProductsState.loading = true;
+    publicProductsState.loaded = false;
     if (!client) {
       console.warn('[Supabase] Cliente nao encontrado. Catalogo publico nao carregado.');
       setProductIndex([]);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
       return;
     }
@@ -1941,11 +1950,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const productsWithVariations = attachProductVariations(products, variations);
       setProductIndex(productsWithVariations);
       pruneCartUnavailableProducts(productsWithVariations);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
       const localProducts = await loadLocalCatalogProducts().catch(() => []);
       setProductIndex(localProducts);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
         showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
@@ -2470,6 +2483,10 @@ document.addEventListener('DOMContentLoaded', () => {
         value: option.id || option.variationId || option.value || option.name || option.label || '',
         name: option.name || option.value || option.label || '',
         price: Number(option.price || product.price || 0),
+        originalPrice: Number(option.originalPrice || option.preco_original || option.price || product.price || 0),
+        offerActive: Boolean(option.offerActive || option.oferta_ativa),
+        offerEndsAt: option.offerEndsAt || option.oferta_fim || '',
+        updatedAt: option.updatedAt || option.updated_at || product.updatedAt || product.updated_at || '',
         stock: normalizeVariationStockValue(option.stock),
         canBuy: option.canBuy ?? option.pode_comprar,
         unavailable: option.unavailable ?? option.indisponivel,
@@ -2485,6 +2502,10 @@ document.addEventListener('DOMContentLoaded', () => {
         value: option.value || option.textContent.trim(),
         name: option.dataset.variationName || option.textContent.trim(),
         price: Number(option.dataset.price || product.price || 0),
+        originalPrice: Number(option.dataset.originalPrice || option.dataset.price || product.price || 0),
+        offerActive: option.dataset.offerActive === 'true',
+        offerEndsAt: option.dataset.offerEndsAt || '',
+        updatedAt: option.dataset.updatedAt || product.updatedAt || product.updated_at || '',
         stock: normalizeVariationStockValue(option.dataset.stock),
         canBuy: option.dataset.available === '' ? undefined : option.dataset.available !== 'false',
         unavailable: option.dataset.available === 'false',
@@ -2587,7 +2608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         name: activeSearchProduct.name,
         variant: selected?.name || '',
         price: Number(selected?.price || activeSearchProduct.price || 0),
-        image: selected?.image || productAssetPath(activeSearchProduct),
+        image: getImagemProdutoSelecionada(activeSearchProduct, selected),
         stock: selected?.stock ?? activeSearchProduct.stock,
       });
       closeProductSearchModal();
@@ -2634,11 +2655,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!content || !activeSearchProduct) return;
 
     const card = productCatalogCard(activeSearchProduct);
-    const image = productAssetPath(activeSearchProduct, card);
     const description = productDescription(activeSearchProduct, card);
     const options = productOptions(activeSearchProduct, card);
     const preferredOption = options.find((option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''));
     const firstOption = preferredOption || options[0] || { price: activeSearchProduct.price || 0 };
+    const image = getImagemProdutoSelecionada(activeSearchProduct, activeSearchProduct.hasVariations ? firstOption : null);
     const resultButtons =
       productSearchResults.length > 1
         ? `
@@ -2672,7 +2693,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     content.innerHTML = `
       <div class="product-search-media">
-        ${productMediaHTML(activeSearchProduct, image)}
+        ${productMediaHTML(activeSearchProduct, image, '', firstOption.updatedAt || activeSearchProduct.updatedAt)}
       </div>
       <div class="product-search-info">
         <span class="eyebrow">Resultado principal</span>
@@ -2713,6 +2734,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const price = qs('[data-product-search-price]', content);
       const stockLine = qs('.product-stock-line', content);
       if (price) price.textContent = formatMoney(selected.price || activeSearchProduct.price);
+      const imageEl = qs('.product-image', content);
+      const selectedImage = getImagemProdutoSelecionada(activeSearchProduct, selected);
+      if (imageEl && selectedImage) setProductImageElement(imageEl, selectedImage, selected?.updatedAt || activeSearchProduct.updatedAt);
       if (stockLine) {
         const text = customerAvailabilityText(activeSearchProduct, selected);
         stockLine.textContent = text;
@@ -3012,6 +3036,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!src || /^(https?:|data:|blob:)/.test(src)) return src || '';
     const clean = canonicalAssetPath(src);
     return `${insidePages() ? '../' : ''}${clean}`;
+  }
+
+  function isRemoteProductImage(src = '') {
+    const value = String(src || '').trim();
+    return /^(https?:|blob:)/.test(value) && !value.includes('/assets/');
+  }
+
+  function productImageFitClass(src = '') {
+    return isRemoteProductImage(src) ? 'product-image-fit-cover' : 'product-image-fit-contain';
+  }
+
+  function imageRenderHref(src = '', version = '') {
+    const href = assetHref(src);
+    const stamp = String(version || '').trim();
+    if (!href || !stamp || !isRemoteProductImage(src)) return href;
+    return `${href}${href.includes('?') ? '&' : '?'}v=${encodeURIComponent(stamp)}`;
+  }
+
+  function setProductImageElement(imageEl, src = '', version = '') {
+    if (!imageEl || !src) return;
+    imageEl.src = imageRenderHref(src, version);
+    imageEl.classList.toggle('product-image-fit-cover', isRemoteProductImage(src));
+    imageEl.classList.toggle('product-image-fit-contain', !isRemoteProductImage(src));
   }
 
   function toastIcon(type = 'info') {
@@ -4153,8 +4200,8 @@ document.addEventListener('DOMContentLoaded', () => {
     entries.forEach(({ product, option }) => {
       const item = document.createElement('button');
       const suggestionProduct = option ? { ...product, preferredVariationId: option.id } : product;
-      const image = option?.image || productAssetPath(product);
-      const imageSrc = assetHref(image);
+      const image = getImagemProdutoSelecionada(product, option || null);
+      const imageSrc = imageRenderHref(image, option?.updatedAt || product.updatedAt);
       item.className = 'search-suggestion-item';
       item.type = 'button';
       item.setAttribute('role', 'option');
@@ -4162,7 +4209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="search-suggestion-media">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
+              ? `<img class="${productImageFitClass(image)}" src="${escapeHTML(imageSrc)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async" onerror="this.remove()">${productPlaceholderHTML(product, 'product-placeholder-compact')}`
               : productPlaceholderHTML(product, 'product-placeholder-compact')
           }
         </span>
@@ -4493,10 +4540,10 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
-  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '') {
+  function productMediaHTML(product = {}, image = productAssetPath(product), modifier = '', version = '') {
     const placeholder = productPlaceholderHTML(product, modifier);
     if (!image) return placeholder;
-    return `<img class="product-image" src="${escapeHTML(assetHref(image))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
+    return `<img class="product-image ${productImageFitClass(image)}" src="${escapeHTML(imageRenderHref(image, version))}" alt="${escapeHTML(product.name || product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
   }
 
   function productStockText(product = {}) {
@@ -4532,11 +4579,76 @@ document.addEventListener('DOMContentLoaded', () => {
     return option.name || option.label || 'Opcao';
   }
 
-  function productOptionsHTML(options = [], product = {}) {
+  function getImagemProdutoSelecionada(produto = {}, variacaoSelecionada = null) {
+    const normalized = normalizeProduct(produto);
+    const variationImage = resolveProductImagePath(
+      variacaoSelecionada?.image || variacaoSelecionada?.imagem || '',
+      normalized.name || produto.name || produto.nome || '',
+    );
+    if (variationImage) return variationImage;
+    const productImage = resolveProductImagePath(
+      normalized.image || produto.image || produto.imagem || '',
+      normalized.name || produto.name || produto.nome || '',
+    );
+    if (productImage) return productImage;
+    return productAssetFallback(normalized.name || produto.name || produto.nome || '') || '';
+  }
+
+  function productSelectionKey(product = {}) {
+    const normalized = product?.name || product?.nome ? normalizeProduct(product) : product || {};
+    return String(normalized.id || product?.id || product?.productId || normalized.name || product?.name || product?.nome || '').trim();
+  }
+
+  function productSelectionKeyFromElement(element) {
+    const card = element?.closest?.('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel, .catalog-product');
+    return String(
+      card?.dataset.catalogDetailKey ||
+        card?.dataset.catalogProductKey ||
+        card?.dataset.productId ||
+        card?.dataset.name ||
+        element?.dataset.productId ||
+        '',
+    ).trim();
+  }
+
+  function selectedVariationForProduct(product = {}, options = []) {
+    const productKey = productSelectionKey(product);
+    const savedVariationId = productKey ? selectedVariationByProductKey[productKey] : '';
+    if (savedVariationId) {
+      const saved = options.find((option) => String(option.id || option.value || '') === String(savedVariationId));
+      if (saved) return saved;
+    }
+    return options[0] || null;
+  }
+
+  function setSelectedVariationForProduct(productKey = '', variationId = '') {
+    const key = String(productKey || '').trim();
+    if (!key) return;
+    selectedVariationByProductKey[key] = String(variationId || '');
+  }
+
+  function syncVariationSelectionAcrossProduct(productKey = '', variationId = '', sourceSelect = null) {
+    const key = String(productKey || '').trim();
+    if (!key || !variationId) return;
+    qsa('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel').forEach((card) => {
+      const cardKey = productSelectionKeyFromElement(card);
+      if (cardKey !== key) return;
+      const select = qs('.product-option', card);
+      if (!select || select === sourceSelect) return;
+      const match = [...select.options].find((option) => String(option.dataset.variationId || option.value || '') === String(variationId));
+      if (!match) return;
+      select.value = match.value;
+      updateSelectedVariationUI(select, { sync: false });
+    });
+  }
+
+  function productOptionsHTML(options = [], product = {}, selectedVariationId = '') {
     return options
       .map((option) => {
-        const image = option.image || productAssetPath(product);
-        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}">${escapeHTML(optionSelectLabel(option))}</option>`;
+        const image = getImagemProdutoSelecionada(product, option);
+        const selected =
+          selectedVariationId && String(option.id || option.value || '') === String(selectedVariationId) ? ' selected' : '';
+        return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-updated-at="${escapeHTML(option.updatedAt || product.updatedAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}"${selected}>${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
   }
@@ -4551,12 +4663,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function selectedVariationState(option, card) {
     const button = card?.querySelector('.btn-add-cart');
-    const productId = button?.dataset.productId || card?.dataset.productId || '';
+    const productId = button?.dataset.productId || card?.dataset.productId || productSelectionKeyFromElement(card) || '';
     const variationId = option?.dataset.variationId || button?.dataset.variationId || '';
+    const product = productId
+      ? productIndex.find((item) => String(normalizeProduct(item).id) === String(productId))
+      : null;
+    const normalizedProduct = product ? normalizeProduct(product) : null;
     const current = variationFromProductIndex(productId, variationId);
     const stock = normalizeVariationStockValue(current ? current.stock : option?.dataset.stock);
     const price = Number(current?.price ?? option?.dataset.price ?? button?.dataset.price ?? 0);
-    const image = current?.image || option?.dataset.image || button?.dataset.image || '';
+    const image =
+      (current
+        ? getImagemProdutoSelecionada(normalizedProduct || {}, current)
+        : option?.dataset.image || getImagemProdutoSelecionada(normalizedProduct || {}, null)) ||
+      current?.image ||
+      button?.dataset.image ||
+      '';
     const name = current?.name || option?.dataset.variationName || option?.textContent?.trim() || '';
     const explicitOut = current
       ? optionOutOfStock(current)
@@ -4570,6 +4692,7 @@ document.addEventListener('DOMContentLoaded', () => {
       originalPrice: Number(current?.originalPrice ?? option?.dataset.originalPrice ?? price),
       offerActive: Boolean(current?.offerActive) || option?.dataset.offerActive === 'true',
       offerEndsAt: current?.offerEndsAt || option?.dataset.offerEndsAt || '',
+      imageVersion: current?.updatedAt || option?.dataset.updatedAt || normalizedProduct?.updatedAt || '',
       stock: null,
       image,
       out,
@@ -4578,16 +4701,21 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  function updateSelectedVariationUI(select) {
+  function updateSelectedVariationUI(select, options = {}) {
+    const { sync = true } = options;
     const option = select?.selectedOptions[0];
     const card = select?.closest('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel');
     if (!option || !card) return;
 
     const state = selectedVariationState(option, card);
+    const productKey = productSelectionKeyFromElement(card);
+    if (productKey && state.variationId) setSelectedVariationForProduct(productKey, state.variationId);
     const priceEl = card.querySelector('[data-product-price-display]') || card.querySelector('strong');
     const stockLine = card.querySelector('.product-stock-line');
     const button = card.querySelector('.btn-add-cart');
-    const imageEl = card.querySelector('.product-image');
+    const imageEl =
+      card.querySelector('.product-image') ||
+      card.closest('#catalog-detail-modal')?.querySelector('.catalog-detail-media .product-image');
     const availabilityNote = card.querySelector('.catalog-availability-note');
     const statusBadge = card.querySelector('.catalog-status-badge:not(.is-offer):not(.is-kit)');
     const productCard = card.classList.contains('product-card') ? card : card.closest('.product-card');
@@ -4609,7 +4737,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stockLine.classList.toggle('is-empty', !state.stockText);
       stockLine.classList.toggle('is-unavailable', state.out);
     }
-    if (state.image && imageEl) imageEl.src = assetHref(state.image);
+    if (state.image && imageEl) setProductImageElement(imageEl, state.image, state.imageVersion);
     if (availabilityNote) {
       const label = state.out
         ? 'Indisponivel no momento'
@@ -4652,6 +4780,17 @@ document.addEventListener('DOMContentLoaded', () => {
       button.classList.toggle('btn-esgotado', state.out);
       button.innerHTML = state.out ? 'Indisponivel' : 'Adicionar';
     }
+    card.dataset.catalogVariationId = state.variationId || '';
+    card.dataset.catalogVariationName = state.name || '';
+    card.dataset.catalogVariationImage = state.image || '';
+    const detailTrigger =
+      card.querySelector('[data-catalog-detail]') || card.closest('[data-catalog-detail-key], [data-catalog-product-key]');
+    if (detailTrigger && state.variationId) {
+      detailTrigger.dataset.catalogVariationId = state.variationId;
+      detailTrigger.dataset.catalogVariationName = state.name || '';
+      detailTrigger.dataset.catalogVariationImage = state.image || '';
+    }
+    if (sync) syncVariationSelectionAcrossProduct(productKey, state.variationId, select);
   }
 
   function publicProductCardHTML(product, options = {}) {
@@ -4659,12 +4798,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const productOptionsList = productOptions(normalized);
     const hasOptions = normalized.hasVariations && productOptionsList.length > 0;
-    const firstOption = productOptionsList[0] || { price: normalized.price };
+    const selectedOption = hasOptions
+      ? selectedVariationForProduct(normalized, productOptionsList) || productOptionsList[0]
+      : null;
+    const selectedVariationId = selectedOption?.id || selectedOption?.value || '';
+    const firstOption = selectedOption || { price: normalized.price };
     const outOfStock = normalized.stockState === 'out';
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const image = getImagemProdutoSelecionada(normalized, hasOptions ? firstOption : null);
+    const imageVersion = hasOptions ? firstOption.updatedAt || normalized.updatedAt : normalized.updatedAt;
     const cardClass = rail
       ? [
           'product-card',
@@ -4692,7 +4836,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <select class="product-option ${rail ? '' : 'product-option-compact'}" aria-label="${escapeHTML(
             normalized.name.includes('Desinfetante') ? 'Escolher fragrancia do desinfetante' : 'Escolher opcao do produto',
           )}">
-            ${productOptionsHTML(productOptionsList, normalized)}
+            ${productOptionsHTML(productOptionsList, normalized, selectedVariationId)}
           </select>
         `
       : '';
@@ -4700,15 +4844,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasAnyOffer = selectedOfferActive || productOptionsList.some((option) => option.offerActive);
     const priceHTML = `<strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong>`;
     const addButtonHTML = `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(image)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">${rail ? '' : `<i class="fa-solid ${selectedOutOfStock ? 'fa-ban' : 'fa-cart-plus'}"></i>`}${selectedOutOfStock ? 'Indisponivel' : 'Adicionar'}</button>`;
-    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
+    const detailButtonHTML = `<button class="btn btn-secondary btn-product-details" type="button" data-catalog-detail="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(image)}">${rail ? '' : '<i class="fa-solid fa-circle-info"></i>'}Ver detalhes</button>`;
 
     if (rail) {
       return `
-      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="${cardClass}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-recommended="${recommended}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(image)}">
         ${recommended ? '<span class="recommended-badge">Recomendado</span>' : ''}
         ${selectedOutOfStock ? '<span class="recommended-badge stock-badge">Indisponivel</span>' : ''}
         <div class="product-media">
-          ${productMediaHTML(normalized, image)}
+          ${productMediaHTML(normalized, image, '', imageVersion)}
         </div>
         <div class="product-icon"><i class="fa-solid ${smartProductIcon(normalized)}"></i></div>
           <h3>${escapeHTML(normalized.name)}</h3>
@@ -4728,9 +4872,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return `
-      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}">
+      <article class="${cardClass}" data-full-catalog-product data-catalog-product-key="${escapeHTML(detailKey)}" data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(detailKey)}" data-catalog-variation-id="${escapeHTML(firstOption.id || '')}" data-catalog-variation-name="${escapeHTML(firstOption.name || '')}" data-catalog-variation-image="${escapeHTML(image)}">
         <div class="full-catalog-media">
-          ${productMediaHTML(normalized, image)}
+          ${productMediaHTML(normalized, image, '', imageVersion)}
         </div>
         <div class="full-catalog-copy">
           <div class="full-catalog-badges">
@@ -4892,8 +5036,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     syncPublicProductsStateFromUI();
     const products = getFilteredPublicProducts();
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
     grid.replaceChildren();
-    grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+    if (!isLoading) {
+      grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+    }
 
     const container = publicProductsContainer();
     const empty = qs('#catalog-empty', container || document);
@@ -4902,7 +5049,7 @@ document.addEventListener('DOMContentLoaded', () => {
         publicProductsState.selectedCategory !== 'all' && !normalizeText(publicProductsState.searchTerm)
           ? 'Nenhum produto encontrado nesta categoria'
           : 'Nenhum produto encontrado com esse filtro.';
-      empty.classList.toggle('hidden', products.length > 0);
+      empty.classList.toggle('hidden', isLoading || products.length > 0);
     }
 
     const result = qs('[data-catalog-results]', container || document);
@@ -4910,7 +5057,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const rawTerm = String(publicProductsState.searchTerm || '').trim();
       const suffix = rawTerm ? ` para "${rawTerm}"` : '';
       const suggested = rawTerm && products.length ? (products.length === 1 ? ' sugerido' : ' sugeridos') : '';
-      result.textContent = `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
+      result.textContent = isLoading
+        ? 'Carregando catalogo...'
+        : `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
     }
 
     optimizeImageLoading();
@@ -5123,13 +5272,14 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = recommendedSection + grouped;
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
+    list.innerHTML = isLoading ? '' : recommendedSection + grouped;
     refreshOfferCountdowns(list);
-    qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    qs('[data-full-catalog-empty]')?.classList.toggle('hidden', isLoading || visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
     if (result) {
-      result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+      result.textContent = isLoading || !products.length ? 'Carregando catalogo...' : 'Produtos encontrados';
     }
   }
 
@@ -5137,17 +5287,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const options = productOptions(normalized);
     const hasOptions = normalized.hasVariations && options.length > 0;
-    const firstOption = options[0] || { price: normalized.price };
+    const firstOption = hasOptions ? selectedVariationForProduct(normalized, options) || options[0] : null;
     const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
-    const imageSrc = assetHref(image);
+    const image = getImagemProdutoSelecionada(normalized, hasOptions ? firstOption : null);
+    const imageSrc = imageRenderHref(image, hasOptions ? firstOption?.updatedAt || normalized.updatedAt : normalized.updatedAt);
 
     return `
       <article class="simple-catalog-row catalog-product ${unavailable ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}">
         <div class="simple-catalog-thumb" aria-hidden="true">
           ${
             imageSrc
-              ? `<img src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+              ? `<img class="${productImageFitClass(image)}" src="${escapeHTML(imageSrc)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
               : `<i class="fa-solid ${smartProductIcon(normalized)}"></i>`
           }
         </div>
@@ -5190,10 +5340,11 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = grouped;
-    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
+    list.innerHTML = isLoading ? '' : grouped;
+    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', isLoading || visible.length > 0);
     const result = qs('[data-simple-catalog-results]');
-    if (result) result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+    if (result) result.textContent = isLoading || !products.length ? 'Carregando catalogo...' : 'Produtos encontrados';
     optimizeImageLoading();
   }
 
@@ -5234,7 +5385,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function openCatalogDetailModal(key = '') {
+  function openCatalogDetailModal(key = '', selectedVariationId = '') {
     const product = catalogProductByKey(key);
     if (!product) {
       showToast('Produto nao encontrado no catalogo.', { type: 'warning' });
@@ -5244,29 +5395,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalized = normalizeProduct(product);
     const modal = ensureCatalogDetailModal();
     const body = qs('[data-catalog-detail-body]', modal);
-    const image = productAssetPath(normalized);
     const outOfStock = normalized.stockState === 'out';
     const statusText = fullCatalogStatusText(normalized);
 
     const detailText = normalized.detailedDescription || normalized.description || `Produto de ${normalized.category}.`;
     const options = productOptions(normalized);
-    const firstOption = options[0] || { price: normalized.price };
+    const productKey = productSelectionKey(normalized);
+    const savedVariationId = selectedVariationId || selectedVariationByProductKey[productKey] || '';
+    const selectedOption =
+      (savedVariationId && options.find((option) => String(option.id || option.value || '') === String(savedVariationId))) ||
+      selectedVariationForProduct(normalized, options) ||
+      options[0] ||
+      { price: normalized.price };
     const hasOptions = normalized.hasVariations && options.length > 0;
-    const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
-    const displayImage = (hasOptions && firstOption.image) || image;
-    const selectedOfferActive = Boolean(firstOption.offerActive ?? normalized.offerActive);
+    const selectedOutOfStock = hasOptions ? optionOutOfStock(selectedOption) : outOfStock;
+    const displayImage = getImagemProdutoSelecionada(normalized, hasOptions ? selectedOption : null);
+    const displayImageVersion = hasOptions ? selectedOption.updatedAt || normalized.updatedAt : normalized.updatedAt;
+    const selectedOfferActive = Boolean(selectedOption.offerActive ?? normalized.offerActive);
     const hasAnyOffer = selectedOfferActive || options.some((option) => option.offerActive);
 
     if (body) {
       body.innerHTML = `
         <div class="catalog-detail-media">
-          ${productMediaHTML(normalized, displayImage)}
+          ${productMediaHTML(normalized, displayImage, '', displayImageVersion)}
         </div>
-        <div class="catalog-detail-copy">
+        <div class="catalog-detail-copy" data-product-id="${escapeHTML(normalized.id)}" data-catalog-detail-key="${escapeHTML(productKey)}" data-catalog-variation-id="${escapeHTML(selectedOption.id || '')}" data-catalog-variation-name="${escapeHTML(selectedOption.name || '')}" data-catalog-variation-image="${escapeHTML(displayImage)}">
           <div class="full-catalog-badges">
             ${statusText ? `<span class="catalog-status-badge is-out">${escapeHTML(statusText)}</span>` : ''}
             ${hasAnyOffer ? `<span class="catalog-status-badge is-offer ${selectedOfferActive ? '' : 'hidden'}" data-offer-label>Oferta</span>` : ''}
-            ${productOfferTimerHTML(normalized, hasOptions ? firstOption : null, hasAnyOffer)}
+            ${productOfferTimerHTML(normalized, hasOptions ? selectedOption : null, hasAnyOffer)}
             ${normalized.isKit ? '<span class="catalog-status-badge is-kit">Kit</span>' : ''}
           </div>
           <span class="eyebrow">${escapeHTML(normalized.category)}</span>
@@ -5274,7 +5431,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${escapeHTML(detailText)}</p>
           ${normalized.kitItems ? `<div class="kit-items">${escapeHTML(normalized.kitItems)}</div>` : ''}
           <div class="catalog-detail-facts">
-            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? firstOption : null, selectedOutOfStock)}</strong></div>
+            <div><span>Preco</span><strong data-product-price-display class="${selectedOutOfStock ? 'product-unavailable' : ''}">${productPriceHTML(normalized, hasOptions ? selectedOption : null, selectedOutOfStock)}</strong></div>
 
             <div><span>Categoria</span><strong>${escapeHTML(normalized.category)}</strong></div>
           </div>
@@ -5284,7 +5441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="product-choice catalog-detail-choice">
               <span>Escolha a opcao</span>
               <select class="product-option" aria-label="Escolher opcao do produto">
-                ${productOptionsHTML(options, normalized)}
+                ${productOptionsHTML(options, normalized, selectedOption.id || selectedOption.value || '')}
               </select>
             </label>
           `
@@ -5300,7 +5457,7 @@ document.addEventListener('DOMContentLoaded', () => {
               Voltar ao catalogo
             </button>
             ${
-              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(firstOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(firstOption.id || '')}" data-variation-name="${escapeHTML(firstOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(selectedOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(selectedOption.id || '')}" data-variation-name="${escapeHTML(selectedOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
               ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
             </button>`
@@ -5308,7 +5465,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
+      const select = qs('.product-option', body);
+      if (select && selectedOption?.id) {
+        const match = [...select.options].find((item) => String(item.dataset.variationId || '') === String(selectedOption.id));
+        if (match) select.value = match.value;
+      }
       refreshOfferCountdowns(body);
+      if (select) updateSelectedVariationUI(select);
     }
 
     modal.classList.remove('hidden');
@@ -5346,7 +5509,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!detailButton && event.target.closest('button, select, input, label, a')) return;
       event.preventDefault();
       const key = trigger.dataset.catalogDetail || trigger.dataset.catalogProductKey;
-      openCatalogDetailModal(key);
+      openCatalogDetailModal(key, trigger.dataset.catalogVariationId || '');
     });
 
     renderFullCatalogPage();
@@ -5361,7 +5524,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const detailButton = event.target.closest('[data-catalog-detail]');
       if (!detailButton) return;
       event.preventDefault();
-      openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+      openCatalogDetailModal(detailButton.dataset.catalogDetail || '', detailButton.dataset.catalogVariationId || '');
     });
 
     renderSimpleCatalogPage();
@@ -5480,7 +5643,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailButton = event.target.closest('[data-catalog-detail]');
         if (detailButton) {
           event.preventDefault();
-          openCatalogDetailModal(detailButton.dataset.catalogDetail || '');
+          openCatalogDetailModal(detailButton.dataset.catalogDetail || '', detailButton.dataset.catalogVariationId || '');
           return;
         }
 
@@ -5488,6 +5651,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cardDetail || event.target.closest('button, select, input, label, a')) return;
         openCatalogDetailModal(
           cardDetail.dataset.catalogDetailKey || cardDetail.dataset.productId || cardDetail.dataset.name,
+          cardDetail.dataset.catalogVariationId || '',
         );
         return;
       }
@@ -5501,7 +5665,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const variationId = selectedState?.variationId || option?.dataset.variationId || button.dataset.variationId || '';
       const price = Number(selectedState?.price ?? option?.dataset.price ?? button.dataset.price ?? 0);
       const image = canonicalAssetPath(
-        selectedState?.image || card?.querySelector('.product-image')?.getAttribute('src') || button.dataset.image || '',
+        selectedState?.image ||
+          card?.querySelector('.product-image')?.getAttribute('src') ||
+          button.dataset.image ||
+          getImagemProdutoSelecionada(
+            productIndex.find((item) => String(normalizeProduct(item).id) === String(button.dataset.productId || card?.dataset.productId || '')) || {},
+            selectedState || null,
+          ) ||
+          '',
       );
 
       if (!baseName || Number.isNaN(price)) return;
@@ -5797,7 +5968,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: normalized.name,
           variant: option?.name || '',
           price: Number(option?.price || normalized.price || 0),
-          image: option?.image || productAssetPath(normalized),
+          image: getImagemProdutoSelecionada(normalized, option || null),
           stock: option ? option.stock : normalized.stock,
         });
         return;
@@ -6072,7 +6243,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.innerHTML = `
         <div class="cart-item-left">
           <span class="cart-thumb">
-            ${item.image ? `<img class="cart-thumb-img" src="${assetHref(item.image)}" alt="" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
+            ${item.image ? `<img class="cart-thumb-img ${productImageFitClass(item.image)}" src="${imageRenderHref(item.image)}" alt="" loading="lazy" decoding="async">` : '<i class="fa-solid fa-box"></i>'}
           </span>
           <span>
             <span class="cart-item-name">${escapeHTML(item.name)}</span>
@@ -10248,12 +10419,25 @@ document.addEventListener('DOMContentLoaded', () => {
   function orderStatusTimelineHTML(status = '') {
     const displayStatus = normalizeOrderStatus(status);
     const canceled = displayStatus === 'Cancelado';
-    const steps = ORDER_STATUS_OPTIONS.map((label) => {
-      const isCanceledStep = label === 'Cancelado';
-      const active = canceled ? isCanceledStep : !isCanceledStep && ORDER_STATUS_OPTIONS.indexOf(label) <= ORDER_STATUS_OPTIONS.indexOf(displayStatus);
-      return `<span class="${active ? 'active' : ''} ${isCanceledStep ? 'is-canceled-step' : ''}">${escapeHTML(label)}</span>`;
-    });
-    return steps.join('');
+    const normalSteps = [
+      { label: 'Recebido', status: 'Recebido', icon: 'fa-receipt' },
+      { label: 'Preparo', status: 'Preparando', icon: 'fa-box-open' },
+      { label: 'Entrega', status: 'Saiu para entrega', icon: 'fa-truck-fast' },
+      { label: 'Entregue', status: 'Entregue', icon: 'fa-circle-check' },
+    ];
+    const steps = canceled ? [...normalSteps, { label: 'Cancelado', status: 'Cancelado', icon: 'fa-circle-xmark' }] : normalSteps;
+    const currentIndex = canceled
+      ? steps.length - 1
+      : Math.max(0, normalSteps.findIndex((step) => step.status === displayStatus));
+    const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
+    return steps
+      .map((step, index) => {
+        const active = index <= currentIndex;
+        const current = index === currentIndex;
+        const isCanceledStep = step.status === 'Cancelado';
+        return `<span class="${active ? 'active is-done' : ''} ${current ? 'is-current' : ''} ${isCanceledStep ? 'is-canceled-step' : ''}" style="--order-progress:${progress}%"><i class="fa-solid ${step.icon}"></i><strong>${escapeHTML(step.label)}</strong></span>`;
+      })
+      .join('');
   }
 
   function notifyLowStock(products = []) {
