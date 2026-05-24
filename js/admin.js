@@ -373,6 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  function isMissingProfileRoleError(error) {
+    const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
+    return message.includes('admin_role') || message.includes('pgrst204') || message.includes('could not find');
+  }
+
   function setDatabaseAlert(message = '') {
     const alert = qs('#admin-db-alert');
     if (!alert) return;
@@ -395,6 +400,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <i class="fa-solid fa-right-to-bracket"></i>
           Entrar como administrador
         </a>
+        <button class="btn btn-primary ${options.retry ? '' : 'hidden'}" type="button" data-admin-retry-access>
+          <i class="fa-solid fa-rotate"></i>
+          Tentar novamente
+        </button>
         <a class="btn btn-secondary" href="../index.html">Voltar ao site</a>
       </div>
     `;
@@ -427,11 +436,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  async function loadCurrentAdminProfile(api, user) {
+    let { data: profile, error } = await api
+      .from('profiles')
+      .select('id, email, nome, is_admin, admin_role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error && isMissingProfileRoleError(error)) {
+      const fallback = await api.from('profiles').select('id, email, nome, is_admin').eq('id', user.id).maybeSingle();
+      profile = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error) throw error;
+
+    if (profile) {
+      return {
+        ...profile,
+        email: profile.email || user.email || '',
+        admin_role: profile.admin_role || '',
+        role: profile.admin_role || '',
+      };
+    }
+
+    const fb = getFallbackRoleForEmail(user.email);
+    return {
+      id: user.id,
+      email: user.email,
+      nome: user.user_metadata?.name || user.email,
+      is_admin: false,
+      admin_role: fb || 'customer',
+      role: fb || 'customer',
+    };
+  }
+
   async function verificarAcessoAdmin() {
     const api = client();
     if (!api?.auth) {
       setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', {
         icon: 'triangle-exclamation',
+        retry: true,
       });
       return false;
     }
@@ -440,41 +485,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sessionError) console.warn('[Admin] Falha ao ler usuario autenticado.', sessionError);
     const user = sessionData?.user;
     if (!user?.id) {
-      // Redireciona para login se não estiver autenticado
-      window.location.href = 'login.html?redirect=painel.html';
+      setAccessState('Acesso restrito', 'Entre com uma conta administradora para acessar o painel.', {
+        icon: 'right-to-bracket',
+        login: true,
+      });
       return false;
     }
 
     state.user = user;
 
-    const { data: profile, error } = await api
-      .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (error) console.warn('[Admin] Perfil admin nao foi lido.', error);
-    if (profile) {
-      state.profile = { ...profile, role: profile.admin_role || '' };
-    } else {
-      const fb = getFallbackRoleForEmail(user.email);
-      state.profile = {
-        id: user.id,
-        email: user.email,
-        nome: user.user_metadata?.name || user.email,
-        is_admin: Boolean(fb),
-        admin_role: fb || 'customer',
-        role: fb || 'customer',
-      };
+    try {
+      state.profile = await loadCurrentAdminProfile(api, user);
+    } catch (error) {
+      console.warn('[Admin] Perfil admin nao foi lido.', error);
+      setAccessState('Painel indisponível', 'Não foi possível validar suas permissões no Supabase agora.', {
+        icon: 'triangle-exclamation',
+        retry: true,
+      });
+      return false;
     }
 
     const role = currentAdminRole();
-    const validAdminRoles = ['developer', 'owner', 'staff'];
-    const isAdminRole = validAdminRoles.includes(role);
-    const admin = Boolean(state.profile.is_admin || isAdminRole);
+    const admin = Boolean(state.profile?.is_admin === true || role === 'developer');
     if (!admin) {
-      // Redireciona para login quando usuário não tem cargo administrativo válido
-      window.location.href = 'login.html?redirect=painel.html';
+      setAccessState('Acesso negado', 'Você não tem permissão para acessar o painel administrativo.', {
+        icon: 'shield-halved',
+      });
       return false;
     }
 
@@ -3554,6 +3590,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.body.addEventListener('click', (event) => {
+      const retryAccess = event.target.closest('[data-admin-retry-access]');
+      if (retryAccess) {
+        window.location.reload();
+        return;
+      }
+
       const editorClose = event.target.closest('[data-admin-product-editor-close]');
       if (editorClose) {
         closeProductEditor();
@@ -3787,6 +3829,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('[Admin] Falha ao iniciar painel.', error);
       setAccessState('Painel indisponível', 'Não consegui iniciar o painel agora. Atualize a página e tente novamente.', {
         icon: 'triangle-exclamation',
+        retry: true,
       });
       showToast('Nao consegui iniciar o painel.', 'error');
     }
