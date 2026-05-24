@@ -1913,11 +1913,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { error } = await api.from('produto_variacoes').update(payload).eq('id', variationId);
+    console.info('[Variacao imagem] salvando', {
+      variationId,
+      productId,
+      imagem: payload.imagem || '',
+    });
+    const { data, error } = await api.from('produto_variacoes').update(payload).eq('id', variationId).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
 
-    if (error) {
+    if (error || !data) {
       showToast(
         friendlyDbError(
           error,
@@ -1927,6 +1932,13 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       return false;
     }
+    console.info('[Variacao imagem] salva', {
+      variationId,
+      productId,
+      imagemEnviada: payload.imagem || '',
+      update: data || null,
+      imagemFinal: data?.imagem || payload.imagem || '',
+    });
 
     await logAdminAction(override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada', 'produto_variacao', variationId, {
       produto_id: productId,
@@ -1981,7 +1993,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id').maybeSingle();
+    console.info('[Variacao imagem] criando', {
+      productId,
+      imagem: payload.imagem || '',
+    });
+    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem').maybeSingle();
     variationSaveLocks.delete(`new-${productId}`);
     setVariationAddBusy(productId, false);
 
@@ -2001,6 +2017,12 @@ document.addEventListener('DOMContentLoaded', () => {
     await logAdminAction('variacao_criada', 'produto_variacao', data?.id || payload.nome, {
       produto_id: productId,
       nome: payload.nome,
+    });
+    console.info('[Variacao imagem] criada', {
+      variationId: data?.id || '',
+      productId,
+      imagemEnviada: payload.imagem || '',
+      imagemFinal: data?.imagem || payload.imagem || '',
     });
     showToast('Variacao adicionada.', 'success');
     await refreshProductEditor(productId);
@@ -2068,7 +2090,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let data;
     let error;
     try {
-      ({ data, error } = await api.from('produtos').update(payload).eq('id', productId).select('id').maybeSingle());
+      if (uploadedImage) {
+        const imageInput = productCardField(productId, 'imagem');
+        if (imageInput) imageInput.value = payload.imagem || '';
+      }
+      console.info('[Produto imagem] salvando', {
+        productId,
+        imagem: payload.imagem || '',
+      });
+
+      ({ data, error } = await api
+        .from('produtos')
+        .update(payload)
+        .eq('id', productId)
+        .select('id, imagem')
+        .maybeSingle());
 
     if (error || !data) {
       const rpc = await rpcAtualizarProduto(productId, payload);
@@ -2090,7 +2126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ativo: payload.ativo,
       };
       if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
-      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id').maybeSingle();
+      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id, imagem').maybeSingle();
       data = fallback.data;
       error = fallback.error;
     }
@@ -2118,12 +2154,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload } : product));
+    console.info('[Produto imagem] salvo', {
+      productId,
+      imagemEnviada: payload.imagem || '',
+      update: data || null,
+      imagemFinal: data?.imagem || payload.imagem || '',
+    });
+
+    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product));
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
     if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
     showToast('Produto atualizado.', 'success');
-    carregarProdutosAdmin();
+    await carregarProdutosAdmin();
     unlockProductSave(productId);
     return true;
   }

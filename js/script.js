@@ -236,6 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
     allProducts: [],
     selectedCategory: 'all',
     searchTerm: '',
+    loaded: false,
+    loading: true,
   };
 
   applySavedTheme();
@@ -1907,9 +1909,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadProductsFromSupabase() {
     const client = supabaseProductClient();
+    publicProductsState.loading = true;
+    publicProductsState.loaded = false;
     if (!client) {
       console.warn('[Supabase] Cliente nao encontrado. Catalogo publico nao carregado.');
       setProductIndex([]);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
       return;
     }
@@ -1941,11 +1947,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const productsWithVariations = attachProductVariations(products, variations);
       setProductIndex(productsWithVariations);
       pruneCartUnavailableProducts(productsWithVariations);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
     } catch (error) {
       console.error('[Supabase] Erro ao carregar produtos:', error);
       const localProducts = await loadLocalCatalogProducts().catch(() => []);
       setProductIndex(localProducts);
+      publicProductsState.loading = false;
+      publicProductsState.loaded = true;
       renderSupabaseProducts();
       if (currentPage() === 'produtos.html') {
         showToast('Nao foi possivel carregar os produtos do Supabase. Tente atualizar a pagina.');
@@ -4609,7 +4619,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stockLine.classList.toggle('is-empty', !state.stockText);
       stockLine.classList.toggle('is-unavailable', state.out);
     }
-    if (state.image && imageEl) imageEl.src = assetHref(state.image);
+    if (state.image && imageEl && card.closest('.catalog-detail-panel')) imageEl.src = assetHref(state.image);
     if (availabilityNote) {
       const label = state.out
         ? 'Indisponivel no momento'
@@ -4664,7 +4674,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedOutOfStock = hasOptions ? optionOutOfStock(firstOption) : outOfStock;
     const recommended = isRecommendedProduct(normalized);
     const detailKey = normalized.id || normalized.name;
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const image = productAssetPath(normalized);
     const cardClass = rail
       ? [
           'product-card',
@@ -4892,8 +4902,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     syncPublicProductsStateFromUI();
     const products = getFilteredPublicProducts();
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
     grid.replaceChildren();
-    grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+    if (!isLoading) {
+      grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+    }
 
     const container = publicProductsContainer();
     const empty = qs('#catalog-empty', container || document);
@@ -4902,7 +4915,7 @@ document.addEventListener('DOMContentLoaded', () => {
         publicProductsState.selectedCategory !== 'all' && !normalizeText(publicProductsState.searchTerm)
           ? 'Nenhum produto encontrado nesta categoria'
           : 'Nenhum produto encontrado com esse filtro.';
-      empty.classList.toggle('hidden', products.length > 0);
+      empty.classList.toggle('hidden', isLoading || products.length > 0);
     }
 
     const result = qs('[data-catalog-results]', container || document);
@@ -4910,7 +4923,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const rawTerm = String(publicProductsState.searchTerm || '').trim();
       const suffix = rawTerm ? ` para "${rawTerm}"` : '';
       const suggested = rawTerm && products.length ? (products.length === 1 ? ' sugerido' : ' sugeridos') : '';
-      result.textContent = `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
+      result.textContent = isLoading
+        ? 'Carregando catalogo...'
+        : `${products.length} produto${products.length === 1 ? '' : 's'}${suggested} encontrado${products.length === 1 ? '' : 's'}${suffix}`;
     }
 
     optimizeImageLoading();
@@ -5123,13 +5138,14 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = recommendedSection + grouped;
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
+    list.innerHTML = isLoading ? '' : recommendedSection + grouped;
     refreshOfferCountdowns(list);
-    qs('[data-full-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    qs('[data-full-catalog-empty]')?.classList.toggle('hidden', isLoading || visible.length > 0);
 
     const result = qs('[data-full-catalog-results]');
     if (result) {
-      result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+      result.textContent = isLoading || !products.length ? 'Carregando catalogo...' : 'Produtos encontrados';
     }
   }
 
@@ -5139,7 +5155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasOptions = normalized.hasVariations && options.length > 0;
     const firstOption = options[0] || { price: normalized.price };
     const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
-    const image = (hasOptions && firstOption.image) || productAssetPath(normalized);
+    const image = productAssetPath(normalized);
     const imageSrc = assetHref(image);
 
     return `
@@ -5190,10 +5206,11 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    list.innerHTML = grouped;
-    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', visible.length > 0);
+    const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
+    list.innerHTML = isLoading ? '' : grouped;
+    qs('[data-simple-catalog-empty]')?.classList.toggle('hidden', isLoading || visible.length > 0);
     const result = qs('[data-simple-catalog-results]');
-    if (result) result.textContent = products.length ? 'Produtos encontrados' : 'Carregando catalogo...';
+    if (result) result.textContent = isLoading || !products.length ? 'Carregando catalogo...' : 'Produtos encontrados';
     optimizeImageLoading();
   }
 
