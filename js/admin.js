@@ -2417,7 +2417,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function buildProductImagePath(diagnostic = {}) {
     const recordId = safeFileName(diagnostic.recordId || diagnostic.productId || 'novo');
-    const contextFolder = diagnostic.context?.includes('variacao') ? 'variacoes' : 'produtos';
+    const contextFolder = diagnostic.context?.includes('variacao') ? 'variacao' : 'produto';
     const path = `${contextFolder}/${recordId || 'novo'}/${Date.now()}-${randomUploadToken()}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`;
     if (
       !path ||
@@ -2559,6 +2559,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const path = buildProductImagePath(diagnostic);
+    const fullObjectPath = `${PRODUCT_IMAGE_BUCKET}/${path}`;
     const uploadFile = new File([file], path.split('/').pop(), {
       type: PRODUCT_IMAGE_OUTPUT_TYPE,
       lastModified: Date.now(),
@@ -2569,26 +2570,33 @@ document.addEventListener('DOMContentLoaded', () => {
       originalFile: diagnostic.originalFile || null,
       finalFile: fileDiagnostic(uploadFile),
       dimensions,
+      bucket: PRODUCT_IMAGE_BUCKET,
       path,
+      fullObjectPath,
       contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
-      upsert: true,
+      finalSize: uploadFile.size,
+      upsert: false,
     });
 
     const { data: uploadData, error } = await api.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, uploadFile, {
       cacheControl: '3600',
       contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
-      upsert: true,
+      upsert: false,
     });
 
     if (error) {
       const detail = {
         context: diagnostic.context || 'produto',
+        bucket: PRODUCT_IMAGE_BUCKET,
         path,
+        fullObjectPath,
         request: {
           bucket: PRODUCT_IMAGE_BUCKET,
+          path,
+          fullObjectPath,
           contentType: PRODUCT_IMAGE_OUTPUT_TYPE,
           cacheControl: '3600',
-          upsert: true,
+          upsert: false,
           size: uploadFile.size,
           dimensions,
         },
