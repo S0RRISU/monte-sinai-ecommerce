@@ -1141,8 +1141,8 @@ document.addEventListener('DOMContentLoaded', () => {
         data = data[0] || null;
         continue;
       }
-      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'current_profile_for_app')) {
-        data = data.current_profile_for_app;
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'app_current_profile')) {
+        data = data.app_current_profile;
         continue;
       }
       break;
@@ -1837,9 +1837,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (typeof client.rpc !== 'function') return null;
-      const { data: rpcData, error } = await client.rpc('current_profile_for_app');
+      const { data: rpcData, error } = await client.rpc('app_current_profile');
       if (error) {
-        console.warn('[Supabase] current_profile_for_app falhou. Link admin sera ocultado.', error);
+        console.warn('[Supabase] app_current_profile falhou. Link admin sera ocultado.', error);
         return null;
       }
       const data = parseCurrentProfileRpcData(rpcData);

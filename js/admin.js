@@ -178,8 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
         data = data[0] || null;
         continue;
       }
-      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'current_profile_for_app')) {
-        data = data.current_profile_for_app;
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'app_current_profile')) {
+        data = data.app_current_profile;
         continue;
       }
       break;
@@ -203,9 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
 
-      const { data: rpcData, error } = await api.rpc('current_profile_for_app');
+      const { data: rpcData, error } = await api.rpc('app_current_profile');
       if (error) {
-        console.warn('[Admin] current_profile_for_app falhou.', error);
+        console.warn('[Admin] app_current_profile falhou.', error);
         return null;
       }
       const data = parseCurrentProfileRpcData(rpcData);
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.profile = result;
       return result;
     } catch (err) {
-      console.warn('[Admin] erro ao obter perfil via current_profile_for_app.', err);
+      console.warn('[Admin] erro ao obter perfil via app_current_profile.', err);
       return null;
     }
   }
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.user = user;
 
     const profile = await getCurrentProfileForApp({ force: true }).catch((e) => {
-      console.warn('[Admin] falha ao obter perfil via current_profile_for_app.', e);
+      console.warn('[Admin] falha ao obter perfil via app_current_profile.', e);
       return null;
     });
 
