@@ -1724,19 +1724,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return data?.user || null;
   }
 
-  async function rpcCurrentUserRole(client = authClient()) {
-    if (!client?.rpc) return null;
-    try {
-      const { data, error } = await client.rpc('current_user_role');
-      if (error) throw error;
-      const role = normalizeText(data || '');
-      return ADMIN_ROLES.includes(role) ? role : null;
-    } catch (error) {
-      console.warn('[Supabase] current_user_role indisponivel, usando fallback em profiles.', error);
-      return null;
-    }
-  }
-
   async function upsertProfileRecord(user = null, source = currentUser || {}) {
     const client = ordersClient();
     const authUser = user || (await currentAuthUser());
@@ -1769,9 +1756,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (lookupError) throw lookupError;
-
-    const remoteRole = await rpcCurrentUserRole(client);
-    if (existing && ADMIN_PANEL_ROLES.includes(remoteRole)) return { ...existing, role: remoteRole };
     if (existing && adminRole(existing) !== 'cliente') return existing;
 
     const writeProfile = (selectColumns) => {
@@ -1788,7 +1772,7 @@ document.addEventListener('DOMContentLoaded', () => {
       error = fallback.error;
     }
     if (error) throw error;
-    return remoteRole ? { ...data, role: remoteRole } : data;
+    return data;
   }
 
   async function safeUpsertProfileRecord(user = null, source = currentUser || {}, context = 'perfil') {
@@ -1825,18 +1809,6 @@ document.addEventListener('DOMContentLoaded', () => {
     await authReady.catch(() => null);
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id || !isUUID(authUser.id)) return null;
-
-    const rpcRole = await rpcCurrentUserRole(client);
-    if (rpcRole) {
-      adminProfileCache = {
-        id: authUser.id,
-        email: authUser.email || '',
-        nome: authMetadata(authUser).name || authUser.email || '',
-        role: rpcRole,
-        _source: 'rpc',
-      };
-      return adminProfileCache;
-    }
 
     // Read role directly from public.profiles with layered fallbacks
     try {

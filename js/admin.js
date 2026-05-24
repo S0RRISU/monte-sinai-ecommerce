@@ -163,19 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const isUuid = (value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
-  async function rpcCurrentUserRole(api = client()) {
-    if (!api?.rpc) return null;
-    try {
-      const { data, error } = await api.rpc('current_user_role');
-      if (error) throw error;
-      const role = normalize(data || '');
-      return ADMIN_ROLES.includes(role) ? role : null;
-    } catch (error) {
-      console.warn('[Admin] current_user_role indisponivel, usando fallback em profiles.', error);
-      return null;
-    }
-  }
-
   // Local helper to obtain current admin profile directly from public.profiles
   // This avoids depending on currentAdminProfile() from script.js which
   // is not loaded on pages that include only admin.js (painel.html).
@@ -193,20 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
-
-      const rpcRole = await rpcCurrentUserRole(api);
-      if (rpcRole) {
-        const result = {
-          id: user.id,
-          email: user.email || '',
-          nome: user.user_metadata?.name || user.user_metadata?.full_name || user.email || '',
-          role: rpcRole,
-          _source: 'rpc',
-        };
-
-        state.profile = result;
-        return result;
-      }
 
       const tryFields = ['id, email, nome, role, is_admin', 'id, email, nome, is_admin', 'id, email, nome'];
       let profile = null;
