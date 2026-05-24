@@ -163,6 +163,60 @@ document.addEventListener('DOMContentLoaded', () => {
   const isUuid = (value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
+  // Local helper to obtain current admin profile directly from public.profiles
+  // This avoids depending on currentAdminProfile() from script.js which
+  // is not loaded on pages that include only admin.js (painel.html).
+  async function getCurrentAdminProfileFromProfiles({ force = false } = {}) {
+    if (state.profile && !force) return state.profile;
+
+    const api = client();
+    if (!api?.auth) return null;
+
+    try {
+      const { data: sessionData, error: sessionError } = await api.auth.getUser();
+      if (sessionError) {
+        console.warn('[Admin] falha ao obter sessao do Supabase.', sessionError);
+        return null;
+      }
+      const user = sessionData?.user;
+      if (!user?.id || !isUuid(user.id)) return null;
+
+      const { data: profile, error: profileError } = await api
+        .from('profiles')
+        .select('id, email, nome, role, is_admin')
+        .eq('id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn('[Admin] falha ao ler profiles.', profileError);
+        return null;
+      }
+
+      const rawRole = profile?.role;
+      let role = 'cliente';
+      if (rawRole && ADMIN_ROLES.includes(normalize(rawRole))) {
+        role = normalize(rawRole);
+      } else if (profile?.is_admin) {
+        role = 'admin';
+      }
+
+      const result = {
+        id: user.id,
+        email: profile?.email || user.email || '',
+        nome: profile?.nome || user.user_metadata?.name || user.email || '',
+        role,
+      };
+
+      // cache locally on state for admin pages
+      state.profile = result;
+      return result;
+    } catch (err) {
+      console.warn('[Admin] erro ao obter perfil do profiles.', err);
+      return null;
+    }
+  }
+
   applyAdminTheme();
 
   function applyAdminTheme(theme = localStorage.getItem(ADMIN_THEME_KEY) || 'dark') {
@@ -547,8 +601,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     state.user = user;
 
-    // Use profiles table directly instead of calling RPC current_user_role
-    const profile = await currentAdminProfile({ force: true }).catch((e) => {
+    // Use local helper that reads profiles directly (does not depend on script.js)
+    const profile = await getCurrentAdminProfileFromProfiles({ force: true }).catch((e) => {
       console.warn('[Admin] falha ao obter perfil via profiles.', e);
       return null;
     });
