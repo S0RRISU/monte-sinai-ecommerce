@@ -2234,6 +2234,36 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function safeStringify(value) {
+    const seen = new WeakSet();
+    try {
+      return JSON.stringify(
+        value,
+        (key, item) => {
+          if (item instanceof Error) {
+            return {
+              name: item.name,
+              message: item.message,
+              code: item.code,
+              status: item.status || item.statusCode,
+              details: item.details,
+              hint: item.hint,
+              stack: item.stack,
+            };
+          }
+          if (item && typeof item === 'object') {
+            if (seen.has(item)) return '[Circular]';
+            seen.add(item);
+          }
+          return item;
+        },
+        2,
+      );
+    } catch (stringifyError) {
+      return String(value);
+    }
+  }
+
   function uploadLogPrefix(stage = '', context = '') {
     if (stage.includes('erro') || stage.includes('falha')) return '[Storage erro]';
     if (stage.includes('upload') || stage.includes('public-url')) return '[Storage upload]';
@@ -2258,42 +2288,70 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function friendlyStorageUploadError(error, fallback = 'Nao consegui enviar essa imagem.') {
-    const message = normalize(
-      `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''} ${
-        error?.status || error?.statusCode || ''
-      }`,
-    );
-    if (
-      message.includes('bucket') &&
-      (message.includes('not found') || message.includes('does not exist') || message.includes('nao encontrado'))
-    ) {
-      return 'Falha no Storage: bucket produtos nao encontrado.';
-    }
+    const rawMessage = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''} ${
+      error?.status || error?.statusCode || ''
+    }`;
+    const message = normalize(rawMessage);
     if (
       message.includes('row-level security') ||
+      message.includes('rls') ||
       message.includes('permission') ||
       message.includes('unauthorized') ||
       message.includes('not authorized') ||
       message.includes('403')
     ) {
-      return 'Sem permissao para enviar imagem no Storage.';
+      return 'Sem permissão no Storage para enviar imagem.';
     }
-    if (message.includes('mime') || message.includes('invalid') || message.includes('unsupported')) {
+    if (message.includes('bucket')) return 'Bucket produtos não encontrado ou inacessível.';
+    if (
+      message.includes('invalid') ||
+      message.includes('path') ||
+      message.includes('key') ||
+      message.includes('object name')
+    ) {
+      return 'Arquivo/path inválido para Storage.';
+    }
+    if (message.includes('mime') || message.includes('unsupported')) {
       return 'Formato de imagem nao aceito pelo Storage.';
-    }
-    if (message.includes('path') || message.includes('key') || message.includes('object name')) {
-      return 'Path da imagem invalido para o Storage.';
     }
     if (message.includes('too large') || message.includes('payload') || message.includes('413')) {
       return 'Imagem preparada, mas ainda ficou grande para envio.';
     }
-    if (message.includes('400')) {
-      return `Erro 400 no Storage: ${error?.message || 'veja o console [Storage erro] para detalhes.'}`;
-    }
-    if (message.includes('storage') || message.includes('bucket')) {
-      return 'O armazenamento de imagens nao esta configurado corretamente.';
-    }
     return error?.message || fallback;
+  }
+
+  async function diagnoseAdminCanWrite(api, context = 'produto') {
+    try {
+      if (typeof api.rpc !== 'function') {
+        logImageUploadDiagnostic('admin-can-write-indisponivel', {
+          context,
+          error: { message: 'Cliente Supabase sem api.rpc disponivel.' },
+        });
+        return null;
+      }
+      const { data, error } = await api.rpc('admin_can_write');
+      if (error) {
+        logImageUploadDiagnostic('admin-can-write-erro', {
+          context,
+          error: storageErrorDiagnostic(error),
+        });
+        console.error('[Upload produto] admin_can_write erro', error?.message, error);
+        return null;
+      }
+      logImageUploadDiagnostic('admin-can-write', {
+        context,
+        allowed: data === true,
+        rawResult: data,
+      });
+      return data === true;
+    } catch (error) {
+      logImageUploadDiagnostic('admin-can-write-erro', {
+        context,
+        error: storageErrorDiagnostic(error),
+      });
+      console.error('[Upload produto] admin_can_write erro', error?.message, error);
+      return null;
+    }
   }
 
   function imageSourceSize(source) {
@@ -2485,6 +2543,7 @@ document.addEventListener('DOMContentLoaded', () => {
       logImageUploadDiagnostic('autenticacao', {
         context: diagnostic.context || 'produto',
         userId: data.user.id,
+        email: data.user.email || '',
       });
     } catch (error) {
       logImageUploadDiagnostic('autenticacao-falhou', {
@@ -2494,33 +2553,16 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Usuario admin nao autenticado para enviar imagem.');
     }
 
+    const canWrite = await diagnoseAdminCanWrite(api, diagnostic.context || 'produto');
+    if (canWrite === false) {
+      throw new Error('Seu usuário está logado, mas não tem permissão administrativa para enviar imagens.');
+    }
+
     const path = buildProductImagePath(diagnostic);
     const uploadFile = new File([file], path.split('/').pop(), {
       type: PRODUCT_IMAGE_OUTPUT_TYPE,
       lastModified: Date.now(),
     });
-
-    if (api.storage.listBuckets) {
-      try {
-        const { data: buckets, error: bucketError } = await api.storage.listBuckets();
-        if (bucketError) {
-          logImageUploadDiagnostic('bucket-nao-validado', {
-            context: diagnostic.context || 'produto',
-            error: storageErrorDiagnostic(bucketError),
-          });
-        } else if (Array.isArray(buckets) && !buckets.some((bucket) => bucket.name === PRODUCT_IMAGE_BUCKET)) {
-          const error = new Error('Bucket produtos nao encontrado.');
-          error.code = 'bucket_not_found';
-          throw error;
-        }
-      } catch (error) {
-        if (error?.code === 'bucket_not_found') throw error;
-        logImageUploadDiagnostic('bucket-nao-validado', {
-          context: diagnostic.context || 'produto',
-          error: storageErrorDiagnostic(error),
-        });
-      }
-    }
 
     logImageUploadDiagnostic('upload', {
       context: diagnostic.context || 'produto',
@@ -2555,6 +2597,12 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       logImageUploadDiagnostic('upload-falhou', detail);
       console.error('[Storage erro] Supabase retornou erro no upload.', detail);
+      console.error('[Storage erro message]', error?.message);
+      console.error('[Storage erro status]', error?.status || error?.statusCode);
+      console.error('[Storage erro code]', error?.code);
+      console.error('[Storage erro details]', error?.details);
+      console.error('[Storage erro hint]', error?.hint);
+      console.error('[Storage erro json]', safeStringify(error));
       throw error;
     }
     logImageUploadDiagnostic('upload-ok', {
