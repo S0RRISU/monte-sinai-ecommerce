@@ -163,6 +163,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const isUuid = (value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
+  function parseCurrentProfileRpcData(rawData) {
+    let data = rawData;
+    for (let i = 0; i < 3; i += 1) {
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (_error) {
+          return null;
+        }
+        continue;
+      }
+      if (Array.isArray(data)) {
+        data = data[0] || null;
+        continue;
+      }
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'current_profile_for_app')) {
+        data = data.current_profile_for_app;
+        continue;
+      }
+      break;
+    }
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+  }
+
   // Local helper for painel.html: admin.js is loaded without script.js here.
   async function getCurrentProfileForApp({ force = false } = {}) {
     if (state.profile && !force) return state.profile;
@@ -179,11 +203,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
 
-      const { data, error } = await api.rpc('current_profile_for_app').maybeSingle();
+      const { data: rpcData, error } = await api.rpc('current_profile_for_app');
       if (error) {
         console.warn('[Admin] current_profile_for_app falhou.', error);
         return null;
       }
+      const data = parseCurrentProfileRpcData(rpcData);
       if (!data?.id) return null;
 
       let role = 'cliente';
@@ -564,12 +589,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const workspace = qs('[data-admin-workspace]');
     workspace?.classList.add('hidden');
     if (!access) return;
+    const retryButton = options.retry
+      ? `<button type="button" class="btn btn-primary" data-admin-retry-access>
+          <i class="fa-solid fa-rotate-right"></i>
+          Tentar novamente
+        </button>`
+      : '';
     access.classList.remove('hidden');
     access.innerHTML = `
       <i class="fa-solid fa-${escapeHTML(options.icon || 'lock')}"></i>
       <h1>${escapeHTML(title)}</h1>
       <p>${escapeHTML(message)}</p>
       <div class="settings-actions">
+        ${retryButton}
         <a class="btn btn-primary ${options.login ? '' : 'hidden'}" href="login.html?redirect=painel.html">
           <i class="fa-solid fa-right-to-bracket"></i>
           Entrar como administrador
@@ -577,6 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <a class="btn btn-secondary" href="../index.html">Voltar ao site</a>
       </div>
     `;
+    qs('[data-admin-retry-access]', access)?.addEventListener('click', () => window.location.reload());
   }
 
   function currentAdminRole() {
@@ -673,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setAccessState(
         'Erro ao carregar perfil',
         `Email detectado: ${user.email || 'nao informado'}. Nao foi possivel validar suas permissoes no Supabase agora.`,
-        { icon: 'triangle-exclamation' },
+        { icon: 'triangle-exclamation', retry: true },
       );
       return false;
     }

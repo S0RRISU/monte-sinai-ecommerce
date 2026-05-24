@@ -211,35 +211,30 @@ $$;
 drop function if exists public.current_profile_for_app();
 
 create or replace function public.current_profile_for_app()
-returns table (
-  id uuid,
-  email text,
-  nome text,
-  role text,
-  is_admin boolean
-)
+returns jsonb
 language sql
 security definer
 stable
 set search_path = public, auth
 as $$
-  select
-    au.id::uuid as id,
-    au.email::text as email,
-    coalesce(
+  select jsonb_build_object(
+    'id', au.id,
+    'email', au.email,
+    'nome', coalesce(
       nullif(p.nome, ''),
       nullif(au.raw_user_meta_data->>'nome', ''),
       nullif(au.raw_user_meta_data->>'name', ''),
       au.email
-    )::text as nome,
-    coalesce(
+    ),
+    'role', coalesce(
       nullif(p.role, ''),
       case
         when p.is_admin is true then 'admin'
         else 'cliente'
       end
-    )::text as role,
-    coalesce(p.is_admin, false)::boolean as is_admin
+    ),
+    'is_admin', coalesce(p.is_admin, false)
+  )
   from auth.users au
   left join public.profiles p on p.id = au.id
   where au.id = auth.uid()

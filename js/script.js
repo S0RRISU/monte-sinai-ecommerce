@@ -1126,6 +1126,30 @@ document.addEventListener('DOMContentLoaded', () => {
       .toLowerCase();
   }
 
+  function parseCurrentProfileRpcData(rawData) {
+    let data = rawData;
+    for (let i = 0; i < 3; i += 1) {
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (_error) {
+          return null;
+        }
+        continue;
+      }
+      if (Array.isArray(data)) {
+        data = data[0] || null;
+        continue;
+      }
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'current_profile_for_app')) {
+        data = data.current_profile_for_app;
+        continue;
+      }
+      break;
+    }
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+  }
+
   function adminRole(profile = adminProfileCache) {
     const role = normalizeText(profile?.role || '');
     if (!ADMIN_ROLES.includes(role) && profile?.is_admin === true) return 'admin';
@@ -1813,11 +1837,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (typeof client.rpc !== 'function') return null;
-      const { data, error } = await client.rpc('current_profile_for_app').maybeSingle();
+      const { data: rpcData, error } = await client.rpc('current_profile_for_app');
       if (error) {
         console.warn('[Supabase] current_profile_for_app falhou. Link admin sera ocultado.', error);
         return null;
       }
+      const data = parseCurrentProfileRpcData(rpcData);
       if (!data?.id) return null;
 
       const role = adminRole(data);
