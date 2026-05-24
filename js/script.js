@@ -1724,6 +1724,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return data?.user || null;
   }
 
+  async function rpcCurrentUserRole(client = authClient()) {
+    if (!client?.rpc) return null;
+    try {
+      const { data, error } = await client.rpc('current_user_role');
+      if (error) throw error;
+      const role = normalizeText(data || '');
+      return ADMIN_ROLES.includes(role) ? role : null;
+    } catch (error) {
+      console.warn('[Supabase] current_user_role indisponivel, usando fallback em profiles.', error);
+      return null;
+    }
+  }
+
   async function upsertProfileRecord(user = null, source = currentUser || {}) {
     const client = ordersClient();
     const authUser = user || (await currentAuthUser());
@@ -1740,22 +1753,42 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const columns = 'id, email, nome, apelido, telefone, endereco, foto, role';
-    const { data: existing, error: lookupError } = await client
-      .from('profiles')
-      .select(columns)
-      .eq('id', authUser.id)
-      .maybeSingle();
+    const basicColumns = 'id, email, nome, apelido, telefone, endereco, foto';
+    let existing = null;
+    let lookupError = null;
+
+    for (const selectColumns of [columns, basicColumns]) {
+      const { data, error } = await client.from('profiles').select(selectColumns).eq('id', authUser.id).maybeSingle();
+      if (error) {
+        lookupError = error;
+        continue;
+      }
+      existing = data ? { ...data, _fields: selectColumns.split(',').map((field) => field.trim()) } : data;
+      lookupError = null;
+      break;
+    }
 
     if (lookupError) throw lookupError;
+
+    const remoteRole = await rpcCurrentUserRole(client);
+    if (existing && ADMIN_PANEL_ROLES.includes(remoteRole)) return { ...existing, role: remoteRole };
     if (existing && adminRole(existing) !== 'cliente') return existing;
 
-    const query = existing
-      ? client.from('profiles').update(profile).eq('id', authUser.id)
-      : client.from('profiles').insert(profile);
+    const writeProfile = (selectColumns) => {
+      const query = existing
+        ? client.from('profiles').update(profile).eq('id', authUser.id)
+        : client.from('profiles').insert(profile);
+      return query.select(selectColumns).single();
+    };
 
-    const { data, error } = await query.select(columns).single();
+    let { data, error } = await writeProfile(columns);
+    if (error) {
+      const fallback = await writeProfile(basicColumns);
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error) throw error;
-    return data;
+    return remoteRole ? { ...data, role: remoteRole } : data;
   }
 
   async function safeUpsertProfileRecord(user = null, source = currentUser || {}, context = 'perfil') {
@@ -1793,37 +1826,73 @@ document.addEventListener('DOMContentLoaded', () => {
     const authUser = await currentAuthUser().catch(() => null);
     if (!authUser?.id || !isUUID(authUser.id)) return null;
 
-    // Read role directly from public.profiles instead of relying on RPC current_user_role
-    try {
-      const { data: profile, error: profileError } = await client
-        .from('profiles')
-        .select('id, email, nome, role, is_admin')
-        .eq('id', authUser.id)
-        .limit(1)
-        .maybeSingle();
+    const rpcRole = await rpcCurrentUserRole(client);
+    if (rpcRole) {
+      adminProfileCache = {
+        id: authUser.id,
+        email: authUser.email || '',
+        nome: authMetadata(authUser).name || authUser.email || '',
+        role: rpcRole,
+        _source: 'rpc',
+      };
+      return adminProfileCache;
+    }
 
-      if (profileError) {
-        console.warn('[Supabase] falha ao ler perfil em profiles, usando fallback.', profileError);
+    // Read role directly from public.profiles with layered fallbacks
+    try {
+      const tryFields = ['id, email, nome, role, is_admin', 'id, email, nome, is_admin', 'id, email, nome'];
+
+      let profile = null;
+      let tried = [];
+      let lastError = null;
+
+      for (const fields of tryFields) {
+        tried.push(fields);
+        const { data, error } = await client
+          .from('profiles')
+          .select(fields)
+          .eq('id', authUser.id)
+          .limit(1)
+          .maybeSingle();
+        if (error) {
+          lastError = error;
+          console.warn('[Supabase] profiles select failed for fields:', fields, error);
+          continue;
+        }
+        profile = data;
+        // annotate which fields we successfully retrieved
+        profile = { ...(profile || {}), _fields: fields.split(',').map((s) => s.trim()) };
+        break;
+      }
+
+      if (!profile) {
+        console.warn('[Supabase] nao conseguiu ler profile com nenhum fallback.', { tried, lastError });
         return null;
       }
 
-      const rawRole = profile?.role;
+      const hasRoleField = Array.isArray(profile._fields) && profile._fields.includes('role');
+      const hasIsAdminField = Array.isArray(profile._fields) && profile._fields.includes('is_admin');
+
       let role = 'cliente';
-      if (rawRole && ADMIN_ROLES.includes(normalizeText(rawRole))) {
-        role = normalizeText(rawRole);
-      } else if (profile?.is_admin) {
+      if (hasRoleField && profile.role && ADMIN_ROLES.includes(normalizeText(profile.role))) {
+        role = normalizeText(profile.role);
+      } else if (hasIsAdminField && profile.is_admin) {
         role = 'admin';
+      } else if (!hasRoleField && !hasIsAdminField) {
+        // only id/email/nome available -> default to cliente for public pages
+        role = 'cliente';
       }
 
       adminProfileCache = {
         id: authUser.id,
-        email: profile?.email || authUser.email || '',
-        nome: profile?.nome || authMetadata(authUser).name || authUser.email || '',
+        email: profile.email || authUser.email || '',
+        nome: profile.nome || authMetadata(authUser).name || authUser.email || '',
         role,
+        _fields: profile._fields,
       };
       return adminProfileCache;
     } catch (err) {
-      console.warn('[Supabase] erro ao consultar profiles para role.', err);
+      console.warn('[Supabase] erro inesperado ao consultar profiles para role.', err);
       return null;
     }
   }

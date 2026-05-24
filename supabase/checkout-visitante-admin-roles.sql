@@ -1,5 +1,5 @@
 -- Checkout visitante, status de pagamento e perfis administrativos.
--- Execute depois de schema-pedidos.sql e admin-acesso.sql.
+-- Execute depois de schema-pedidos.sql e 20260524-base-rbac-permissoes.sql.
 
 begin;
 

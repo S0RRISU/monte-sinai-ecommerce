@@ -6,12 +6,78 @@
 
 begin;
 
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  nome text,
+  apelido text,
+  telefone text,
+  endereco text,
+  foto text,
+  is_admin boolean not null default false,
+  admin_role text not null default 'customer',
+  role text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.profiles
-  add column if not exists role text;
+  add column if not exists email text,
+  add column if not exists nome text,
+  add column if not exists apelido text,
+  add column if not exists telefone text,
+  add column if not exists endereco text,
+  add column if not exists foto text,
+  add column if not exists is_admin boolean not null default false,
+  add column if not exists admin_role text not null default 'customer',
+  add column if not exists role text,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.profiles
+  alter column is_admin set default false,
+  alter column admin_role set default 'customer',
+  alter column created_at set default now(),
+  alter column updated_at set default now();
 
 -- Drop old role constraints before attempting to normalize values.
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles drop constraint if exists profiles_admin_role_check;
+
+-- Backfill missing profile rows and missing email/name from Supabase Auth.
+insert into public.profiles (id, email, nome, role, is_admin, admin_role)
+select
+  u.id,
+  u.email,
+  coalesce(
+    nullif(u.raw_user_meta_data->>'name', ''),
+    nullif(u.raw_user_meta_data->>'full_name', ''),
+    split_part(u.email, '@', 1)
+  ),
+  'cliente',
+  false,
+  'customer'
+from auth.users u
+on conflict (id) do nothing;
+
+update public.profiles p
+set email = coalesce(nullif(p.email, ''), u.email),
+    nome = coalesce(
+      nullif(p.nome, ''),
+      nullif(u.raw_user_meta_data->>'name', ''),
+      nullif(u.raw_user_meta_data->>'full_name', ''),
+      split_part(u.email, '@', 1)
+    ),
+    updated_at = coalesce(p.updated_at, now())
+from auth.users u
+where p.id = u.id
+  and (
+    p.email is null
+    or btrim(p.email) = ''
+    or p.nome is null
+    or btrim(p.nome) = ''
+    or p.updated_at is null
+  );
 
 -- Normalize legacy or inconsistent role values into the canonical set:
 -- cliente, equipe, motoboy, admin, developer
@@ -32,6 +98,7 @@ set role = case
   when lower(btrim(coalesce(admin_role, ''))) in ('developer', 'dev') then 'developer'
   when lower(btrim(coalesce(admin_role, ''))) in ('owner', 'admin') then 'admin'
   when lower(btrim(coalesce(admin_role, ''))) in ('staff', 'equipe') then 'equipe'
+  when lower(btrim(coalesce(admin_role, ''))) in ('delivery', 'courier', 'motoboy') then 'motoboy'
   when lower(btrim(coalesce(admin_role, ''))) in ('customer', 'client', 'cliente') then 'cliente'
 
   -- preserve existing canonical values
@@ -55,9 +122,39 @@ update public.profiles
 set is_admin = role in ('admin', 'developer')
 where is_admin is distinct from (role in ('admin', 'developer'));
 
+update public.profiles
+set created_at = coalesce(created_at, now()),
+    updated_at = coalesce(updated_at, now()),
+    admin_role = coalesce(nullif(btrim(admin_role), ''), 'customer')
+where created_at is null
+  or updated_at is null
+  or admin_role is null
+  or btrim(admin_role) = '';
+
+-- Keep the legacy admin_role column coherent for older scripts/pages.
+update public.profiles
+set admin_role = case role
+  when 'developer' then 'developer'
+  when 'admin' then 'owner'
+  when 'equipe' then 'staff'
+  when 'motoboy' then 'delivery'
+  else 'customer'
+end
+where admin_role is distinct from case role
+  when 'developer' then 'developer'
+  when 'admin' then 'owner'
+  when 'equipe' then 'staff'
+  when 'motoboy' then 'delivery'
+  else 'customer'
+end;
+
 alter table public.profiles
   alter column role set default 'cliente',
-  alter column role set not null;
+  alter column role set not null,
+  alter column is_admin set not null,
+  alter column admin_role set not null,
+  alter column created_at set not null,
+  alter column updated_at set not null;
 
 -- Recreate the canonical role check constraint.
 alter table public.profiles
@@ -75,6 +172,14 @@ begin
     new.role := 'cliente';
   end if;
   new.is_admin := new.role in ('admin', 'developer');
+  new.admin_role := case new.role
+    when 'developer' then 'developer'
+    when 'admin' then 'owner'
+    when 'equipe' then 'staff'
+    when 'motoboy' then 'delivery'
+    else 'customer'
+  end;
+  new.updated_at := coalesce(new.updated_at, now());
   return new;
 end;
 $$;
@@ -212,7 +317,14 @@ begin
   update public.profiles p
   set role = target_role,
       is_admin = target_role in ('admin', 'developer'),
-      updated_at = coalesce(p.updated_at, now())
+      admin_role = case target_role
+        when 'developer' then 'developer'
+        when 'admin' then 'owner'
+        when 'equipe' then 'staff'
+        when 'motoboy' then 'delivery'
+        else 'customer'
+      end,
+      updated_at = now()
   where p.id = p_user_id;
 
   if not found then
@@ -251,16 +363,19 @@ alter table public.profiles enable row level security;
 drop policy if exists "profiles_select_own_or_admin" on public.profiles;
 create policy "profiles_select_own_or_admin"
 on public.profiles for select
+to authenticated
 using (id = auth.uid() or public.is_admin());
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
 on public.profiles for insert
+to authenticated
 with check (id = auth.uid() and role = 'cliente');
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
 on public.profiles for update
+to authenticated
 using (id = auth.uid() or public.is_admin())
 with check (id = auth.uid() or public.is_admin());
 
@@ -269,12 +384,51 @@ grant select on public.profiles to authenticated;
 grant insert (id, email, nome, apelido, telefone, endereco, foto) on public.profiles to authenticated;
 grant update (email, nome, apelido, telefone, endereco, foto, updated_at) on public.profiles to authenticated;
 
+-- Official admin/developer bootstrap. Re-runnable and tied to auth.users.
+insert into public.profiles (id, email, nome, role, is_admin, admin_role)
+select
+  u.id,
+  u.email,
+  coalesce(
+    nullif(u.raw_user_meta_data->>'name', ''),
+    nullif(u.raw_user_meta_data->>'full_name', ''),
+    split_part(u.email, '@', 1)
+  ),
+  case
+    when lower(u.email) = 'marcelol527319@gmail.com' then 'developer'
+    when lower(u.email) in ('marcelo52731@gmail.com', 'patriciapaula01234@gmail.com') then 'admin'
+    else 'cliente'
+  end,
+  lower(u.email) in ('marcelol527319@gmail.com', 'marcelo52731@gmail.com', 'patriciapaula01234@gmail.com'),
+  case
+    when lower(u.email) = 'marcelol527319@gmail.com' then 'developer'
+    when lower(u.email) in ('marcelo52731@gmail.com', 'patriciapaula01234@gmail.com') then 'owner'
+    else 'customer'
+  end
+from auth.users u
+where lower(u.email) in (
+  'marcelol527319@gmail.com',
+  'marcelo52731@gmail.com',
+  'patriciapaula01234@gmail.com',
+  'marcelosorrisu527@gmail.com'
+)
+on conflict (id) do update
+set email = excluded.email,
+    nome = coalesce(nullif(public.profiles.nome, ''), excluded.nome),
+    role = excluded.role,
+    is_admin = excluded.is_admin,
+    admin_role = excluded.admin_role,
+    updated_at = now();
+
 do $$
 begin
   if to_regclass('public.pedidos') is not null then
+    grant select, update on public.pedidos to authenticated;
+
     drop policy if exists "pedidos_select_own_or_admin" on public.pedidos;
     create policy "pedidos_select_own_or_admin"
     on public.pedidos for select
+    to authenticated
     using (
       (user_id is not null and user_id = auth.uid())
       or public.is_staff()
@@ -284,8 +438,9 @@ begin
     drop policy if exists "pedidos_update_admin" on public.pedidos;
     create policy "pedidos_update_admin"
     on public.pedidos for update
-    using (public.is_admin() or public.is_delivery())
-    with check (public.is_admin() or public.is_delivery());
+    to authenticated
+    using (public.is_staff() or public.is_delivery())
+    with check (public.is_staff() or public.is_delivery());
   end if;
 end;
 $$;
@@ -293,9 +448,12 @@ $$;
 do $$
 begin
   if to_regclass('public.pedido_itens') is not null then
+    grant select on public.pedido_itens to authenticated;
+
     drop policy if exists "pedido_itens_select_by_order_access" on public.pedido_itens;
     create policy "pedido_itens_select_by_order_access"
     on public.pedido_itens for select
+    to authenticated
     using (
       exists (
         select 1
@@ -315,9 +473,13 @@ $$;
 do $$
 begin
   if to_regclass('public.produtos') is not null then
+    grant select on public.produtos to anon, authenticated;
+    grant insert, update, delete on public.produtos to authenticated;
+
     drop policy if exists "produtos_admin_all" on public.produtos;
     create policy "produtos_admin_all"
     on public.produtos for all
+    to authenticated
     using (public.admin_can_write())
     with check (public.admin_can_write());
   end if;
@@ -327,9 +489,13 @@ $$;
 do $$
 begin
   if to_regclass('public.site_configuracoes') is not null then
+    grant select on public.site_configuracoes to anon, authenticated;
+    grant insert, update, delete on public.site_configuracoes to authenticated;
+
     drop policy if exists "site_configuracoes_admin_write" on public.site_configuracoes;
     create policy "site_configuracoes_admin_write"
     on public.site_configuracoes for all
+    to authenticated
     using (public.admin_can_write())
     with check (public.admin_can_write());
   end if;
@@ -342,17 +508,20 @@ begin
     drop policy if exists "product_images_admin_insert" on storage.objects;
     create policy "product_images_admin_insert"
     on storage.objects for insert
+    to authenticated
     with check (bucket_id = 'produtos' and public.admin_can_write());
 
     drop policy if exists "product_images_admin_update" on storage.objects;
     create policy "product_images_admin_update"
     on storage.objects for update
+    to authenticated
     using (bucket_id = 'produtos' and public.admin_can_write())
     with check (bucket_id = 'produtos' and public.admin_can_write());
 
     drop policy if exists "product_images_admin_delete" on storage.objects;
     create policy "product_images_admin_delete"
     on storage.objects for delete
+    to authenticated
     using (bucket_id = 'produtos' and public.admin_can_write());
   end if;
 end;

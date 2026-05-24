@@ -1,5 +1,5 @@
 -- Alertas de pedidos, auditoria admin, roles e catalogo de consulta.
--- Execute depois de schema-pedidos.sql, admin-acesso.sql e checkout-visitante-admin-roles.sql.
+-- Execute depois de schema-pedidos.sql, 20260524-base-rbac-permissoes.sql e checkout-visitante-admin-roles.sql.
 
 begin;
 

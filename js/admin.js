@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     equipe: {
       panel: true,
       orders: true,
-      products: true,
+      products: false,
       deliveries: true,
       finance: false,
       config: false,
@@ -163,6 +163,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const isUuid = (value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
 
+  async function rpcCurrentUserRole(api = client()) {
+    if (!api?.rpc) return null;
+    try {
+      const { data, error } = await api.rpc('current_user_role');
+      if (error) throw error;
+      const role = normalize(data || '');
+      return ADMIN_ROLES.includes(role) ? role : null;
+    } catch (error) {
+      console.warn('[Admin] current_user_role indisponivel, usando fallback em profiles.', error);
+      return null;
+    }
+  }
+
   // Local helper to obtain current admin profile directly from public.profiles
   // This avoids depending on currentAdminProfile() from script.js which
   // is not loaded on pages that include only admin.js (painel.html).
@@ -181,34 +194,59 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
 
-      const { data: profile, error: profileError } = await api
-        .from('profiles')
-        .select('id, email, nome, role, is_admin')
-        .eq('id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const rpcRole = await rpcCurrentUserRole(api);
+      if (rpcRole) {
+        const result = {
+          id: user.id,
+          email: user.email || '',
+          nome: user.user_metadata?.name || user.user_metadata?.full_name || user.email || '',
+          role: rpcRole,
+          _source: 'rpc',
+        };
 
-      if (profileError) {
-        console.warn('[Admin] falha ao ler profiles.', profileError);
+        state.profile = result;
+        return result;
+      }
+
+      const tryFields = ['id, email, nome, role, is_admin', 'id, email, nome, is_admin', 'id, email, nome'];
+      let profile = null;
+      let tried = [];
+      let lastError = null;
+      for (const fields of tryFields) {
+        tried.push(fields);
+        const { data, error } = await api.from('profiles').select(fields).eq('id', user.id).limit(1).maybeSingle();
+        if (error) {
+          lastError = error;
+          console.warn('[Admin] profiles select failed for fields:', fields, error);
+          continue;
+        }
+        profile = { ...(data || {}), _fields: fields.split(',').map((s) => s.trim()) };
+        break;
+      }
+
+      if (!profile) {
+        console.warn('[Admin] nao conseguiu ler profile com nenhum fallback.', { tried, lastError });
         return null;
       }
 
-      const rawRole = profile?.role;
+      const hasRoleField = Array.isArray(profile._fields) && profile._fields.includes('role');
+      const hasIsAdminField = Array.isArray(profile._fields) && profile._fields.includes('is_admin');
+
       let role = 'cliente';
-      if (rawRole && ADMIN_ROLES.includes(normalize(rawRole))) {
-        role = normalize(rawRole);
-      } else if (profile?.is_admin) {
+      if (hasRoleField && profile.role && ADMIN_ROLES.includes(normalize(profile.role))) {
+        role = normalize(profile.role);
+      } else if (hasIsAdminField && profile.is_admin) {
         role = 'admin';
       }
 
       const result = {
         id: user.id,
-        email: profile?.email || user.email || '',
-        nome: profile?.nome || user.user_metadata?.name || user.email || '',
+        email: profile.email || user.email || '',
+        nome: profile.nome || user.user_metadata?.name || user.email || '',
         role,
+        _fields: profile._fields,
       };
 
-      // cache locally on state for admin pages
       state.profile = result;
       return result;
     } catch (err) {

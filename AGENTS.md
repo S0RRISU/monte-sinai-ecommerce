@@ -28,7 +28,7 @@
 ## Supabase-specific guidance
 
 - Any Supabase schema or seed changes should be reflected in `supabase/` SQL files.
-- Admin access and user roles are controlled via SQL in `supabase/admin-acesso.sql` and `supabase/checkout-visitante-admin-roles.sql`.
+- Admin access and user roles are controlled via the canonical RBAC SQL in `supabase/20260524-base-rbac-permissoes.sql`; older role files are legacy/context only.
 - The `README.md` includes Supabase setup steps: schema, seed, admin access, storage bucket, and email configuration.
 - The site uses Supabase Auth and RLS; avoid breaking table relationships or client-side queries without understanding the database schema.
 
