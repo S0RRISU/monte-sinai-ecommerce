@@ -251,13 +251,16 @@ stable
 set search_path = public, auth
 as $$
   select jsonb_build_object(
-    'id', au.id,
-    'email', au.email,
+    'id', auth.uid(),
+    'email', coalesce(
+      nullif(p.email, ''),
+      nullif(auth.jwt() ->> 'email', '')
+    ),
     'nome', coalesce(
       nullif(p.nome, ''),
-      nullif(au.raw_user_meta_data->>'nome', ''),
-      nullif(au.raw_user_meta_data->>'name', ''),
-      au.email
+      nullif(auth.jwt() ->> 'name', ''),
+      nullif(auth.jwt() ->> 'email', ''),
+      p.email
     ),
     'role', coalesce(
       nullif(p.role, ''),
@@ -268,9 +271,8 @@ as $$
     ),
     'is_admin', coalesce(p.is_admin, false)
   )
-  from auth.users au
-  left join public.profiles p on p.id = au.id
-  where au.id = auth.uid()
+  from public.profiles p
+  where p.id = auth.uid()
   limit 1;
 $$;
 
