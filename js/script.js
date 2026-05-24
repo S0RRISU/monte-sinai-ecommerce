@@ -206,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let appliedCoupon = loadJSON(STORAGE.coupon, null);
   let currentUser = loadJSON(STORAGE.user, null);
   if (currentUser?.provider !== 'Supabase Auth') currentUser = null;
+  else if (currentUser) currentUser = sanitizeProfileUser(currentUser);
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
   let siteConfig = { ...DEFAULT_SITE_CONFIG, ...loadJSON(STORAGE.site, {}) };
   let remoteOrdersCache = [];
@@ -671,13 +672,31 @@ document.addEventListener('DOMContentLoaded', () => {
     saveJSON(STORAGE.cart, cart);
   }
 
+  function isUnsafeProfilePhotoValue(value = '') {
+    const photo = String(value || '').trim();
+    if (!photo) return false;
+    if (/^(data:image|data:|blob:)/i.test(photo)) return true;
+    if (photo.length > 2048) return true;
+    return photo.length > 512 && /^[A-Za-z0-9+/=\s]+$/.test(photo);
+  }
+
+  function cleanProfilePhotoUrl(value = '') {
+    const photo = String(value || '').trim();
+    return isUnsafeProfilePhotoValue(photo) ? '' : photo;
+  }
+
+  function sanitizeProfileUser(user) {
+    return user ? { ...user, photo: cleanProfilePhotoUrl(user.photo) } : user;
+  }
+
   function saveUser(user) {
     adminProfileCache = null;
-    currentUser = user;
+    const safeUser = sanitizeProfileUser(user);
+    currentUser = safeUser;
     let saved = true;
-    if (user) {
-      saved = saveJSON(STORAGE.user, user);
-      rememberProfile(user);
+    if (safeUser) {
+      saved = saveJSON(STORAGE.user, safeUser);
+      rememberProfile(safeUser);
     } else {
       localStorage.removeItem(STORAGE.user);
       setAdminPanelLinksVisible(false);
@@ -742,7 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nick: user.nick || '',
       phone: user.phone || '',
       address: user.address || '',
-      photo: user.photo || '',
+      photo: cleanProfilePhotoUrl(user.photo),
       provider: user.provider || 'Supabase Auth',
       passwordSaved: user.passwordSaved ?? savedSession,
       updatedAt: user.updatedAt || new Date().toISOString(),
@@ -950,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nick: meta.nick || '',
       phone: meta.phone || '',
       address: meta.address || '',
-      photo: meta.photo || meta.avatar_url || '',
+      photo: cleanProfilePhotoUrl(meta.photo || meta.avatar_url || ''),
       provider: 'Supabase Auth',
       updatedAt: meta.updatedAt || user.updated_at || '',
     };
@@ -1761,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
       apelido: source.nick || '',
       telefone: source.phone || '',
       endereco: source.address || '',
-      foto: source.photo || '',
+      foto: cleanProfilePhotoUrl(source.photo),
     };
 
     const columns = 'id, email, nome, apelido, telefone, endereco, foto, role';
@@ -6692,7 +6711,7 @@ document.addEventListener('DOMContentLoaded', () => {
             password,
             options: {
               emailRedirectTo: authRedirectUrl('perfil.html'),
-              data: { name, phone, address, nick: '', photo: '' },
+              data: { name, phone, address, nick: '' },
             },
           });
           if (error) throw error;
@@ -7942,7 +7961,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nick: qs('#edit-nick')?.value.trim() || '',
         phone: qs('#edit-phone')?.value.trim() || '',
         address: qs('#edit-address')?.value.trim() || '',
-        photo: preview?.src?.startsWith('data:') ? preview.src : currentUser.photo,
+        photo: cleanProfilePhotoUrl(preview?.src || '') || cleanProfilePhotoUrl(currentUser.photo),
         provider: 'Supabase Auth',
         updatedAt: new Date().toISOString(),
       };
@@ -7965,13 +7984,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nick: updated.nick,
             phone: updated.phone,
             address: updated.address,
-            photo: updated.photo || '',
             updatedAt: updated.updatedAt,
           },
         });
         if (error) throw error;
 
-        const savedUser = userFromAuthUser(data.user);
+        const savedUser = { ...userFromAuthUser(data.user), photo: updated.photo };
         if (!savedUser?.email) throw new Error('Perfil não retornado pelo Supabase.');
         saveUser(savedUser);
         await safeUpsertProfileRecord(data.user, savedUser, 'edicao de perfil');
