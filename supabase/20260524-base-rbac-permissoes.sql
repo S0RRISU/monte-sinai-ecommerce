@@ -6,17 +6,35 @@ begin;
 alter table public.profiles
   add column if not exists role text;
 
+-- Drop old role constraints before attempting to normalize values.
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles drop constraint if exists profiles_admin_role_check;
+
+-- Normalize legacy or inconsistent role values into the canonical set:
+-- cliente, equipe, motoboy, admin, developer
 update public.profiles
 set role = case
   when lower(coalesce(email, '')) = 'marcelol527319@gmail.com' then 'developer'
   when lower(coalesce(email, '')) in ('marcelo52731@gmail.com', 'patriciapaula01234@gmail.com') then 'admin'
   when lower(coalesce(email, '')) = 'marcelosorrisu527@gmail.com' then 'cliente'
-  when lower(btrim(coalesce(role, ''))) in ('cliente', 'equipe', 'motoboy', 'admin', 'developer')
-    then lower(btrim(role))
-  when lower(btrim(coalesce(admin_role, ''))) = 'developer' then 'developer'
+
+  -- normalize explicit role text variants first
+  when lower(btrim(coalesce(role, ''))) in ('developer', 'dev') then 'developer'
+  when lower(btrim(coalesce(role, ''))) in ('owner', 'admin', 'administrator') then 'admin'
+  when lower(btrim(coalesce(role, ''))) in ('staff', 'equipe') then 'equipe'
+  when lower(btrim(coalesce(role, ''))) in ('customer', 'client', 'cliente') then 'cliente'
+  when lower(btrim(coalesce(role, ''))) in ('delivery', 'courier', 'motoboy') then 'motoboy'
+
+  -- fallback to legacy admin_role column if present
+  when lower(btrim(coalesce(admin_role, ''))) in ('developer', 'dev') then 'developer'
   when lower(btrim(coalesce(admin_role, ''))) in ('owner', 'admin') then 'admin'
   when lower(btrim(coalesce(admin_role, ''))) in ('staff', 'equipe') then 'equipe'
   when lower(btrim(coalesce(admin_role, ''))) in ('customer', 'client', 'cliente') then 'cliente'
+
+  -- preserve existing canonical values
+  when lower(btrim(coalesce(role, ''))) in ('cliente', 'equipe', 'motoboy', 'admin', 'developer') then lower(btrim(role))
+
+  -- if the is_admin flag was true, prefer admin
   when coalesce(is_admin, false) then 'admin'
   else 'cliente'
 end
@@ -29,6 +47,7 @@ where role is null
     'marcelosorrisu527@gmail.com'
   );
 
+-- Synchronize is_admin according to canonical roles.
 update public.profiles
 set is_admin = role in ('admin', 'developer')
 where is_admin is distinct from (role in ('admin', 'developer'));
@@ -37,9 +56,7 @@ alter table public.profiles
   alter column role set default 'cliente',
   alter column role set not null;
 
-alter table public.profiles
-  drop constraint if exists profiles_role_check;
-
+-- Recreate the canonical role check constraint.
 alter table public.profiles
   add constraint profiles_role_check
   check (role in ('cliente', 'equipe', 'motoboy', 'admin', 'developer'));
