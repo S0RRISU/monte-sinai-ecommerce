@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productImageHTML(product = {}) {
-    const src = adminImageRenderSrc(product.imagem || '');
+    const src = adminImageRenderSrc(product.imagem || '', product.updated_at || '');
     const placeholder = productPlaceholderHTML(product);
     if (!src) return placeholder;
     return `<img src="${escapeHTML(src)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
@@ -489,10 +489,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function adminImageRenderSrc(value = '') {
+  function imageVersionToken(version = '') {
+    return text(version).trim().replace(/[^a-z0-9_.:-]+/gi, '-');
+  }
+
+  function addImageCacheBuster(src = '', version = '') {
+    const token = imageVersionToken(version);
+    if (!src || !token || /^(data:|blob:)/i.test(src)) return src;
+    try {
+      const url = new URL(src, location.origin);
+      url.searchParams.set('v', token);
+      return url.href;
+    } catch (_error) {
+      const separator = src.includes('?') ? '&' : '?';
+      return `${src}${separator}v=${encodeURIComponent(token)}`;
+    }
+  }
+
+  function adminImageRenderSrc(value = '', version = '') {
     const src = normalizeProductImageUrlForDisplay(value);
-    if (!src || /^(https?:|data:|blob:)/i.test(src)) return src;
-    return location.pathname.includes('/pages/') ? `../${src.replace(/^\.?\//, '')}` : src;
+    const rendered =
+      !src || /^(https?:|data:|blob:)/i.test(src)
+        ? src
+        : location.pathname.includes('/pages/')
+          ? `../${src.replace(/^\.?\//, '')}`
+          : src;
+    return addImageCacheBuster(rendered, version);
   }
 
   function savedImageMatches(expected = '', saved = '') {
@@ -1798,6 +1820,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ...product,
       nome: variation.nome || product.nome || 'Variacao',
       imagem: variation.imagem || '',
+      updated_at: variation.updated_at || product.updated_at || '',
     });
   }
 
@@ -2236,6 +2259,14 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     showToast(override?.ativo === false ? 'Variacao desativada.' : 'Variacao salva.', 'success');
     await refreshProductEditor(productId);
+    if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+      const savedVariation = state.variacoes.find((variation) => String(variation.id) === String(variationId));
+      renderSavedVariationImagePreview(
+        variationId,
+        savedVariation?.imagem ?? data.imagem ?? '',
+        savedVariation?.updated_at ?? data.updated_at ?? '',
+      );
+    }
     return true;
   }
 
@@ -2313,6 +2344,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     showToast('Variacao adicionada.', 'success');
     await refreshProductEditor(productId);
+    if (data?.id) {
+      const savedVariation = state.variacoes.find((variation) => String(variation.id) === String(data.id));
+      renderSavedVariationImagePreview(data.id, savedVariation?.imagem ?? data.imagem ?? '', savedVariation?.updated_at ?? data.updated_at ?? '');
+    }
     return true;
   }
 
@@ -2466,6 +2501,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
     showToast('Produto atualizado.', 'success');
     await carregarProdutosAdmin();
+    if (!qs('#admin-product-editor-modal')?.classList.contains('hidden')) {
+      const savedProduct = state.produtos.find((product) => String(product.id) === String(productId));
+      openProductEditor(productId);
+      if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+        renderSavedProductImagePreview(
+          productId,
+          savedProduct?.imagem ?? data?.imagem ?? '',
+          savedProduct?.updated_at ?? data?.updated_at ?? '',
+        );
+      }
+    }
     unlockProductSave(productId);
     return true;
   }
@@ -3099,6 +3145,41 @@ document.addEventListener('DOMContentLoaded', () => {
       setAdminImageFeedback('', selector);
       showToast(error.message || 'Essa imagem nao pode ser usada. Tente outra foto.', 'error');
     }
+  }
+
+  function renderSavedImagePreview(preview, image = '', version = '', options = {}) {
+    if (!preview) return;
+    const src = adminImageRenderSrc(image, version);
+    preview.classList.remove('hidden');
+    if (!src) {
+      preview.innerHTML = `
+        <i class="fa-solid fa-image" aria-hidden="true"></i>
+        <span>${escapeHTML(options.emptyText || 'Sem imagem salva.')}</span>
+      `;
+      return;
+    }
+    preview.innerHTML = `
+      <img src="${escapeHTML(src)}" alt="${escapeHTML(options.alt || 'Imagem salva')}" loading="lazy" decoding="async">
+      <span>${escapeHTML(options.savedText || 'Imagem salva no banco.')}</span>
+    `;
+  }
+
+  function renderSavedProductImagePreview(productId, image = '', version = '') {
+    const preview = qs(`[data-admin-edit-image-preview="${escapeSelector(productId)}"]`);
+    renderSavedImagePreview(preview, image, version, {
+      alt: 'Imagem principal salva',
+      savedText: 'Imagem principal salva no banco.',
+      emptyText: 'Produto sem imagem principal salva.',
+    });
+  }
+
+  function renderSavedVariationImagePreview(variationId, image = '', version = '') {
+    const preview = qs(`[data-admin-variation-image-preview="${escapeSelector(variationId)}"]`);
+    renderSavedImagePreview(preview, image, version, {
+      alt: 'Imagem da variacao salva',
+      savedText: 'Imagem da variacao salva no banco.',
+      emptyText: 'Variacao sem imagem salva.',
+    });
   }
 
   function selectedCreateProductImageFile() {
@@ -3962,9 +4043,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const save = event.target.closest('[data-admin-product-save]');
       if (save) {
-        salvarEdicaoProduto(save.dataset.adminProductSave).then((saved) => {
-          if (saved) closeProductEditor();
-        });
+        salvarEdicaoProduto(save.dataset.adminProductSave);
         return;
       }
 
