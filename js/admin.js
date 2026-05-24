@@ -17,11 +17,56 @@ document.addEventListener('DOMContentLoaded', () => {
     developer: 'Desenvolvedor',
   };
   const ADMIN_ROLE_PERMISSIONS = {
-    cliente: { panel: false, orders: false, products: false, deliveries: false, finance: false, config: false, team: false, developer: false },
-    equipe: { panel: true, orders: true, products: true, deliveries: true, finance: false, config: false, team: false, developer: false },
-    motoboy: { panel: true, orders: false, products: false, deliveries: true, finance: false, config: false, team: false, developer: false },
-    admin: { panel: true, orders: true, products: true, deliveries: true, finance: true, config: true, team: true, developer: false },
-    developer: { panel: true, orders: true, products: true, deliveries: true, finance: true, config: true, team: true, developer: true },
+    cliente: {
+      panel: false,
+      orders: false,
+      products: false,
+      deliveries: false,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    equipe: {
+      panel: true,
+      orders: true,
+      products: true,
+      deliveries: true,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    motoboy: {
+      panel: true,
+      orders: false,
+      products: false,
+      deliveries: true,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    admin: {
+      panel: true,
+      orders: true,
+      products: true,
+      deliveries: true,
+      finance: true,
+      config: true,
+      team: true,
+      developer: false,
+    },
+    developer: {
+      panel: true,
+      orders: true,
+      products: true,
+      deliveries: true,
+      finance: true,
+      config: true,
+      team: true,
+      developer: true,
+    },
   };
   const ORDER_STATUS = {
     pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
@@ -96,6 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+  // Lightweight safe helper to set text content. Some admin pages load only admin.js
+  // so we define a minimal `setText` here to avoid runtime errors when `script.js` is not present.
+  function setText(selectorOrEl, value) {
+    try {
+      const el = typeof selectorOrEl === 'string' ? qs(selectorOrEl) : selectorOrEl;
+      if (!el) return;
+      if ('textContent' in el) el.textContent = String(value ?? '');
+    } catch (e) {
+      /* noop - avoid breaking admin UI on missing elements */
+    }
+  }
   const text = (value) => String(value ?? '');
   const onlyDigits = (value) => text(value).replace(/\D/g, '');
   const normalize = (value) =>
@@ -433,7 +489,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function firstAllowedTab() {
-    return ['pedidos', 'produtos', 'entregas', 'perfil', 'financeiro', 'config'].find((tab) => canAccessTab(tab)) || 'perfil';
+    return (
+      ['pedidos', 'produtos', 'entregas', 'perfil', 'financeiro', 'config'].find((tab) => canAccessTab(tab)) || 'perfil'
+    );
   }
 
   function isDeveloperAdmin() {
@@ -479,7 +537,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!user?.id || !isUuid(user.id)) {
       setAccessState(
         'Acesso restrito',
-        user?.id ? 'Sessao invalida. Entre novamente para acessar o painel.' : 'Entre com uma conta autorizada para acessar o painel.',
+        user?.id
+          ? 'Sessao invalida. Entre novamente para acessar o painel.'
+          : 'Entre com uma conta autorizada para acessar o painel.',
         { icon: 'right-to-bracket', login: true },
       );
       return false;
@@ -598,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderizarPedidosAdmin(state.pedidos);
   }
 
-
   function unreadAdminOrders(pedidos = state.pedidos) {
     const list = pedidos || [];
     const unconfirmed = list.filter((order) => order.confirmado === false);
@@ -681,7 +740,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Object.prototype.hasOwnProperty.call(payload, 'ativo') && payload.ativo === false && previous.ativo !== false) {
       actions.add('produto_desativado');
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'estoque') && Number(payload.estoque) !== Number(previous.estoque)) {
+    if (
+      Object.prototype.hasOwnProperty.call(payload, 'estoque') &&
+      Number(payload.estoque) !== Number(previous.estoque)
+    ) {
       actions.add('estoque_alterado');
     }
     if (
@@ -939,9 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const query = adminSearchQuery('#admin-order-search');
     const archivedCount = pedidos.filter((order) => order.archivedAt).length;
     const activeCount = pedidos.length - archivedCount;
-    const byArchive = pedidos.filter((order) =>
-      state.orderView === 'history' ? order.archivedAt : !order.archivedAt,
-    );
+    const byArchive = pedidos.filter((order) => (state.orderView === 'history' ? order.archivedAt : !order.archivedAt));
     const visiblePedidos = query ? byArchive.filter((order) => orderMatchesSearch(order, query)) : byArchive;
     const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
     const activeConfig = ORDER_STATUS[activeStatus];
@@ -1198,7 +1258,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     if (!api || !pedidoId) return false;
     if (!ordersArchiveReady) {
-      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.');
+      setDatabaseAlert(
+        'Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.',
+      );
       showToast('Aplique a migracao da etapa 7 para arquivar pedidos.', 'error');
       return false;
     }
@@ -1268,7 +1330,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     state.pedidos = state.pedidos.map((order) =>
-      String(order.id) === String(pedidoId) ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' } : order,
+      String(order.id) === String(pedidoId)
+        ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' }
+        : order,
     );
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
@@ -1334,7 +1398,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (error) {
       if (isMissingVariationTableError(error)) {
         const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-        if (message.includes('preco_promocional') || message.includes('oferta_ativa') || message.includes('oferta_inicio') || message.includes('oferta_fim') || message.includes('estoque_minimo')) {
+        if (
+          message.includes('preco_promocional') ||
+          message.includes('oferta_ativa') ||
+          message.includes('oferta_inicio') ||
+          message.includes('oferta_fim') ||
+          message.includes('estoque_minimo')
+        ) {
           variationsExtendedReady = false;
           setDatabaseAlert(
             'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar oferta formal por opcao.',
@@ -1913,19 +1983,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const offerActive = field('oferta_ativa')?.value === 'true';
       payload.oferta_ativa = offerActive;
       payload.preco_promocional = offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null;
-      payload.oferta_inicio = offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null;
+      payload.oferta_inicio = offerActive
+        ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString()
+        : null;
       payload.oferta_fim = offerActive ? isoFromLocal(field('oferta_fim')?.value) : null;
     }
     return payload;
   }
 
   function setVariationBusy(variationId, busy) {
-    qsa(`[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-toggle="${escapeSelector(variationId)}"]`).forEach(
-      (button) => {
-        button.disabled = busy;
-        button.classList.toggle('is-loading', busy);
-      },
-    );
+    qsa(
+      `[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-toggle="${escapeSelector(variationId)}"]`,
+    ).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
   }
 
   function setVariationAddBusy(productId, busy) {
@@ -1975,7 +2047,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').update(payload).eq('id', variationId).select('id, imagem').maybeSingle();
+    const { data, error } = await api
+      .from('produto_variacoes')
+      .update(payload)
+      .eq('id', variationId)
+      .select('id, imagem')
+      .maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
 
@@ -1983,17 +2060,24 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(
         friendlyDbError(
           error,
-          payload.imagem ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.' : 'Nao consegui salvar a variacao.',
+          payload.imagem
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.'
+            : 'Nao consegui salvar a variacao.',
         ),
         'error',
       );
       return false;
     }
 
-    await logAdminAction(override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada', 'produto_variacao', variationId, {
-      produto_id: productId,
-      nome: payload.nome,
-    });
+    await logAdminAction(
+      override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada',
+      'produto_variacao',
+      variationId,
+      {
+        produto_id: productId,
+        nome: payload.nome,
+      },
+    );
     showToast(override?.ativo === false ? 'Variacao desativada.' : 'Variacao salva.', 'success');
     await refreshProductEditor(productId);
     return true;
@@ -2142,36 +2226,43 @@ document.addEventListener('DOMContentLoaded', () => {
         .select('id, imagem')
         .maybeSingle());
 
-    if (error || !data) {
-      const rpc = await rpcAtualizarProduto(productId, payload);
-      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-      error = rpc.error;
-    }
+      if (error || !data) {
+        const rpc = await rpcAtualizarProduto(productId, payload);
+        data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+        error = rpc.error;
+      }
 
-    if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
-      productsExtendedReady = false;
-      setDatabaseAlert(
-        'Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.',
-      );
-      const basePayload = {
-        nome: payload.nome,
-        preco: payload.preco,
-        categoria: payload.categoria,
-        imagem: payload.imagem,
-        descricao: payload.descricao,
-        ativo: payload.ativo,
-      };
-      if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
-      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id, imagem').maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-    }
+      if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
+        productsExtendedReady = false;
+        setDatabaseAlert(
+          'Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.',
+        );
+        const basePayload = {
+          nome: payload.nome,
+          preco: payload.preco,
+          categoria: payload.categoria,
+          imagem: payload.imagem,
+          descricao: payload.descricao,
+          ativo: payload.ativo,
+        };
+        if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
+        const fallback = await api
+          .from('produtos')
+          .update(basePayload)
+          .eq('id', productId)
+          .select('id, imagem')
+          .maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+      }
     } catch (requestError) {
       unlockProductSave(productId);
       showToast(
         friendlyDbError(
           requestError,
-          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+          uploadedImage
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.'
+            : 'Nao consegui alterar o produto.',
         ),
         'error',
       );
@@ -2183,14 +2274,18 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(
         friendlyDbError(
           error,
-          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+          uploadedImage
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.'
+            : 'Nao consegui alterar o produto.',
         ),
         'error',
       );
       return false;
     }
 
-    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product));
+    state.produtos = state.produtos.map((product) =>
+      product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product,
+    );
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
     if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
@@ -2267,7 +2362,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function ensureSafeProductImageValue(value = '') {
     const image = text(value).trim();
     if (/^data:/i.test(image)) {
-      throw new Error('Imagem em base64/DataURL nao pode ser salva no produto. Envie a imagem pelo Storage ou use uma URL.');
+      throw new Error(
+        'Imagem em base64/DataURL nao pode ser salva no produto. Envie a imagem pelo Storage ou use uma URL.',
+      );
     }
     return image;
   }
@@ -2351,7 +2448,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ...details,
     };
     const prefix = uploadLogPrefix(stage, details.context || '');
-    const isErrorStage = /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
+    const isErrorStage =
+      /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
     if (!isErrorStage) return;
     if (console.groupCollapsed) {
       console.groupCollapsed(`${prefix} ${stage}`);
@@ -2556,7 +2654,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!bestBlob) throw new Error('Nao consegui comprimir essa imagem.');
       if (bestBlob.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
-        throw new Error('A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.');
+        throw new Error(
+          'A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.',
+        );
       }
       const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
       return new File([bestBlob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
@@ -2974,7 +3074,8 @@ document.addEventListener('DOMContentLoaded', () => {
         current.quantidade += quantity;
         current.valor += total;
         current.pedidos.add(order.id);
-        current.ultima = !current.ultima || new Date(order.created_at) > new Date(current.ultima) ? order.created_at : current.ultima;
+        current.ultima =
+          !current.ultima || new Date(order.created_at) > new Date(current.ultima) ? order.created_at : current.ultima;
         map.set(key, current);
       });
     });
@@ -3023,7 +3124,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pedidos = state.pedidos.filter((order) => orderInFinancePeriod(order, period));
     const total = pedidos.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pagos = pedidos.filter((order) => normalize(order.pagamento_status) === 'pago');
-    const cancelados = pedidos.filter((order) => normalize(order.status).includes('cancel') || normalize(order.pagamento_status) === 'cancelado');
+    const cancelados = pedidos.filter(
+      (order) => normalize(order.status).includes('cancel') || normalize(order.pagamento_status) === 'cancelado',
+    );
     const ticket = pedidos.length ? total / pedidos.length : 0;
     const itemRows = aggregateOrderItems(pedidos);
     renderMetric('#admin-finance-metrics', [
@@ -3695,7 +3798,9 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('Aplique a migracao da etapa 7 para usar oferta por opcao.', 'error');
           return;
         }
-        const variation = state.variacoes.find((item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24));
+        const variation = state.variacoes.find(
+          (item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24),
+        );
         const price = Number(variation?.preco || 0);
         salvarVariacaoAdmin(variationOffer24.dataset.adminVariationOffer24, variationOffer24.dataset.productId, {
           oferta_ativa: true,
@@ -3815,9 +3920,13 @@ document.addEventListener('DOMContentLoaded', () => {
       assinarPedidosRealtime();
     } catch (error) {
       console.error('[Admin] Falha ao iniciar painel.', error);
-      setAccessState('Painel indisponível', 'Não consegui iniciar o painel agora. Atualize a página e tente novamente.', {
-        icon: 'triangle-exclamation',
-      });
+      setAccessState(
+        'Painel indisponível',
+        'Não consegui iniciar o painel agora. Atualize a página e tente novamente.',
+        {
+          icon: 'triangle-exclamation',
+        },
+      );
       showToast('Nao consegui iniciar o painel.', 'error');
     }
   }
