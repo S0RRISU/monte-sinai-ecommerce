@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = sessionData?.user;
       if (!user?.id || !isUuid(user.id)) return null;
 
-      const { data: rpcData, error } = await api.rpc('app_current_profile');
+      const { data: rpcData, error } = await api.rpc('app_current_profile', {});
       if (error) {
         console.warn('[Admin] app_current_profile falhou.', error);
         return null;

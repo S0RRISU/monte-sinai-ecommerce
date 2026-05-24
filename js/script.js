@@ -1837,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (typeof client.rpc !== 'function') return null;
-      const { data: rpcData, error } = await client.rpc('app_current_profile');
+      const { data: rpcData, error } = await client.rpc('app_current_profile', {});
       if (error) {
         console.warn('[Supabase] app_current_profile falhou. Link admin sera ocultado.', error);
         return null;
