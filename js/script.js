@@ -4713,7 +4713,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const priceEl = card.querySelector('[data-product-price-display]') || card.querySelector('strong');
     const stockLine = card.querySelector('.product-stock-line');
     const button = card.querySelector('.btn-add-cart');
-    const imageEl = card.querySelector('.product-image');
+    const imageEl =
+      card.querySelector('.product-image') ||
+      card.closest('#catalog-detail-modal')?.querySelector('.catalog-detail-media .product-image');
     const availabilityNote = card.querySelector('.catalog-availability-note');
     const statusBadge = card.querySelector('.catalog-status-badge:not(.is-offer):not(.is-kit)');
     const productCard = card.classList.contains('product-card') ? card : card.closest('.product-card');
