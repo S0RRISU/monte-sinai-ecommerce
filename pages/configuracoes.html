@@ -1,272 +1,349 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp.">
-  <meta name="theme-color" content="#00061f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="color-scheme" content="dark light">
-  <meta name="robots" content="noindex, nofollow">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Configurações | Monte Sinai">
-  <meta property="og:description" content="Ajuste preferências do site Monte Sinai para comprar com mais conforto.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <title>Configurações | Monte Sinai</title>
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260523-15">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
-</head>
-<body>
-  <header class="navbar">
-    <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
-      </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta
+      name="description"
+      content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp."
+    />
+    <meta name="theme-color" content="#00061f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Monte Sinai" />
+    <meta property="og:title" content="Configurações | Monte Sinai" />
+    <meta property="og:description" content="Ajuste preferências do site Monte Sinai para comprar com mais conforto." />
+    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <title>Configurações | Monte Sinai</title>
+    <link rel="manifest" href="../site.webmanifest" />
+    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
+    <link rel="stylesheet" href="../css/style.css?v=20260523-15" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase.js?v=20260520-4"></script>
+    <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container nav-inner">
+        <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+          <img
+            class="brand-logo"
+            src="../assets/brand/v2/monte-sinai-logo-v2.png"
+            alt="Monte Sinai"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </a>
+        <nav class="nav-menu" aria-label="Navegação principal">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </nav>
+        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="mobile-menu">
+      <a href="../index.html">Início</a>
+      <a href="produtos.html">Produtos</a>
+      <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="sobre.html">Sobre</a>
+      <a href="contato.html">Contato</a>
     </div>
-  </header>
 
-  <div class="mobile-menu">
-    <a href="../index.html">Início</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-    <a href="contato.html">Contato</a>
-  </div>
+    <main>
+      <section class="hero hero-small container">
+        <div class="hero-copy">
+          <span class="eyebrow">Personalize sua experiência</span>
+          <h1>Configurações do site</h1>
+          <p>
+            Controle aparência, preferências locais, dados do carrinho e sugestões para melhorar o atendimento da Monte
+            Sinai.
+          </p>
+        </div>
+      </section>
 
-  <main>
-    <section class="hero hero-small container">
-      <div class="hero-copy">
-        <span class="eyebrow">Personalize sua experiência</span>
-        <h1>Configurações do site</h1>
-        <p>Controle aparência, preferências locais, dados do carrinho e sugestões para melhorar o atendimento da Monte Sinai.</p>
-      </div>
-    </section>
+      <section class="section container settings-page">
+        <div class="settings-section appearance-settings">
+          <div class="settings-section-head">
+            <h2><i class="fa-solid fa-palette"></i> Aparência</h2>
+            <p>Escolha o visual que combina com o ambiente ou deixe o site seguir o padrão do seu dispositivo.</p>
+          </div>
 
-    <section class="section container settings-page">
-      <div class="settings-section appearance-settings">
-        <div class="settings-section-head">
-          <h2><i class="fa-solid fa-palette"></i> Aparência</h2>
-          <p>Escolha o visual que combina com o ambiente ou deixe o site seguir o padrão do seu dispositivo.</p>
-        </div>
-
-        <div class="theme-mode-grid" role="radiogroup" aria-label="Tema do site">
-          <button class="theme-choice" type="button" role="radio" data-theme-choice="system" aria-label="Usar padrão do dispositivo" aria-checked="false">
-            <span class="theme-choice-icon"><i class="fa-solid fa-mobile-screen-button"></i></span>
-            <span class="theme-choice-copy">
-              <strong>Sistema</strong>
-              <small>Do aparelho</small>
-            </span>
-          </button>
-          <button class="theme-choice" type="button" role="radio" data-theme-choice="light" aria-label="Usar modo claro" aria-checked="false">
-            <span class="theme-choice-icon"><i class="fa-solid fa-sun"></i></span>
-            <span class="theme-choice-copy">
-              <strong>Claro</strong>
-              <small>Modo dia</small>
-            </span>
-          </button>
-          <button class="theme-choice" type="button" role="radio" data-theme-choice="dark" aria-label="Usar modo noturno" aria-checked="false">
-            <span class="theme-choice-icon"><i class="fa-solid fa-moon"></i></span>
-            <span class="theme-choice-copy">
-              <strong>Noturno</strong>
-              <small>Modo noite</small>
-            </span>
-          </button>
-        </div>
-
-        <div class="theme-current-card">
-          <div>
-            <div class="settings-item-title">Tema atual</div>
-            <div class="settings-item-desc" id="theme-current">Seguindo o dispositivo</div>
-          </div>
-          <span class="badge theme-badge" id="theme-preview">Sistema</span>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2><i class="fa-solid fa-bell"></i> Notificações</h2>
-        <div class="settings-item">
-          <div>
-            <div class="settings-item-title">Atualizações de pedidos</div>
-            <div class="settings-item-desc">Salva sua preferência local para receber avisos sobre andamento de pedidos.</div>
-          </div>
-          <button class="toggle-switch active" type="button" data-setting-toggle="orders" aria-label="Alternar notificações de pedidos" aria-pressed="true"></button>
-        </div>
-        <div class="settings-item">
-          <div>
-            <div class="settings-item-title">Ofertas e novidades</div>
-            <div class="settings-item-desc">Mostra sua preferência para promoções e produtos em destaque.</div>
-          </div>
-          <button class="toggle-switch" type="button" data-setting-toggle="offers" aria-label="Alternar notificações de ofertas" aria-pressed="false"></button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2><i class="fa-solid fa-circle-info"></i> Sobre a Monte Sinai</h2>
-        <p>A Monte Sinai entrega água, gás e produtos de limpeza com atendimento local, carrinho simples e finalização direta pelo WhatsApp.</p>
-        <div class="settings-grid">
-          <div class="about-highlight">
-            <i class="fa-solid fa-truck-fast"></i>
-            <div>
-              <h3>Entrega rápida</h3>
-              <p>Pedidos essenciais atendidos com foco em agilidade.</p>
-            </div>
-          </div>
-          <div class="about-highlight">
-            <i class="fa-solid fa-shield-halved"></i>
-            <div>
-              <h3>Atendimento confiável</h3>
-              <p>Lista do pedido enviada com itens, quantidades e total.</p>
-            </div>
-          </div>
-          <div class="about-highlight">
-            <i class="fa-solid fa-headset"></i>
-            <div>
-              <h3>Suporte direto</h3>
-              <p>Contato pelo WhatsApp para dúvidas, pedidos e confirmação.</p>
-            </div>
-          </div>
-        </div>
-        <div class="settings-card-list">
-          <div class="feature-item"><i class="fa-solid fa-check"></i><span>Compra online simples no celular e no computador.</span></div>
-          <div class="feature-item"><i class="fa-solid fa-check"></i><span>Água mineral 20L e gás P13 em destaque no catálogo.</span></div>
-          <div class="feature-item"><i class="fa-solid fa-check"></i><span>Carrinho salvo no navegador para não perder o pedido.</span></div>
-          <div class="feature-item"><i class="fa-solid fa-check"></i><span>Contato principal: (11) 96092-8234.</span></div>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2><i class="fa-solid fa-lightbulb"></i> Envie uma sugestão</h2>
-        <p>Compartilhe ideias, melhorias ou problemas. A mensagem é aberta no WhatsApp para continuar o atendimento.</p>
-        <div class="feedback-success" id="feedback-success">
-          <i class="fa-solid fa-check-circle"></i>
-          <span>Sugestão preparada com sucesso.</span>
-        </div>
-        <form class="feedback-form" id="feedback-form">
-          <div class="form-group">
-            <label for="feedback-name">Seu nome</label>
-            <input id="feedback-name" name="name" type="text" placeholder="Digite seu nome" required>
-          </div>
-          <div class="form-group">
-            <label for="feedback-contact">Email ou WhatsApp</label>
-            <input id="feedback-contact" name="contact" type="text" placeholder="(11) 99999-9999 ou email" required>
-          </div>
-          <div class="form-group">
-            <label for="feedback-category">Categoria</label>
-            <select id="feedback-category" name="category" required>
-              <option value="">Selecione uma categoria</option>
-              <option value="Melhoria">Melhoria</option>
-              <option value="Produto">Produto</option>
-              <option value="Problema">Problema</option>
-              <option value="Atendimento">Atendimento</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="feedback-message">Mensagem</label>
-            <textarea id="feedback-message" name="message" placeholder="Escreva sua sugestão" maxlength="500" required></textarea>
-            <div class="form-help-text">Máximo 500 caracteres.</div>
-          </div>
-          <div class="settings-actions">
-            <button class="btn btn-secondary" type="button" data-reset-feedback>Cancelar</button>
-            <button class="btn btn-primary" type="submit">
-              <i class="fa-solid fa-paper-plane"></i>
-              Enviar sugestão
+          <div class="theme-mode-grid" role="radiogroup" aria-label="Tema do site">
+            <button
+              class="theme-choice"
+              type="button"
+              role="radio"
+              data-theme-choice="system"
+              aria-label="Usar padrão do dispositivo"
+              aria-checked="false"
+            >
+              <span class="theme-choice-icon"><i class="fa-solid fa-mobile-screen-button"></i></span>
+              <span class="theme-choice-copy">
+                <strong>Sistema</strong>
+                <small>Do aparelho</small>
+              </span>
+            </button>
+            <button
+              class="theme-choice"
+              type="button"
+              role="radio"
+              data-theme-choice="light"
+              aria-label="Usar modo claro"
+              aria-checked="false"
+            >
+              <span class="theme-choice-icon"><i class="fa-solid fa-sun"></i></span>
+              <span class="theme-choice-copy">
+                <strong>Claro</strong>
+                <small>Modo dia</small>
+              </span>
+            </button>
+            <button
+              class="theme-choice"
+              type="button"
+              role="radio"
+              data-theme-choice="dark"
+              aria-label="Usar modo noturno"
+              aria-checked="false"
+            >
+              <span class="theme-choice-icon"><i class="fa-solid fa-moon"></i></span>
+              <span class="theme-choice-copy">
+                <strong>Noturno</strong>
+                <small>Modo noite</small>
+              </span>
             </button>
           </div>
-        </form>
-      </div>
 
-      <div class="settings-section" id="controle-dados">
-        <h2><i class="fa-solid fa-box-list"></i> Controle de pedidos</h2>
-        <p>Visualize e atualize o status dos pedidos registrados neste navegador.</p>
-        <div class="settings-actions data-clean-actions">
-          <button class="btn btn-secondary" type="button" data-clear-cart>
-            <i class="fa-solid fa-trash-can"></i>
-            Limpar carrinho
-          </button>
-          <button class="btn btn-secondary" type="button" data-clear-cache>
-            <i class="fa-solid fa-broom"></i>
-            Limpar cache
-          </button>
-          <button class="btn btn-secondary" type="button" data-clear-order-history>
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            Limpar histórico de pedidos
-          </button>
-          <button class="btn btn-primary" type="button" data-clear-cache-orders>
-            <i class="fa-solid fa-shield-halved"></i>
-            Limpar cache e histórico
-          </button>
+          <div class="theme-current-card">
+            <div>
+              <div class="settings-item-title">Tema atual</div>
+              <div class="settings-item-desc" id="theme-current">Seguindo o dispositivo</div>
+            </div>
+            <span class="badge theme-badge" id="theme-preview">Sistema</span>
+          </div>
         </div>
-        <div id="settings-orders" data-orders-container></div>
-      </div>
 
-      <div class="settings-section">
-        <h2><i class="fa-solid fa-code-branch"></i> Versão</h2>
-        <p>Monte Sinai v4.0, com vitrine 3D, login local, checkout na entrega, painel do lojista e navegação premium.</p>
-        <div class="settings-actions">
-          <a class="btn btn-secondary" href="https://wa.me/5511960928234" target="_blank" rel="noreferrer">
-            <i class="fa-brands fa-whatsapp"></i>
-            WhatsApp
-          </a>
-          <a class="btn btn-secondary" href="mailto:contato@montesinai.com.br">
-            <i class="fa-solid fa-envelope"></i>
-            Email
-          </a>
+        <div class="settings-section">
+          <h2><i class="fa-solid fa-bell"></i> Notificações</h2>
+          <div class="settings-item">
+            <div>
+              <div class="settings-item-title">Atualizações de pedidos</div>
+              <div class="settings-item-desc">
+                Salva sua preferência local para receber avisos sobre andamento de pedidos.
+              </div>
+            </div>
+            <button
+              class="toggle-switch active"
+              type="button"
+              data-setting-toggle="orders"
+              aria-label="Alternar notificações de pedidos"
+              aria-pressed="true"
+            ></button>
+          </div>
+          <div class="settings-item">
+            <div>
+              <div class="settings-item-title">Ofertas e novidades</div>
+              <div class="settings-item-desc">Mostra sua preferência para promoções e produtos em destaque.</div>
+            </div>
+            <button
+              class="toggle-switch"
+              type="button"
+              data-setting-toggle="offers"
+              aria-label="Alternar notificações de ofertas"
+              aria-pressed="false"
+            ></button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2><i class="fa-solid fa-circle-info"></i> Sobre a Monte Sinai</h2>
+          <p>
+            A Monte Sinai entrega água, gás e produtos de limpeza com atendimento local, carrinho simples e finalização
+            direta pelo WhatsApp.
+          </p>
+          <div class="settings-grid">
+            <div class="about-highlight">
+              <i class="fa-solid fa-truck-fast"></i>
+              <div>
+                <h3>Entrega rápida</h3>
+                <p>Pedidos essenciais atendidos com foco em agilidade.</p>
+              </div>
+            </div>
+            <div class="about-highlight">
+              <i class="fa-solid fa-shield-halved"></i>
+              <div>
+                <h3>Atendimento confiável</h3>
+                <p>Lista do pedido enviada com itens, quantidades e total.</p>
+              </div>
+            </div>
+            <div class="about-highlight">
+              <i class="fa-solid fa-headset"></i>
+              <div>
+                <h3>Suporte direto</h3>
+                <p>Contato pelo WhatsApp para dúvidas, pedidos e confirmação.</p>
+              </div>
+            </div>
+          </div>
+          <div class="settings-card-list">
+            <div class="feature-item">
+              <i class="fa-solid fa-check"></i><span>Compra online simples no celular e no computador.</span>
+            </div>
+            <div class="feature-item">
+              <i class="fa-solid fa-check"></i><span>Água mineral 20L e gás P13 em destaque no catálogo.</span>
+            </div>
+            <div class="feature-item">
+              <i class="fa-solid fa-check"></i><span>Carrinho salvo no navegador para não perder o pedido.</span>
+            </div>
+            <div class="feature-item">
+              <i class="fa-solid fa-check"></i><span>Contato principal: (11) 96092-8234.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2><i class="fa-solid fa-lightbulb"></i> Envie uma sugestão</h2>
+          <p>
+            Compartilhe ideias, melhorias ou problemas. A mensagem é aberta no WhatsApp para continuar o atendimento.
+          </p>
+          <div class="feedback-success" id="feedback-success">
+            <i class="fa-solid fa-check-circle"></i>
+            <span>Sugestão preparada com sucesso.</span>
+          </div>
+          <form class="feedback-form" id="feedback-form">
+            <div class="form-group">
+              <label for="feedback-name">Seu nome</label>
+              <input id="feedback-name" name="name" type="text" placeholder="Digite seu nome" required />
+            </div>
+            <div class="form-group">
+              <label for="feedback-contact">Email ou WhatsApp</label>
+              <input id="feedback-contact" name="contact" type="text" placeholder="(11) 99999-9999 ou email" required />
+            </div>
+            <div class="form-group">
+              <label for="feedback-category">Categoria</label>
+              <select id="feedback-category" name="category" required>
+                <option value="">Selecione uma categoria</option>
+                <option value="Melhoria">Melhoria</option>
+                <option value="Produto">Produto</option>
+                <option value="Problema">Problema</option>
+                <option value="Atendimento">Atendimento</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="feedback-message">Mensagem</label>
+              <textarea
+                id="feedback-message"
+                name="message"
+                placeholder="Escreva sua sugestão"
+                maxlength="500"
+                required
+              ></textarea>
+              <div class="form-help-text">Máximo 500 caracteres.</div>
+            </div>
+            <div class="settings-actions">
+              <button class="btn btn-secondary" type="button" data-reset-feedback>Cancelar</button>
+              <button class="btn btn-primary" type="submit">
+                <i class="fa-solid fa-paper-plane"></i>
+                Enviar sugestão
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="settings-section" id="controle-dados">
+          <h2><i class="fa-solid fa-box-list"></i> Controle de pedidos</h2>
+          <p>Visualize e atualize o status dos pedidos registrados neste navegador.</p>
+          <div class="settings-actions data-clean-actions">
+            <button class="btn btn-secondary" type="button" data-clear-cart>
+              <i class="fa-solid fa-trash-can"></i>
+              Limpar carrinho
+            </button>
+            <button class="btn btn-secondary" type="button" data-clear-cache>
+              <i class="fa-solid fa-broom"></i>
+              Limpar cache
+            </button>
+            <button class="btn btn-secondary" type="button" data-clear-order-history>
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              Limpar histórico de pedidos
+            </button>
+            <button class="btn btn-primary" type="button" data-clear-cache-orders>
+              <i class="fa-solid fa-shield-halved"></i>
+              Limpar cache e histórico
+            </button>
+          </div>
+          <div id="settings-orders" data-orders-container></div>
+        </div>
+
+        <div class="settings-section">
+          <h2><i class="fa-solid fa-code-branch"></i> Versão</h2>
+          <p>
+            Monte Sinai v4.0, com vitrine 3D, login local, checkout na entrega, painel do lojista e navegação premium.
+          </p>
+          <div class="settings-actions">
+            <a class="btn btn-secondary" href="https://wa.me/5511960928234" target="_blank" rel="noreferrer">
+              <i class="fa-brands fa-whatsapp"></i>
+              WhatsApp
+            </a>
+            <a class="btn btn-secondary" href="mailto:contato@montesinai.com.br">
+              <i class="fa-solid fa-envelope"></i>
+              Email
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <div>
+          <h3>Monte Sinai</h3>
+          <p>Água, gás e produtos de limpeza para sua casa.</p>
+        </div>
+        <div class="footer-links">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </div>
+        <div class="footer-social">
+          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
         </div>
       </div>
-    </section>
-  </main>
+      <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
+    </footer>
 
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <h3>Monte Sinai</h3>
-        <p>Água, gás e produtos de limpeza para sua casa.</p>
-      </div>
-      <div class="footer-links">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </div>
-      <div class="footer-social">
-        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-      </div>
-    </div>
-    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-  </footer>
-
-  <a class="whatsapp-float" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento" target="_blank" rel="noreferrer">
-    <i class="fa-brands fa-whatsapp"></i>
-    <span>WhatsApp</span>
-  </a>
-</body>
+    <a
+      class="whatsapp-float"
+      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class="fa-brands fa-whatsapp"></i>
+      <span>WhatsApp</span>
+    </a>
+  </body>
 </html>

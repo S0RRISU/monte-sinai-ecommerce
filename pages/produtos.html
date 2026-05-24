@@ -1,138 +1,162 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Catálogo Monte Sinai com água mineral, gás de cozinha, limpeza, lavanderia, higiene e utensílios para compra rápida.">
-  <meta name="theme-color" content="#00061f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="color-scheme" content="dark light">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <link rel="canonical" href="https://monte-sinai.netlify.app/produtos">
-  <meta property="og:url" content="https://monte-sinai.netlify.app/produtos">
-  <meta property="og:locale" content="pt_BR">
-  <meta property="og:image:secure_url" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <meta property="og:image:alt" content="Monte Sinai - água, gás e produtos de limpeza">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Produtos | Monte Sinai">
-  <meta name="twitter:description" content="Catálogo Monte Sinai com água mineral, gás de cozinha, limpeza, lavanderia, higiene e utensilios para compra rápida.">
-  <meta name="twitter:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Produtos | Monte Sinai">
-  <meta property="og:description" content="Escolha produtos, filtre por categoria e finalize pelo carrinho da Monte Sinai.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <title>Produtos | Monte Sinai</title>
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260523-15">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
-</head>
-<body>
-  <header class="navbar">
-    <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
-      </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta
+      name="description"
+      content="Catálogo Monte Sinai com água mineral, gás de cozinha, limpeza, lavanderia, higiene e utensílios para compra rápida."
+    />
+    <meta name="theme-color" content="#00061f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://monte-sinai.netlify.app/produtos" />
+    <meta property="og:url" content="https://monte-sinai.netlify.app/produtos" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:image:secure_url" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <meta property="og:image:alt" content="Monte Sinai - água, gás e produtos de limpeza" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Produtos | Monte Sinai" />
+    <meta
+      name="twitter:description"
+      content="Catálogo Monte Sinai com água mineral, gás de cozinha, limpeza, lavanderia, higiene e utensilios para compra rápida."
+    />
+    <meta name="twitter:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Monte Sinai" />
+    <meta property="og:title" content="Produtos | Monte Sinai" />
+    <meta
+      property="og:description"
+      content="Escolha produtos, filtre por categoria e finalize pelo carrinho da Monte Sinai."
+    />
+    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <title>Produtos | Monte Sinai</title>
+    <link rel="manifest" href="../site.webmanifest" />
+    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
+    <link rel="stylesheet" href="../css/style.css?v=20260523-15" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase.js?v=20260520-4"></script>
+    <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container nav-inner">
+        <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+          <img
+            class="brand-logo"
+            src="../assets/brand/v2/monte-sinai-logo-v2.png"
+            alt="Monte Sinai"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </a>
+        <nav class="nav-menu" aria-label="Navegação principal">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </nav>
+        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="mobile-menu">
+      <a href="../index.html">Início</a>
+      <a href="produtos.html">Produtos</a>
+      <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="sobre.html">Sobre</a>
+      <a href="contato.html">Contato</a>
     </div>
-  </header>
 
-  <div class="mobile-menu">
-    <a href="../index.html">Início</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-    <a href="contato.html">Contato</a>
-  </div>
+    <main class="container catalog-page products-store-page">
+      <section class="hero hero-small catalog-hero">
+        <div class="hero-copy">
+          <span class="eyebrow">Loja Monte Sinai</span>
+          <h1>Produtos para comprar</h1>
+          <p>Escolha por categoria, use a busca e adicione ao carrinho sem ver dados internos da loja.</p>
+          <div class="hero-actions">
+            <a class="btn btn-secondary" href="catalogo.html">
+              <i class="fa-solid fa-list"></i>
+              Cat&aacute;logo
+            </a>
+          </div>
+        </div>
+      </section>
 
-  <main class="container catalog-page products-store-page">
-    <section class="hero hero-small catalog-hero">
-      <div class="hero-copy">
-        <span class="eyebrow">Loja Monte Sinai</span>
-        <h1>Produtos para comprar</h1>
-        <p>Escolha por categoria, use a busca e adicione ao carrinho sem ver dados internos da loja.</p>
-        <div class="hero-actions">
-          <a class="btn btn-secondary" href="catalogo.html">
-            <i class="fa-solid fa-list"></i>
-            Cat&aacute;logo
-          </a>
+      <section class="section full-catalog-section" id="loja-produtos" aria-label="Produtos da loja">
+        <div class="full-catalog-toolbar">
+          <div class="full-catalog-filters" role="group" aria-label="Categorias de produtos">
+            <button class="active" type="button" data-full-catalog-filter="all">Todos</button>
+            <button type="button" data-full-catalog-filter="agua">&Aacute;gua</button>
+            <button type="button" data-full-catalog-filter="gas">G&aacute;s</button>
+            <button type="button" data-full-catalog-filter="limpeza">Limpeza</button>
+            <button type="button" data-full-catalog-filter="lavanderia">Lavanderia</button>
+            <button type="button" data-full-catalog-filter="higiene">Higiene</button>
+            <button type="button" data-full-catalog-filter="banheiro">Banheiro</button>
+            <button type="button" data-full-catalog-filter="cozinha">Cozinha</button>
+            <button type="button" data-full-catalog-filter="utensilios">Utens&iacute;lios</button>
+            <button type="button" data-full-catalog-filter="organizacao">Organiza&ccedil;&atilde;o</button>
+            <button type="button" data-full-catalog-filter="limpeza-pesada">Limpeza pesada</button>
+          </div>
+        </div>
+
+        <p class="catalog-results" data-full-catalog-results>Carregando produtos...</p>
+        <div class="full-catalog-list" data-full-catalog-list></div>
+        <p class="empty-cart hidden" data-full-catalog-empty>Nenhum produto encontrado neste filtro.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <div>
+          <h3>Monte Sinai</h3>
+          <p>Seu fornecedor de água, gás e produtos de limpeza.</p>
+        </div>
+        <div class="footer-links">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </div>
+        <div class="footer-social">
+          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
         </div>
       </div>
-    </section>
+      <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
+    </footer>
 
-    <section class="section full-catalog-section" id="loja-produtos" aria-label="Produtos da loja">
-      <div class="full-catalog-toolbar">
-        <div class="full-catalog-filters" role="group" aria-label="Categorias de produtos">
-          <button class="active" type="button" data-full-catalog-filter="all">Todos</button>
-          <button type="button" data-full-catalog-filter="agua">&Aacute;gua</button>
-          <button type="button" data-full-catalog-filter="gas">G&aacute;s</button>
-          <button type="button" data-full-catalog-filter="limpeza">Limpeza</button>
-          <button type="button" data-full-catalog-filter="lavanderia">Lavanderia</button>
-          <button type="button" data-full-catalog-filter="higiene">Higiene</button>
-          <button type="button" data-full-catalog-filter="banheiro">Banheiro</button>
-          <button type="button" data-full-catalog-filter="cozinha">Cozinha</button>
-          <button type="button" data-full-catalog-filter="utensilios">Utens&iacute;lios</button>
-          <button type="button" data-full-catalog-filter="organizacao">Organiza&ccedil;&atilde;o</button>
-          <button type="button" data-full-catalog-filter="limpeza-pesada">Limpeza pesada</button>
-        </div>
-      </div>
-
-      <p class="catalog-results" data-full-catalog-results>Carregando produtos...</p>
-      <div class="full-catalog-list" data-full-catalog-list></div>
-      <p class="empty-cart hidden" data-full-catalog-empty>Nenhum produto encontrado neste filtro.</p>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <h3>Monte Sinai</h3>
-        <p>Seu fornecedor de água, gás e produtos de limpeza.</p>
-      </div>
-      <div class="footer-links">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </div>
-      <div class="footer-social">
-        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-      </div>
-    </div>
-    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-  </footer>
-
-  <a class="whatsapp-float" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento" target="_blank" rel="noreferrer">
-    <i class="fa-brands fa-whatsapp"></i>
-    <span>WhatsApp</span>
-  </a>
-</body>
+    <a
+      class="whatsapp-float"
+      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class="fa-brands fa-whatsapp"></i>
+      <span>WhatsApp</span>
+    </a>
+  </body>
 </html>

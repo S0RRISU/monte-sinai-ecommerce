@@ -1,119 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Promoções Monte Sinai com ofertas de água, gás e produtos de limpeza por tempo limitado.">
-  <meta name="theme-color" content="#00061f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="color-scheme" content="dark light">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <link rel="canonical" href="https://monte-sinai.netlify.app/promocoes">
-  <meta property="og:url" content="https://monte-sinai.netlify.app/promocoes">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Promoções | Monte Sinai">
-  <meta property="og:description" content="Veja ofertas ativas da Monte Sinai e monte seu pedido pelo carrinho.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <title>Promoções | Monte Sinai</title>
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260523-15">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
-</head>
-<body>
-  <header class="navbar">
-    <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
-      </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="promocoes.html">Promoções</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta
+      name="description"
+      content="Promoções Monte Sinai com ofertas de água, gás e produtos de limpeza por tempo limitado."
+    />
+    <meta name="theme-color" content="#00061f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://monte-sinai.netlify.app/promocoes" />
+    <meta property="og:url" content="https://monte-sinai.netlify.app/promocoes" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Monte Sinai" />
+    <meta property="og:title" content="Promoções | Monte Sinai" />
+    <meta property="og:description" content="Veja ofertas ativas da Monte Sinai e monte seu pedido pelo carrinho." />
+    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <title>Promoções | Monte Sinai</title>
+    <link rel="manifest" href="../site.webmanifest" />
+    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
+    <link rel="stylesheet" href="../css/style.css?v=20260523-15" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase.js?v=20260520-4"></script>
+    <script defer src="../js/script.js?v=20260524-rbac-role-profile"></script>
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container nav-inner">
+        <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+          <img
+            class="brand-logo"
+            src="../assets/brand/v2/monte-sinai-logo-v2.png"
+            alt="Monte Sinai"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </a>
+        <nav class="nav-menu" aria-label="Navegação principal">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="promocoes.html">Promoções</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </nav>
+        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="mobile-menu">
+      <a href="../index.html">Início</a>
+      <a href="produtos.html">Produtos</a>
+      <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="promocoes.html">Promoções</a>
+      <a href="sobre.html">Sobre</a>
+      <a href="contato.html">Contato</a>
     </div>
-  </header>
 
-  <div class="mobile-menu">
-    <a href="../index.html">Início</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="promocoes.html">Promoções</a>
-    <a href="sobre.html">Sobre</a>
-    <a href="contato.html">Contato</a>
-  </div>
+    <main class="container promotions-page">
+      <section class="hero hero-small">
+        <div class="hero-copy">
+          <span class="eyebrow">Ofertas ativas</span>
+          <h1>Ofertas Monte Sinai</h1>
+          <p>Produtos com preço promocional aparecem aqui automaticamente quando a oferta estiver ativa no painel.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="catalogo.html">
+              <i class="fa-solid fa-list-check"></i>
+              Ver catálogo completo
+            </a>
+          </div>
+        </div>
+      </section>
 
-  <main class="container promotions-page">
-    <section class="hero hero-small">
-      <div class="hero-copy">
-        <span class="eyebrow">Ofertas ativas</span>
-        <h1>Ofertas Monte Sinai</h1>
-        <p>Produtos com preço promocional aparecem aqui automaticamente quando a oferta estiver ativa no painel.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="catalogo.html">
-            <i class="fa-solid fa-list-check"></i>
-            Ver catálogo completo
-          </a>
+      <section class="section">
+        <div class="section-head">
+          <span class="eyebrow"><span data-promotions-count>0</span> ofertas</span>
+          <h2>Produtos em oferta agora</h2>
+          <p>Adicione ao carrinho e finalize com sua conta para salvar o pedido no histórico.</p>
+        </div>
+        <div class="grid-produtos promotions-grid" data-promotions-grid></div>
+        <p id="promotions-empty" class="empty-cart">
+          Nenhuma promoção ativa agora. Volte em breve ou confira o catálogo completo.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <div>
+          <h3>Monte Sinai</h3>
+          <p>água, gás e produtos de limpeza para sua casa.</p>
+        </div>
+        <div class="footer-links">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="promocoes.html">Promoções</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </div>
+        <div class="footer-social">
+          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
         </div>
       </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <span class="eyebrow"><span data-promotions-count>0</span> ofertas</span>
-        <h2>Produtos em oferta agora</h2>
-        <p>Adicione ao carrinho e finalize com sua conta para salvar o pedido no histórico.</p>
-      </div>
-      <div class="grid-produtos promotions-grid" data-promotions-grid></div>
-      <p id="promotions-empty" class="empty-cart">Nenhuma promoção ativa agora. Volte em breve ou confira o catálogo completo.</p>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <h3>Monte Sinai</h3>
-        <p>água, gás e produtos de limpeza para sua casa.</p>
-      </div>
-      <div class="footer-links">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="promocoes.html">Promoções</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </div>
-      <div class="footer-social">
-        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-      </div>
-    </div>
-    <p class="footer-copy">&copy; 2026 Monte Sinai. Todos os direitos reservados.</p>
-  </footer>
-  <a class="whatsapp-float" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento" target="_blank" rel="noreferrer">
-    <i class="fa-brands fa-whatsapp"></i>
-    <span>WhatsApp</span>
-  </a>
-</body>
+      <p class="footer-copy">&copy; 2026 Monte Sinai. Todos os direitos reservados.</p>
+    </footer>
+    <a
+      class="whatsapp-float"
+      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class="fa-brands fa-whatsapp"></i>
+      <span>WhatsApp</span>
+    </a>
+  </body>
 </html>

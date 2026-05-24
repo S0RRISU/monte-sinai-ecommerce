@@ -174,7 +174,12 @@
             <div class="admin-alert admin-db-alert hidden" id="admin-db-alert" role="alert"></div>
 
             <div class="admin-orders-view-tabs" role="group" aria-label="Tela de pedidos">
-              <button class="admin-orders-view-tab active" type="button" data-admin-orders-view="active" aria-pressed="true">
+              <button
+                class="admin-orders-view-tab active"
+                type="button"
+                data-admin-orders-view="active"
+                aria-pressed="true"
+              >
                 <i class="fa-solid fa-list-check"></i>
                 <span>Pedidos ativos</span>
                 <strong data-admin-orders-view-count>0</strong>
@@ -316,7 +321,9 @@
               </summary>
               <div class="admin-console-card">
                 <label for="admin-sql-console" class="eyebrow">SQL para copiar</label>
-                <p class="form-help-text">Por segurança, o painel não executa SQL. Cole aqui apenas para revisar e copiar para o Supabase.</p>
+                <p class="form-help-text">
+                  Por segurança, o painel não executa SQL. Cole aqui apenas para revisar e copiar para o Supabase.
+                </p>
                 <textarea
                   id="admin-sql-console"
                   class="sql-console"
@@ -524,7 +531,13 @@
                   <small>Acessos administrativos e funções</small>
                 </span>
               </button>
-              <button class="admin-profile-action" type="button" data-admin-tab="dev-console" data-developer-only hidden>
+              <button
+                class="admin-profile-action"
+                type="button"
+                data-admin-tab="dev-console"
+                data-developer-only
+                hidden
+              >
                 <i class="fa-solid fa-heart-pulse"></i>
                 <span>
                   <strong>Central do sistema</strong>
