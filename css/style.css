@@ -34422,6 +34422,33 @@ body:not(.admin-shell-body) .public-product-card .full-catalog-media .product-im
 }
 
 @media (max-width: 767px) {
+  body:not(.admin-shell-body) .catalog-detail-panel {
+    max-height: calc(100dvh - 14px) !important;
+    overflow: auto !important;
+  }
+
+  body:not(.admin-shell-body) .catalog-detail-media {
+    min-height: clamp(220px, 44dvh, 330px) !important;
+    max-height: clamp(220px, 44dvh, 330px) !important;
+    overflow: hidden !important;
+  }
+
+  body:not(.admin-shell-body) .catalog-detail-media .product-image {
+    width: min(88%, 320px) !important;
+    height: 100% !important;
+    max-height: clamp(210px, 42dvh, 310px) !important;
+  }
+
+  body:not(.admin-shell-body) .catalog-detail-media img.product-image-fit-cover {
+    width: min(92%, 320px) !important;
+    max-width: 320px !important;
+    object-fit: contain !important;
+  }
+
+  body:not(.admin-shell-body) .catalog-detail-copy {
+    padding: 12px 16px 16px !important;
+  }
+
   body:not(.admin-shell-body) .products-page .product-card .product-media,
   body:not(.admin-shell-body):has(.products-page) .product-card .product-media {
     min-height: clamp(150px, 42vw, 174px) !important;
