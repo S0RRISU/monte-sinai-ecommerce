@@ -69,10 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   };
   const ORDER_STATUS = {
-    pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
-    preparo: { label: 'Em Preparo', db: 'Preparando', column: 'lista-preparo' },
-    entrega: { label: 'Saiu para Entrega', db: 'Saiu para entrega', column: 'lista-entrega' },
-    entregue: { label: 'Entregue', db: 'Entregue', column: 'lista-entregues' },
+    pendente: { label: 'Recebido', db: 'recebido', column: 'lista-pendentes' },
+    preparo: { label: 'Em Separacao', db: 'em_separacao', column: 'lista-preparo' },
+    entrega: { label: 'Saiu para Entrega', db: 'saiu_para_entrega', column: 'lista-entrega' },
+    entregue: { label: 'Entregue', db: 'entregue', column: 'lista-entregues' },
+    cancelado: { label: 'Cancelado', db: 'cancelado', column: 'lista-cancelados' },
   };
   const PAYMENT_STATUS = ['Pendente', 'Pago', 'Cancelado'];
   const PRODUCT_BASIC_SELECT = 'id, nome, preco, categoria, descricao, imagem, ativo, estoque, created_at';
@@ -91,7 +92,16 @@ document.addEventListener('DOMContentLoaded', () => {
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, preco_promocional, oferta_ativa, oferta_inicio, oferta_fim, estoque_minimo, created_at, updated_at';
   const PRODUCT_VARIATION_BASIC_SELECT =
     'id, produto_id, nome, slug, sku, preco, estoque, ativo, imagem, atributos, ordem, created_at, updated_at';
-  const DB_TO_UI_STATUS = Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {});
+  const DB_TO_UI_STATUS = {
+    Recebido: 'pendente',
+    Preparando: 'preparo',
+    'Em separacao': 'preparo',
+    'Em Separacao': 'preparo',
+    'Saiu para entrega': 'entrega',
+    Entregue: 'entregue',
+    Cancelado: 'cancelado',
+    ...Object.entries(ORDER_STATUS).reduce((map, [ui, config]) => ({ ...map, [config.db]: ui }), {}),
+  };
   const ADMIN_THEME_KEY = 'ms_admin_theme';
 
   function orderStatusClass(statusUi = 'pendente') {
@@ -101,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         preparo: 'is-status-preparing',
         entrega: 'is-status-delivery',
         entregue: 'is-status-delivered',
+        cancelado: 'is-status-canceled',
       }[statusUi] || 'is-status-received'
     );
   }
@@ -1091,13 +1102,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function adminOrderProgressHTML(statusUi = 'pendente') {
-    const currentIndex = Math.max(0, Object.keys(ORDER_STATUS).indexOf(statusUi));
-    const steps = [
+    const canceled = statusUi === 'cancelado';
+    const normalSteps = [
       { key: 'pendente', label: 'Recebido', icon: 'fa-receipt' },
-      { key: 'preparo', label: 'Preparo', icon: 'fa-box-open' },
+      { key: 'preparo', label: 'Separacao', icon: 'fa-box-open' },
       { key: 'entrega', label: 'Entrega', icon: 'fa-truck-fast' },
       { key: 'entregue', label: 'Entregue', icon: 'fa-circle-check' },
     ];
+    const steps = canceled
+      ? [...normalSteps, { key: 'cancelado', label: 'Cancelado', icon: 'fa-circle-xmark' }]
+      : normalSteps;
+    const currentIndex = canceled ? steps.length - 1 : Math.max(0, normalSteps.findIndex((step) => step.key === statusUi));
     const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
     return `
       <div class="admin-order-progress" style="--order-progress:${progress}%;" aria-label="Progresso do pedido">

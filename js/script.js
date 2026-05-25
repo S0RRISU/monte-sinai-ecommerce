@@ -130,7 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
     'gas-de-cozinha-p13': ['Supergas', 'Ultragas'],
     'desinfetante-2l': ['Kaialque', 'Violeta', 'Eucalipto', 'Pinho', 'Jasmim', 'Talco', 'Dama da Noite', 'Palmolive'],
   };
-  const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue', 'Cancelado'];
+  const ORDER_STATUS_CANONICAL = {
+    recebido: 'Recebido',
+    em_separacao: 'Em separacao',
+    saiu_para_entrega: 'Saiu para entrega',
+    entregue: 'Entregue',
+    cancelado: 'Cancelado',
+  };
+  const ORDER_STATUS_OPTIONS = Object.values(ORDER_STATUS_CANONICAL);
+  const ORDER_STATUS_TO_DB = Object.fromEntries(
+    Object.entries(ORDER_STATUS_CANONICAL).map(([db, label]) => [label, db]),
+  );
   const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
   const ADMIN_ROLES = ['cliente', 'equipe', 'motoboy', 'admin', 'developer'];
   const ADMIN_PANEL_ROLES = ['equipe', 'motoboy', 'admin', 'developer'];
@@ -1102,12 +1112,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeOrderStatus(status = '') {
     const text = normalizeText(status);
+    const compact = text.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (compact === 'recebido' || text.includes('pendente')) return ORDER_STATUS_CANONICAL.recebido;
+    if (compact === 'em_separacao' || text.includes('separacao')) return ORDER_STATUS_CANONICAL.em_separacao;
+    if (compact === 'saiu_para_entrega') return ORDER_STATUS_CANONICAL.saiu_para_entrega;
+    if (compact === 'entregue') return ORDER_STATUS_CANONICAL.entregue;
+    if (compact === 'cancelado') return ORDER_STATUS_CANONICAL.cancelado;
     if (text.includes('cancel')) return 'Cancelado';
-    if (text.includes('prepar')) return 'Preparando';
+    if (text.includes('prepar')) return ORDER_STATUS_CANONICAL.em_separacao;
     if (text.includes('saiu') || text.includes('entrega'))
-      return text.includes('entregue') ? 'Entregue' : 'Saiu para entrega';
-    if (text.includes('entregue')) return 'Entregue';
-    return 'Recebido';
+      return text.includes('entregue') ? ORDER_STATUS_CANONICAL.entregue : ORDER_STATUS_CANONICAL.saiu_para_entrega;
+    if (text.includes('entregue')) return ORDER_STATUS_CANONICAL.entregue;
+    return ORDER_STATUS_CANONICAL.recebido;
+  }
+
+  function orderStatusToDb(status = '') {
+    return ORDER_STATUS_TO_DB[normalizeOrderStatus(status)] || 'recebido';
   }
 
   function normalizePaymentStatus(status = '') {
@@ -1121,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (
       {
         Recebido: 'is-status-received',
-        Preparando: 'is-status-preparing',
+        'Em separacao': 'is-status-preparing',
         'Saiu para entrega': 'is-status-delivery',
         Entregue: 'is-status-delivered',
         Cancelado: 'is-status-canceled',
@@ -3989,13 +4009,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (eyebrow) eyebrow.textContent = 'Acompanhamento';
       if (title) title.textContent = 'Meus pedidos';
       if (text)
-        text.textContent = 'Veja o status que a loja atualiza: recebido, preparando, saiu para entrega e entregue.';
+        text.textContent = 'Veja o status que a loja atualiza: recebido, em separacao, saiu para entrega e entregue.';
       if (panelEyebrow) panelEyebrow.textContent = 'Histórico';
       if (panelTitle) panelTitle.innerHTML = '<i class="fa-solid fa-clipboard-list"></i> Pedidos vinculados ao cliente';
       if (panelText)
         panelText.textContent = currentUser?.email
           ? 'Veja os pedidos vinculados ao seu cadastro.'
-          : 'Visitantes veem o histórico deste aparelho sem precisar entrar.';
+          : 'Use o codigo e WhatsApp para consultar pedidos salvos no Supabase.';
     }
 
     await renderOrdersEverywhere({ force: true });
@@ -6836,7 +6856,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (confirm) {
       confirm.innerHTML =
         activePayment === 'whatsapp'
-          ? '<i class="fa-brands fa-whatsapp"></i> Enviar pelo WhatsApp'
+          ? '<i class="fa-solid fa-floppy-disk"></i> Salvar pedido'
           : '<i class="fa-solid fa-truck-fast"></i> Finalizar para entrega';
     }
   }
@@ -7019,7 +7039,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activePayment === 'whatsapp'
           ? 'Combinar pelo WhatsApp'
           : qs('input[name="delivery-payment"]:checked')?.value || 'Pagar na entrega',
-      status: 'Recebido',
+      status: ORDER_STATUS_CANONICAL.recebido,
       confirmed: false,
       paymentStatus: 'Pendente',
       customerType: authUser?.id ? 'cliente' : 'visitante',
@@ -7040,14 +7060,17 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('[Supabase] Erro ao salvar pedido:', error);
       checkoutWarning = checkoutFriendlyError(error);
-      saveOrderLocally(order);
-      showToast('O Supabase falhou, mas seu pedido sera enviado pelo WhatsApp.', {
-        type: 'warning',
-        title: 'Pedido por WhatsApp',
+      showToast(checkoutWarning || 'Nao consegui salvar o pedido no Supabase. Tente novamente.', {
+        type: 'error',
+        title: 'Pedido nao salvo',
       });
+      if (confirm) {
+        confirm.disabled = false;
+        confirm.classList.remove('is-loading');
+      }
+      return;
     }
 
-    openWhatsAppOrder(order);
     cart = [];
     saveCart();
     renderCart();
@@ -7058,16 +7081,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (summary) {
       summary.innerHTML = `
         <div class="checkout-success">
-          <span class="eyebrow">Pedido enviado</span>
+          <span class="eyebrow">Pedido salvo</span>
           <h3>${escapeHTML(order.id)}</h3>
+          <span class="badge">${escapeHTML(normalizeOrderStatus(order.status))}</span>
           <p>${
             savedInSupabase
-              ? `Seu pedido foi salvo e enviado para atendimento no WhatsApp. ${authUser?.id ? 'Ele tambem ficou vinculado ao seu perfil.' : 'Voce finalizou como visitante, sem precisar fazer login.'}`
-              : `Seu pedido foi enviado pelo WhatsApp. ${checkoutWarning || 'O Supabase nao salvou agora, entao confirme o pedido pela conversa.'}`
+              ? `Seu pedido foi salvo no Supabase. ${authUser?.id ? 'Ele tambem ficou vinculado ao seu perfil.' : 'Voce finalizou como visitante, sem precisar fazer login.'}`
+              : `Nao consegui salvar no Supabase. ${checkoutWarning || 'Tente novamente antes de enviar pelo WhatsApp.'}`
           }</p>
-          <a class="btn btn-primary" href="https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}" target="_blank" rel="noreferrer">
+          ${
+            savedInSupabase
+              ? `<a class="btn btn-primary" href="${ordersHref()}?codigo=${encodeURIComponent(order.id)}&telefone=${encodeURIComponent(onlyDigits(order.customer.phone))}">
+            <i class="fa-solid fa-location-dot"></i>
+            Acompanhar pedido
+          </a>`
+              : ''
+          }
+          <a class="btn btn-secondary" href="https://wa.me/${ownerWhatsApp()}?text=${encodeURIComponent(buildOrderMessage(order))}" target="_blank" rel="noreferrer">
             <i class="fa-brands fa-whatsapp"></i>
-            Reenviar WhatsApp
+            Enviar mensagem no WhatsApp
           </a>
           <a class="btn btn-secondary" href="${productHref()}">Comprar mais</a>
         </div>
@@ -7075,7 +7107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderOrdersEverywhere({ force: true });
-    showToast('Pedido finalizado.');
+    showToast(savedInSupabase ? 'Pedido salvo no Supabase.' : 'Pedido nao salvo no Supabase.');
   }
 
   async function finalizeOrder() {
@@ -7124,14 +7156,14 @@ document.addEventListener('DOMContentLoaded', () => {
       endereco_entrega: order.customer.address,
       observacao: order.customer.note || '',
       pagamento: order.payment,
-      status: order.status,
+      status: orderStatusToDb(order.status),
       subtotal: order.subtotal,
       desconto: order.discount || 0,
       cupom_codigo: order.coupon?.code || '',
       entrega: order.delivery,
       total: order.total,
       brinde: order.gift,
-      whatsapp_enviado: true,
+      whatsapp_enviado: false,
       confirmado: false,
       pagamento_status: normalizePaymentStatus(order.paymentStatus),
     };
@@ -7894,6 +7926,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (submit) submit.disabled = false;
       }
     });
+
+    const params = new URLSearchParams(location.search);
+    const initialCode = params.get('codigo') || '';
+    const initialPhone = params.get('telefone') || '';
+    if (initialCode && initialPhone) {
+      const codeInput = qs('#track-order-code');
+      const phoneInput = qs('#track-order-phone');
+      if (codeInput) codeInput.value = initialCode;
+      if (phoneInput) phoneInput.value = initialPhone;
+      window.setTimeout(() => form?.requestSubmit(), 80);
+    }
 
     window.setInterval(() => {
       if (document.hidden) return;
@@ -8884,6 +8927,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!orderId || !ORDER_STATUS_OPTIONS.includes(status)) return;
     const client = ordersClient();
     if (!client) return;
+    const dbStatus = orderStatusToDb(status);
 
     const previousOrders = remoteOrdersCache;
     remoteOrdersCache = remoteOrdersCache.map((order) =>
@@ -8894,13 +8938,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let { data, error } = await client
       .from('pedidos')
-      .update({ status })
+      .update({ status: dbStatus })
       .eq('id', orderId)
       .select('id, status')
       .maybeSingle();
 
     if (error || !data) {
-      const fallback = await rpcAdminUpdateOrder(orderId, { status });
+      const fallback = await rpcAdminUpdateOrder(orderId, { status: dbStatus });
       data = Array.isArray(fallback.data) ? fallback.data[0] : fallback.data;
       error = fallback.error;
     }
@@ -10514,13 +10558,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayStatus = normalizeOrderStatus(status);
     const canceled = displayStatus === 'Cancelado';
     const normalSteps = [
-      { label: 'Recebido', status: 'Recebido', icon: 'fa-receipt' },
-      { label: 'Preparo', status: 'Preparando', icon: 'fa-box-open' },
-      { label: 'Entrega', status: 'Saiu para entrega', icon: 'fa-truck-fast' },
-      { label: 'Entregue', status: 'Entregue', icon: 'fa-circle-check' },
+      { label: 'Recebido', status: ORDER_STATUS_CANONICAL.recebido, icon: 'fa-receipt' },
+      { label: 'Separacao', status: ORDER_STATUS_CANONICAL.em_separacao, icon: 'fa-box-open' },
+      { label: 'Entrega', status: ORDER_STATUS_CANONICAL.saiu_para_entrega, icon: 'fa-truck-fast' },
+      { label: 'Entregue', status: ORDER_STATUS_CANONICAL.entregue, icon: 'fa-circle-check' },
     ];
     const steps = canceled
-      ? [...normalSteps, { label: 'Cancelado', status: 'Cancelado', icon: 'fa-circle-xmark' }]
+      ? [...normalSteps, { label: 'Cancelado', status: ORDER_STATUS_CANONICAL.cancelado, icon: 'fa-circle-xmark' }]
       : normalSteps;
     const currentIndex = canceled
       ? steps.length - 1

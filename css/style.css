@@ -3289,6 +3289,12 @@ body:not(.light-mode) .product-option option {
   background: linear-gradient(90deg, rgba(37, 211, 102, 0.14), transparent 38%), var(--surface-soft);
 }
 
+.order-card.is-status-canceled,
+.admin-order-card.is-status-canceled {
+  border-left-color: #ef4444;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.14), transparent 38%), var(--surface-soft);
+}
+
 .order-card.is-payment-paid,
 .admin-order-card.is-payment-paid {
   box-shadow:
@@ -14870,6 +14876,12 @@ body.light-mode .search-field .search-suggestions {
   border-color: #25d366;
   background: rgba(37, 211, 102, 0.18);
   color: #8dffb7;
+}
+
+.order-card.is-status-canceled .order-status-steps span.active {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
 }
 
 .order-card-actions {
