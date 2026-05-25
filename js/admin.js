@@ -8,16 +8,66 @@ document.addEventListener('DOMContentLoaded', () => {
   const PRODUCT_IMAGE_OUTPUT_TYPE = 'image/jpeg';
   const PRODUCT_IMAGE_OUTPUT_EXTENSION = 'jpg';
   const IMAGE_COMPRESS_QUALITY = 0.85;
-  // Fallback mapping for admin emails — should NOT be relied on in production.
-  // If you need an emergency fallback, inject via `window.__FALLBACK_ADMIN_EMAILS__ = { 'email@ex.com': 'developer' }`.
-  const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
-  function getFallbackRoleForEmail(email) {
-    try {
-      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
-    } catch (e) {
-      return '';
-    }
-  }
+  const ADMIN_ROLES = ['cliente', 'equipe', 'motoboy', 'admin', 'developer'];
+  const ADMIN_ROLE_LABELS = {
+    cliente: 'Cliente',
+    equipe: 'Equipe',
+    motoboy: 'Entregas',
+    admin: 'Administrador',
+    developer: 'Desenvolvedor',
+  };
+  const ADMIN_ROLE_PERMISSIONS = {
+    cliente: {
+      panel: false,
+      orders: false,
+      products: false,
+      deliveries: false,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    equipe: {
+      panel: true,
+      orders: true,
+      products: false,
+      deliveries: true,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    motoboy: {
+      panel: true,
+      orders: false,
+      products: false,
+      deliveries: true,
+      finance: false,
+      config: false,
+      team: false,
+      developer: false,
+    },
+    admin: {
+      panel: true,
+      orders: true,
+      products: true,
+      deliveries: true,
+      finance: true,
+      config: true,
+      team: true,
+      developer: false,
+    },
+    developer: {
+      panel: true,
+      orders: true,
+      products: true,
+      deliveries: true,
+      finance: true,
+      config: true,
+      team: true,
+      developer: true,
+    },
+  };
   const ORDER_STATUS = {
     pendente: { label: 'Pendente', db: 'Recebido', column: 'lista-pendentes' },
     preparo: { label: 'Em Preparo', db: 'Preparando', column: 'lista-preparo' },
@@ -91,6 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const qs = (selector, scope = document) => scope.querySelector(selector);
   const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+  // Lightweight safe helper to set text content. Some admin pages load only admin.js
+  // so we define a minimal `setText` here to avoid runtime errors when `script.js` is not present.
+  function setText(selectorOrEl, value) {
+    try {
+      const el = typeof selectorOrEl === 'string' ? qs(selectorOrEl) : selectorOrEl;
+      if (!el) return;
+      if ('textContent' in el) el.textContent = String(value ?? '');
+    } catch (e) {
+      /* noop - avoid breaking admin UI on missing elements */
+    }
+  }
   const text = (value) => String(value ?? '');
   const onlyDigits = (value) => text(value).replace(/\D/g, '');
   const normalize = (value) =>
@@ -99,6 +160,77 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
+  const isUuid = (value) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(value));
+
+  function parseCurrentProfileRpcData(rawData) {
+    let data = rawData;
+    for (let i = 0; i < 3; i += 1) {
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (_error) {
+          return null;
+        }
+        continue;
+      }
+      if (Array.isArray(data)) {
+        data = data[0] || null;
+        continue;
+      }
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'app_current_profile')) {
+        data = data.app_current_profile;
+        continue;
+      }
+      break;
+    }
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+  }
+
+  // Local helper for painel.html: admin.js is loaded without script.js here.
+  async function getCurrentProfileForApp({ force = false } = {}) {
+    if (state.profile && !force) return state.profile;
+
+    const api = client();
+    if (!api?.auth || typeof api.rpc !== 'function') return null;
+
+    try {
+      const { data: sessionData, error: sessionError } = await api.auth.getUser();
+      if (sessionError) {
+        console.warn('[Admin] falha ao obter sessao do Supabase.', sessionError);
+        return null;
+      }
+      const user = sessionData?.user;
+      if (!user?.id || !isUuid(user.id)) return null;
+
+      const { data: rpcData, error } = await api.rpc('app_current_profile', {});
+      if (error) {
+        console.warn('[Admin] app_current_profile falhou.', error);
+        return null;
+      }
+      const data = parseCurrentProfileRpcData(rpcData);
+      if (!data?.id) return null;
+
+      let role = 'cliente';
+      const normalizedRole = normalize(data.role || '');
+      if (ADMIN_ROLES.includes(normalizedRole)) role = normalizedRole;
+      else if (data.is_admin === true) role = 'admin';
+
+      const result = {
+        id: data.id || user.id,
+        email: data.email || user.email || '',
+        nome: data.nome || user.user_metadata?.name || user.email || '',
+        role,
+        is_admin: data.is_admin === true || role === 'admin' || role === 'developer',
+      };
+
+      state.profile = result;
+      return result;
+    } catch (err) {
+      console.warn('[Admin] erro ao obter perfil via app_current_profile.', err);
+      return null;
+    }
+  }
 
   applyAdminTheme();
 
@@ -254,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productImageHTML(product = {}) {
-    const src = text(product.imagem || '').trim();
+    const src = adminImageRenderSrc(product.imagem || '');
     const placeholder = productPlaceholderHTML(product);
     if (!src) return placeholder;
     return `<img src="${escapeHTML(src)}" alt="${escapeHTML(product.nome || '')}" loading="lazy" decoding="async" onerror="this.remove()">${placeholder}`;
@@ -299,6 +431,78 @@ document.addEventListener('DOMContentLoaded', () => {
   function client() {
     if (!state.client) state.client = window.monteSinaiSupabase || window.supabaseClient || null;
     return state.client;
+  }
+
+  function productStoragePathFromValue(value = '') {
+    const raw = text(value).trim();
+    if (!raw) return '';
+    let clean = raw.replaceAll('\\', '/').trim();
+
+    const publicMarker = '/storage/v1/object/public/';
+    const markerIndex = clean.indexOf(publicMarker);
+    if (markerIndex >= 0) {
+      clean = clean.slice(markerIndex + publicMarker.length);
+    }
+
+    clean = clean
+      .replace(/^https?:\/\/[^/]+\/?/i, '')
+      .replace(/^storage\/v1\/object\/public\//i, '')
+      .replace(/^object\/public\//i, '')
+      .replace(/^public\//i, '')
+      .replace(/^\/+/, '')
+      .split(/[?#]/)[0];
+
+    while (clean.toLowerCase().startsWith(`${PRODUCT_IMAGE_BUCKET.toLowerCase()}/`)) {
+      clean = clean.slice(PRODUCT_IMAGE_BUCKET.length + 1);
+    }
+
+    return /^(produto|variacao)\/[a-z0-9-]+\/[a-z0-9.-]+$/i.test(clean) ? clean : '';
+  }
+
+  function publicProductStorageUrl(path = '') {
+    const cleanPath = productStoragePathFromValue(path);
+    if (!cleanPath) return '';
+    const api = client();
+    const { data } = api?.storage?.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(cleanPath) || {};
+    return data?.publicUrl || '';
+  }
+
+  function normalizeProductImageUrl(value = '') {
+    const image = text(value).trim();
+    if (!image) return '';
+    if (/^data:/i.test(image) || /^blob:/i.test(image)) {
+      throw new Error('Imagem temporaria nao pode ser salva no produto. Envie pelo Storage ou use uma URL publica.');
+    }
+
+    const storagePath = productStoragePathFromValue(image);
+    if (storagePath) return publicProductStorageUrl(storagePath) || image;
+
+    if (/^https?:\/\//i.test(image)) return image;
+    return image.replaceAll('\\', '/').replace(/^\/+/, '');
+  }
+
+  function normalizeProductImageUrlForDisplay(value = '') {
+    try {
+      return normalizeProductImageUrl(value);
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function adminImageRenderSrc(value = '') {
+    const src = normalizeProductImageUrlForDisplay(value);
+    if (!src || /^(https?:|data:|blob:)/i.test(src)) return src;
+    return location.pathname.includes('/pages/') ? `../${src.replace(/^\.?\//, '')}` : src;
+  }
+
+  function savedImageMatches(expected = '', saved = '') {
+    return normalizeProductImageUrlForDisplay(expected) === normalizeProductImageUrlForDisplay(saved);
+  }
+
+  function assertImagePersisted(expected = '', saved = '', label = 'produto') {
+    if (!savedImageMatches(expected, saved)) {
+      throw new Error(`Imagem enviada, mas a URL salva no ${label} nao confere com o retorno do banco.`);
+    }
   }
 
   async function rpcAtualizarPedido(pedidoId, payload = {}) {
@@ -385,12 +589,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const workspace = qs('[data-admin-workspace]');
     workspace?.classList.add('hidden');
     if (!access) return;
+    const retryButton = options.retry
+      ? `<button type="button" class="btn btn-primary" data-admin-retry-access>
+          <i class="fa-solid fa-rotate-right"></i>
+          Tentar novamente
+        </button>`
+      : '';
     access.classList.remove('hidden');
     access.innerHTML = `
       <i class="fa-solid fa-${escapeHTML(options.icon || 'lock')}"></i>
       <h1>${escapeHTML(title)}</h1>
       <p>${escapeHTML(message)}</p>
       <div class="settings-actions">
+        ${retryButton}
         <a class="btn btn-primary ${options.login ? '' : 'hidden'}" href="login.html?redirect=painel.html">
           <i class="fa-solid fa-right-to-bracket"></i>
           Entrar como administrador
@@ -398,23 +609,43 @@ document.addEventListener('DOMContentLoaded', () => {
         <a class="btn btn-secondary" href="../index.html">Voltar ao site</a>
       </div>
     `;
+    qs('[data-admin-retry-access]', access)?.addEventListener('click', () => window.location.reload());
   }
 
   function currentAdminRole() {
-    // Prefer explicit role from `profiles.admin_role`; `profile.role` is only a compatibility fallback.
-    const profileRole = normalize(state.profile?.admin_role || state.profile?.role || '');
-    if (profileRole && profileRole !== 'customer') return profileRole;
-    // Only use fallback email mapping when profile is not available (emergency).
-    if (!state.profile) return normalize(getFallbackRoleForEmail(state.user?.email) || '');
-    return '';
+    const role = normalize(state.profile?.role || '');
+    if (!ADMIN_ROLES.includes(role) && state.profile?.is_admin === true) return 'admin';
+    return ADMIN_ROLES.includes(role) ? role : 'cliente';
+  }
+
+  function currentRolePermissions() {
+    return ADMIN_ROLE_PERMISSIONS[currentAdminRole()] || ADMIN_ROLE_PERMISSIONS.cliente;
+  }
+
+  function canAccessTab(tab = '') {
+    const permissions = currentRolePermissions();
+    const tabPermission = {
+      pedidos: 'orders',
+      produtos: 'products',
+      entregas: 'deliveries',
+      perfil: 'panel',
+      financeiro: 'finance',
+      config: 'config',
+      equipe: 'team',
+      developer: 'developer',
+      'dev-console': 'developer',
+    }[tab];
+    return tabPermission ? Boolean(permissions[tabPermission]) : Boolean(permissions.panel);
+  }
+
+  function firstAllowedTab() {
+    return (
+      ['pedidos', 'produtos', 'entregas', 'perfil', 'financeiro', 'config'].find((tab) => canAccessTab(tab)) || 'perfil'
+    );
   }
 
   function isDeveloperAdmin() {
-    // Primary check: profile role
-    if (currentAdminRole() === 'developer') return true;
-    // Emergency fallback: use injected email map only if profile not loaded
-    if (!state.profile) return getFallbackRoleForEmail(state.user?.email) === 'developer';
-    return false;
+    return currentAdminRole() === 'developer';
   }
 
   function applyDeveloperAccessUI() {
@@ -427,10 +658,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function applyRoleAccessUI() {
+    const role = currentAdminRole();
+    document.body.dataset.adminRole = role;
+    document.body.classList.toggle('admin-owner', role === 'admin' || role === 'developer');
+    applyDeveloperAccessUI();
+    qsa('[data-admin-tab]').forEach((element) => {
+      const tab = element.dataset.adminTab || '';
+      const allowed = canAccessTab(tab);
+      element.classList.toggle('hidden', !allowed);
+      element.hidden = !allowed;
+      element.setAttribute('aria-hidden', String(!allowed));
+    });
+  }
+
   async function verificarAcessoAdmin() {
     const api = client();
     if (!api?.auth) {
-      setAccessState('Supabase indisponível', 'O cliente Supabase não carregou nesta página.', {
+      setAccessState('Supabase indisponivel', 'O cliente Supabase nao carregou nesta pagina.', {
         icon: 'triangle-exclamation',
       });
       return false;
@@ -439,56 +684,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const { data: sessionData, error: sessionError } = await api.auth.getUser();
     if (sessionError) console.warn('[Admin] Falha ao ler usuario autenticado.', sessionError);
     const user = sessionData?.user;
-    if (!user?.id) {
-      // Redireciona para login se não estiver autenticado
-      window.location.href = 'login.html?redirect=painel.html';
+    if (!user?.id || !isUuid(user.id)) {
+      setAccessState(
+        'Acesso restrito',
+        user?.id
+          ? 'Sessao invalida. Entre novamente para acessar o painel.'
+          : 'Entre com uma conta autorizada para acessar o painel.',
+        { icon: 'right-to-bracket', login: true },
+      );
       return false;
     }
 
     state.user = user;
 
-    const { data: profile, error } = await api
-      .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
-      .eq('id', user.id)
-      .maybeSingle();
+    const profile = await getCurrentProfileForApp({ force: true }).catch((e) => {
+      console.warn('[Admin] falha ao obter perfil via app_current_profile.', e);
+      return null;
+    });
 
-    if (error) console.warn('[Admin] Perfil admin nao foi lido.', error);
-    if (profile) {
-      state.profile = { ...profile, role: profile.admin_role || '' };
-    } else {
-      const fb = getFallbackRoleForEmail(user.email);
-      state.profile = {
-        id: user.id,
-        email: user.email,
-        nome: user.user_metadata?.name || user.email,
-        is_admin: Boolean(fb),
-        admin_role: fb || 'customer',
-        role: fb || 'customer',
-      };
+    if (!profile) {
+      setAccessState(
+        'Erro ao carregar perfil',
+        `Email detectado: ${user.email || 'nao informado'}. Nao foi possivel validar suas permissoes no Supabase agora.`,
+        { icon: 'triangle-exclamation', retry: true },
+      );
+      return false;
     }
 
-    const role = currentAdminRole();
-    const validAdminRoles = ['developer', 'owner', 'staff'];
-    const isAdminRole = validAdminRoles.includes(role);
-    const admin = Boolean(state.profile.is_admin || isAdminRole);
-    if (!admin) {
-      // Redireciona para login quando usuário não tem cargo administrativo válido
-      window.location.href = 'login.html?redirect=painel.html';
+    state.profile = profile;
+
+    if (!currentRolePermissions().panel) {
+      setAccessState('Acesso negado', 'Voce nao tem permissao para acessar o painel administrativo.', {
+        icon: 'shield-halved',
+      });
       return false;
     }
 
     qs('#admin-access-state')?.classList.add('hidden');
     qs('[data-admin-workspace]')?.classList.remove('hidden');
     document.body.classList.add('admin-ready');
-    document.body.classList.toggle('admin-owner', role === 'owner');
-    applyDeveloperAccessUI();
-    applyTeamAccessUI();
+    applyRoleAccessUI();
+    const initialTab = location.hash.replace('#', '') || state.activeTab || firstAllowedTab();
+    if (!canAccessTab(initialTab)) state.activeTab = firstAllowedTab();
     return true;
   }
 
   function canManageTeam() {
-    return ['developer', 'owner'].includes(currentAdminRole());
+    return Boolean(currentRolePermissions().team);
   }
 
   function applyTeamAccessUI() {
@@ -501,14 +743,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderAdminTab(tab = 'pedidos') {
-    let nextTab = qs(`[data-admin-panel="${tab}"]`) ? tab : 'pedidos';
-    if ((nextTab === 'developer' || nextTab === 'dev-console') && !isDeveloperAdmin()) {
-      nextTab = 'pedidos';
-      showToast('Área exclusiva do desenvolvedor.', 'error');
-    }
-    if (nextTab === 'equipe' && !canManageTeam()) {
-      nextTab = 'pedidos';
-      showToast('Área exclusiva para desenvolvedor e proprietários.', 'error');
+    let nextTab = qs(`[data-admin-panel="${tab}"]`) ? tab : firstAllowedTab();
+    if (!canAccessTab(nextTab)) {
+      showToast('Area restrita para o seu cargo.', 'error');
+      nextTab = firstAllowedTab();
     }
     state.activeTab = nextTab;
 
@@ -566,7 +804,6 @@ document.addEventListener('DOMContentLoaded', () => {
     state.orderView = view === 'history' ? 'history' : 'active';
     renderizarPedidosAdmin(state.pedidos);
   }
-
 
   function unreadAdminOrders(pedidos = state.pedidos) {
     const list = pedidos || [];
@@ -650,7 +887,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Object.prototype.hasOwnProperty.call(payload, 'ativo') && payload.ativo === false && previous.ativo !== false) {
       actions.add('produto_desativado');
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'estoque') && Number(payload.estoque) !== Number(previous.estoque)) {
+    if (
+      Object.prototype.hasOwnProperty.call(payload, 'estoque') &&
+      Number(payload.estoque) !== Number(previous.estoque)
+    ) {
       actions.add('estoque_alterado');
     }
     if (
@@ -908,9 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const query = adminSearchQuery('#admin-order-search');
     const archivedCount = pedidos.filter((order) => order.archivedAt).length;
     const activeCount = pedidos.length - archivedCount;
-    const byArchive = pedidos.filter((order) =>
-      state.orderView === 'history' ? order.archivedAt : !order.archivedAt,
-    );
+    const byArchive = pedidos.filter((order) => (state.orderView === 'history' ? order.archivedAt : !order.archivedAt));
     const visiblePedidos = query ? byArchive.filter((order) => orderMatchesSearch(order, query)) : byArchive;
     const activeStatus = ORDER_STATUS[state.activeOrderStatus] ? state.activeOrderStatus : 'pendente';
     const activeConfig = ORDER_STATUS[activeStatus];
@@ -986,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const role = currentAdminRole() || 'admin';
     setText('#admin-profile-name', name);
     setText('#admin-profile-email', email);
-    setText('#admin-profile-role', role === 'developer' ? 'Desenvolvedor' : role === 'owner' ? 'Proprietário' : 'Equipe');
+    setText('#admin-profile-role', ADMIN_ROLE_LABELS[role] || 'Painel');
   }
 
   function assinarPedidosRealtime() {
@@ -1167,7 +1405,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const api = client();
     if (!api || !pedidoId) return false;
     if (!ordersArchiveReady) {
-      setDatabaseAlert('Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.');
+      setDatabaseAlert(
+        'Aplique supabase/20260523-etapa-7-base-correta.sql para arquivar pedidos sem usar o navegador.',
+      );
       showToast('Aplique a migracao da etapa 7 para arquivar pedidos.', 'error');
       return false;
     }
@@ -1237,7 +1477,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     state.pedidos = state.pedidos.map((order) =>
-      String(order.id) === String(pedidoId) ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' } : order,
+      String(order.id) === String(pedidoId)
+        ? { ...order, archivedAt: null, archivedBy: null, archivedReason: '' }
+        : order,
     );
     renderizarPedidosAdmin(state.pedidos);
     renderFinanceiro();
@@ -1303,7 +1545,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (error) {
       if (isMissingVariationTableError(error)) {
         const message = normalize(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-        if (message.includes('preco_promocional') || message.includes('oferta_ativa') || message.includes('oferta_inicio') || message.includes('oferta_fim') || message.includes('estoque_minimo')) {
+        if (
+          message.includes('preco_promocional') ||
+          message.includes('oferta_ativa') ||
+          message.includes('oferta_inicio') ||
+          message.includes('oferta_fim') ||
+          message.includes('estoque_minimo')
+        ) {
           variationsExtendedReady = false;
           setDatabaseAlert(
             'Aplique supabase/20260523-etapa-7-base-correta.sql para habilitar oferta formal por opcao.',
@@ -1882,19 +2130,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const offerActive = field('oferta_ativa')?.value === 'true';
       payload.oferta_ativa = offerActive;
       payload.preco_promocional = offerActive ? parsePrice(field('preco_promocional')?.value || 0) : null;
-      payload.oferta_inicio = offerActive ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString() : null;
+      payload.oferta_inicio = offerActive
+        ? isoFromLocal(field('oferta_inicio')?.value) || new Date().toISOString()
+        : null;
       payload.oferta_fim = offerActive ? isoFromLocal(field('oferta_fim')?.value) : null;
     }
     return payload;
   }
 
   function setVariationBusy(variationId, busy) {
-    qsa(`[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-toggle="${escapeSelector(variationId)}"]`).forEach(
-      (button) => {
-        button.disabled = busy;
-        button.classList.toggle('is-loading', busy);
-      },
-    );
+    qsa(
+      `[data-admin-variation-save="${escapeSelector(variationId)}"], [data-admin-variation-toggle="${escapeSelector(variationId)}"]`,
+    ).forEach((button) => {
+      button.disabled = busy;
+      button.classList.toggle('is-loading', busy);
+    });
   }
 
   function setVariationAddBusy(productId, busy) {
@@ -1944,7 +2194,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').update(payload).eq('id', variationId).select('id, imagem').maybeSingle();
+    const { data, error } = await api
+      .from('produto_variacoes')
+      .update(payload)
+      .eq('id', variationId)
+      .select('id, imagem, updated_at')
+      .maybeSingle();
     variationSaveLocks.delete(variationId);
     setVariationBusy(variationId, false);
 
@@ -1952,17 +2207,33 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(
         friendlyDbError(
           error,
-          payload.imagem ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.' : 'Nao consegui salvar a variacao.',
+          payload.imagem
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL na variacao.'
+            : 'Nao consegui salvar a variacao.',
         ),
         'error',
       );
       return false;
     }
 
-    await logAdminAction(override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada', 'produto_variacao', variationId, {
-      produto_id: productId,
-      nome: payload.nome,
-    });
+    if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+      try {
+        assertImagePersisted(payload.imagem, data.imagem, 'variacao');
+      } catch (imageError) {
+        showToast(friendlyDbError(imageError, imageError.message), 'error');
+        return false;
+      }
+    }
+
+    await logAdminAction(
+      override?.ativo === false ? 'variacao_desativada' : 'variacao_atualizada',
+      'produto_variacao',
+      variationId,
+      {
+        produto_id: productId,
+        nome: payload.nome,
+      },
+    );
     showToast(override?.ativo === false ? 'Variacao desativada.' : 'Variacao salva.', 'success');
     await refreshProductEditor(productId);
     return true;
@@ -2012,7 +2283,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
-    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem').maybeSingle();
+    const { data, error } = await api.from('produto_variacoes').insert(payload).select('id, imagem, updated_at').maybeSingle();
     variationSaveLocks.delete(`new-${productId}`);
     setVariationAddBusy(productId, false);
 
@@ -2026,6 +2297,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ),
         'error',
       );
+      return false;
+    }
+
+    try {
+      assertImagePersisted(payload.imagem, data?.imagem, 'nova variacao');
+    } catch (imageError) {
+      showToast(friendlyDbError(imageError, imageError.message), 'error');
       return false;
     }
 
@@ -2108,39 +2386,46 @@ document.addEventListener('DOMContentLoaded', () => {
         .from('produtos')
         .update(payload)
         .eq('id', productId)
-        .select('id, imagem')
+        .select('id, imagem, updated_at')
         .maybeSingle());
 
-    if (error || !data) {
-      const rpc = await rpcAtualizarProduto(productId, payload);
-      data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
-      error = rpc.error;
-    }
+      if (error || !data) {
+        const rpc = await rpcAtualizarProduto(productId, payload);
+        data = Array.isArray(rpc.data) ? rpc.data[0] : rpc.data;
+        error = rpc.error;
+      }
 
-    if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
-      productsExtendedReady = false;
-      setDatabaseAlert(
-        'Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.',
-      );
-      const basePayload = {
-        nome: payload.nome,
-        preco: payload.preco,
-        categoria: payload.categoria,
-        imagem: payload.imagem,
-        descricao: payload.descricao,
-        ativo: payload.ativo,
-      };
-      if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
-      const fallback = await api.from('produtos').update(basePayload).eq('id', productId).select('id, imagem').maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-    }
+      if (error && isMissingSchemaError(error, ['oferta', 'promocional', 'estoque_minimo', 'destaque'])) {
+        productsExtendedReady = false;
+        setDatabaseAlert(
+          'Produto salvo apenas com campos básicos. Execute supabase/reparar-painel-admin.sql para salvar oferta e estoque completo.',
+        );
+        const basePayload = {
+          nome: payload.nome,
+          preco: payload.preco,
+          categoria: payload.categoria,
+          imagem: payload.imagem,
+          descricao: payload.descricao,
+          ativo: payload.ativo,
+        };
+        if (payload.estoque !== undefined) basePayload.estoque = payload.estoque;
+        const fallback = await api
+          .from('produtos')
+          .update(basePayload)
+          .eq('id', productId)
+          .select('id, imagem, updated_at')
+          .maybeSingle();
+        data = fallback.data;
+        error = fallback.error;
+      }
     } catch (requestError) {
       unlockProductSave(productId);
       showToast(
         friendlyDbError(
           requestError,
-          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+          uploadedImage
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.'
+            : 'Nao consegui alterar o produto.',
         ),
         'error',
       );
@@ -2152,14 +2437,30 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(
         friendlyDbError(
           error,
-          uploadedImage ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.' : 'Nao consegui alterar o produto.',
+          uploadedImage
+            ? 'Imagem enviada, mas nao foi possivel salvar a URL no produto.'
+            : 'Nao consegui alterar o produto.',
         ),
         'error',
       );
       return false;
     }
 
-    state.produtos = state.produtos.map((product) => (product.id === productId ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem } : product));
+    if (Object.prototype.hasOwnProperty.call(payload, 'imagem')) {
+      try {
+        assertImagePersisted(payload.imagem, data.imagem, 'produto');
+      } catch (imageError) {
+        unlockProductSave(productId);
+        showToast(friendlyDbError(imageError, imageError.message), 'error');
+        return false;
+      }
+    }
+
+    state.produtos = state.produtos.map((product) =>
+      product.id === productId
+        ? { ...product, ...payload, imagem: data?.imagem ?? payload.imagem, updated_at: data?.updated_at ?? product.updated_at }
+        : product,
+    );
     renderizarProdutosAdmin(state.produtos);
     await logProductActions(productId, previousProduct, payload, override ? 'produto_atalho' : 'produto_atualizado');
     if (uploadedImage) setAdminImageFeedback('Imagem atualizada.', productId);
@@ -2234,11 +2535,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function ensureSafeProductImageValue(value = '') {
-    const image = text(value).trim();
-    if (/^data:/i.test(image)) {
-      throw new Error('Imagem em base64/DataURL nao pode ser salva no produto. Envie a imagem pelo Storage ou use uma URL.');
-    }
-    return image;
+    return normalizeProductImageUrl(value);
   }
 
   function adminImageFeedbackTargets(target = '') {
@@ -2320,7 +2617,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ...details,
     };
     const prefix = uploadLogPrefix(stage, details.context || '');
-    const isErrorStage = /erro|falha|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(stage);
+    const isErrorStage =
+      /erro|falha|inacessivel|autenticacao-falhou|upload-falhou|admin-can-write-erro|admin-can-write-indisponivel/i.test(
+        stage,
+      );
     if (!isErrorStage) return;
     if (console.groupCollapsed) {
       console.groupCollapsed(`${prefix} ${stage}`);
@@ -2362,6 +2662,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Imagem preparada, mas ainda ficou grande para envio.';
     }
     return error?.message || fallback;
+  }
+
+  async function assertUploadedImageIsPublic(publicUrl = '', diagnostic = {}) {
+    const storagePath = productStoragePathFromValue(publicUrl);
+    if (!storagePath || typeof fetch !== 'function') return;
+    try {
+      const response = await fetch(publicUrl, { method: 'HEAD', cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Storage retornou ${response.status} ao abrir a imagem enviada.`);
+      }
+    } catch (error) {
+      logImageUploadDiagnostic('public-url-inacessivel', {
+        context: diagnostic.context || 'produto',
+        path: storagePath,
+        publicUrl,
+        error: storageErrorDiagnostic(error),
+      });
+      throw error;
+    }
   }
 
   async function diagnoseAdminCanWrite(api, context = 'produto') {
@@ -2525,7 +2844,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!bestBlob) throw new Error('Nao consegui comprimir essa imagem.');
       if (bestBlob.size > PRODUCT_IMAGE_TARGET_SIZE * 1.35) {
-        throw new Error('A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.');
+        throw new Error(
+          'A foto ficou grande mesmo apos reducao. Tente tirar a foto mais perto do produto ou escolher outra imagem.',
+        );
       }
       const baseName = safeFileName(file.name.replace(/\.[^.]+$/, '') || 'produto');
       return new File([bestBlob], `${baseName}.${PRODUCT_IMAGE_OUTPUT_EXTENSION}`, {
@@ -2664,12 +2985,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const { data } = api.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
     if (!data?.publicUrl) throw new Error('Upload concluido, mas nao consegui gerar URL publica.');
+    const publicUrl = normalizeProductImageUrl(data.publicUrl);
     logImageUploadDiagnostic('public-url', {
       context: diagnostic.context || 'produto',
       path,
-      publicUrl: data.publicUrl,
+      publicUrl,
     });
-    return data.publicUrl;
+    await assertUploadedImageIsPublic(publicUrl, diagnostic);
+    return publicUrl;
   }
 
   function renderCreateProductImagePreview(file) {
@@ -2833,7 +3156,11 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Informe o preco promocional para ativar a oferta.');
       }
 
-      let { data: insertedProduct, error } = await api.from('produtos').insert(payload).select('id').maybeSingle();
+      let { data: insertedProduct, error } = await api
+        .from('produtos')
+        .insert(payload)
+        .select('id, imagem, updated_at')
+        .maybeSingle();
       if (
         error &&
         normalize(error.message || error.details || '').match(
@@ -2849,11 +3176,12 @@ document.addEventListener('DOMContentLoaded', () => {
           ativo: payload.ativo,
         };
         if (estoqueValue !== '') basePayload.estoque = payload.estoque;
-        const fallback = await api.from('produtos').insert(basePayload).select('id').maybeSingle();
+        const fallback = await api.from('produtos').insert(basePayload).select('id, imagem, updated_at').maybeSingle();
         insertedProduct = fallback.data;
         error = fallback.error;
       }
       if (error) throw error;
+      assertImagePersisted(payload.imagem, insertedProduct?.imagem, 'produto');
 
       form.reset();
       renderCreateProductImagePreview(null);
@@ -2943,7 +3271,8 @@ document.addEventListener('DOMContentLoaded', () => {
         current.quantidade += quantity;
         current.valor += total;
         current.pedidos.add(order.id);
-        current.ultima = !current.ultima || new Date(order.created_at) > new Date(current.ultima) ? order.created_at : current.ultima;
+        current.ultima =
+          !current.ultima || new Date(order.created_at) > new Date(current.ultima) ? order.created_at : current.ultima;
         map.set(key, current);
       });
     });
@@ -2992,7 +3321,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pedidos = state.pedidos.filter((order) => orderInFinancePeriod(order, period));
     const total = pedidos.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const pagos = pedidos.filter((order) => normalize(order.pagamento_status) === 'pago');
-    const cancelados = pedidos.filter((order) => normalize(order.status).includes('cancel') || normalize(order.pagamento_status) === 'cancelado');
+    const cancelados = pedidos.filter(
+      (order) => normalize(order.status).includes('cancel') || normalize(order.pagamento_status) === 'cancelado',
+    );
     const ticket = pedidos.length ? total / pedidos.length : 0;
     const itemRows = aggregateOrderItems(pedidos);
     renderMetric('#admin-finance-metrics', [
@@ -3128,7 +3459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       developerCardHTML('Acesso', 'user-shield', [
         { label: 'Conta', value: profile.email || state.user?.email || 'Sem email' },
         { label: 'Cargo', value: currentAdminRole() || 'Sem cargo' },
-        { label: 'Perfil', value: profile.is_admin ? 'Administrador no Supabase' : 'Fallback por email conhecido' },
+        { label: 'Perfil', value: ADMIN_ROLE_LABELS[profile.role] || 'Cliente' },
       ]),
       developerCardHTML('Supabase', 'database', [
         { label: 'Cliente', value: client() ? 'Carregado' : 'Indisponível' },
@@ -3306,15 +3637,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canManageTeam()) {
       container.innerHTML =
         container.tagName && container.tagName.toLowerCase() === 'tbody'
-          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</td></tr>'
-          : '<p class="admin-empty-state">Acesso restrito ao desenvolvedor e proprietários.</p>';
+          ? '<tr><td colspan="4" class="admin-empty-state">Acesso restrito para gerenciamento de equipe.</td></tr>'
+          : '<p class="admin-empty-state">Acesso restrito para gerenciamento de equipe.</p>';
       return;
     }
-    container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuários...</p>';
+    container.innerHTML = '<p class="admin-empty-state">Carregando lista de usuarios...</p>';
 
     const { data: profiles, error: profilesErr } = await api
       .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
+      .select('id, email, nome, role')
       .order('email', { ascending: true });
     if (profilesErr) {
       console.warn('[Admin] Falha ao carregar profiles', profilesErr);
@@ -3326,47 +3657,44 @@ document.addEventListener('DOMContentLoaded', () => {
       id: pr.id,
       email: pr.email,
       nome: pr.nome,
-      is_admin: pr.is_admin,
-      admin_role: pr.admin_role,
+      role: ADMIN_ROLES.includes(normalize(pr.role)) ? normalize(pr.role) : 'cliente',
     }));
 
     const currentRole = currentAdminRole();
     const isDeveloper = currentRole === 'developer';
-    const isOwner = currentRole === 'owner';
-    const canEditRoles = ['developer', 'owner'].includes(currentRole);
+    const isAdmin = currentRole === 'admin';
+    const canEditRoles = canManageTeam();
     const rolesOptions = [
       { value: 'developer', label: 'Desenvolvedor / Presidente' },
-      { value: 'owner', label: 'Proprietário' },
-      { value: 'staff', label: 'Equipe' },
-      { value: 'customer', label: 'Cliente' },
+      { value: 'admin', label: 'Admin' },
+      { value: 'equipe', label: 'Equipe' },
+      { value: 'motoboy', label: 'Motoboy' },
+      { value: 'cliente', label: 'Cliente' },
     ];
 
     const html = rows
       .map((row) => {
-        const userRole = row.admin_role || (row.is_admin ? 'owner' : 'customer');
+        const userRole = row.role || 'cliente';
 
         let selectDisabled = !canEditRoles;
-        // Do not allow non-developers to change a developer's role
         if (userRole === 'developer' && !isDeveloper) selectDisabled = true;
 
         const optionsHtml = rolesOptions
           .map((opt) => {
             let disableOpt = '';
-            // Only developer can assign another developer
             if (opt.value === 'developer' && !isDeveloper) disableOpt = 'disabled';
-            // Owner cannot create developers
-            if (isOwner && opt.value === 'developer') disableOpt = 'disabled';
+            if (isAdmin && opt.value === 'developer') disableOpt = 'disabled';
             return `<option value="${escapeHTML(opt.value)}" ${opt.value === userRole ? 'selected' : ''} ${disableOpt}>${escapeHTML(opt.label)}</option>`;
           })
           .join('');
 
-        const active = userRole !== 'customer';
+        const active = userRole !== 'cliente';
         const statusHtml = `<span class="team-badge ${active ? 'is-active' : 'is-inactive'}"><span class="team-badge-dot" aria-hidden="true"></span>${active ? 'Ativo' : 'Inativo'}</span>`;
 
         return `
           <tr data-team-row="${escapeHTML(row.id)}">
             <td class="team-user">
-              <div class="team-user-name">${escapeHTML(row.nome || row.email || 'Usuário')}</div>
+              <div class="team-user-name">${escapeHTML(row.nome || row.email || 'Usuario')}</div>
               <div class="team-user-email">${escapeHTML(row.email || '')}</div>
             </td>
             <td class="team-role">
@@ -3378,7 +3706,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
             <td class="team-status">${statusHtml}</td>
             <td class="team-actions">
-              <button class="btn btn-ghost team-action-btn" type="button" data-admin-team-save="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} title="Salvar alterações">
+              <button class="btn btn-ghost team-action-btn" type="button" data-admin-team-save="${escapeHTML(row.id)}" ${selectDisabled ? 'disabled' : ''} title="Salvar alteracoes">
                 <i class="fa-solid fa-floppy-disk"></i>
               </button>
             </td>
@@ -3387,12 +3715,11 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .join('');
 
-    // Se o container for um <tbody>, inserir tr corretamente; senão, substituir diretamente
     if (container.tagName && container.tagName.toLowerCase() === 'tbody') {
       container.innerHTML =
-        html || '<tr><td colspan="4" class="admin-empty-state">Nenhum usuário encontrado.</td></tr>';
+        html || '<tr><td colspan="4" class="admin-empty-state">Nenhum usuario encontrado.</td></tr>';
     } else {
-      container.innerHTML = html || '<p class="admin-empty-state">Nenhum usuário encontrado.</p>';
+      container.innerHTML = html || '<p class="admin-empty-state">Nenhum usuario encontrado.</p>';
     }
   }
 
@@ -3668,7 +3995,9 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('Aplique a migracao da etapa 7 para usar oferta por opcao.', 'error');
           return;
         }
-        const variation = state.variacoes.find((item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24));
+        const variation = state.variacoes.find(
+          (item) => String(item.id) === String(variationOffer24.dataset.adminVariationOffer24),
+        );
         const price = Number(variation?.preco || 0);
         salvarVariacaoAdmin(variationOffer24.dataset.adminVariationOffer24, variationOffer24.dataset.productId, {
           oferta_ativa: true,
@@ -3775,7 +4104,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const initialTab = text(location.hash).replace('#', '') || 'pedidos';
       renderAdminTab(initialTab);
-      const results = await Promise.allSettled([carregarPedidosAdmin(), carregarProdutosAdmin()]);
+      const loaders = [];
+      if (canAccessTab('pedidos') || canAccessTab('entregas')) loaders.push(carregarPedidosAdmin());
+      if (canAccessTab('produtos')) loaders.push(carregarProdutosAdmin());
+      const results = await Promise.allSettled(loaders);
       const failed = results.find((result) => result.status === 'rejected');
       if (failed) {
         console.warn('[Admin] Uma parte do painel nao carregou.', failed.reason);
@@ -3785,9 +4117,13 @@ document.addEventListener('DOMContentLoaded', () => {
       assinarPedidosRealtime();
     } catch (error) {
       console.error('[Admin] Falha ao iniciar painel.', error);
-      setAccessState('Painel indisponível', 'Não consegui iniciar o painel agora. Atualize a página e tente novamente.', {
-        icon: 'triangle-exclamation',
-      });
+      setAccessState(
+        'Painel indisponível',
+        'Não consegui iniciar o painel agora. Atualize a página e tente novamente.',
+        {
+          icon: 'triangle-exclamation',
+        },
+      );
       showToast('Nao consegui iniciar o painel.', 'error');
     }
   }

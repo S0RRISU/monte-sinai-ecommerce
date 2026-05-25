@@ -1,176 +1,208 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp.">
-  <meta name="theme-color" content="#00061f">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="color-scheme" content="dark light">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <link rel="canonical" href="https://monte-sinai.netlify.app/contato">
-  <meta property="og:url" content="https://monte-sinai.netlify.app/contato">
-  <meta property="og:locale" content="pt_BR">
-  <meta property="og:image:secure_url" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <meta property="og:image:alt" content="Monte Sinai - água, gás e produtos de limpeza">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Contato | Monte Sinai">
-  <meta name="twitter:description" content="Fale com a Monte Sinai pelo WhatsApp e finalize pedidos de água, gás e produtos de limpeza.">
-  <meta name="twitter:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Monte Sinai">
-  <meta property="og:title" content="Contato | Monte Sinai">
-  <meta property="og:description" content="Fale com a Monte Sinai pelo WhatsApp e finalize pedidos de água, gás e limpeza.">
-  <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png">
-  <title>Contato | Monte Sinai</title>
-  <link rel="manifest" href="../site.webmanifest">
-  <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co">
-  <link rel="stylesheet" href="../css/style.css?v=20260523-15">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase.js?v=20260520-4"></script>
-  <script defer src="../js/script.js?v=20260523-14"></script>
-</head>
-<body>
-  <header class="navbar">
-    <div class="container nav-inner">
-      <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-        <img class="brand-logo" src="../assets/brand/v2/monte-sinai-logo-v2.png" alt="Monte Sinai" loading="eager" decoding="async" fetchpriority="high">
-      </a>
-      <nav class="nav-menu" aria-label="Navegação principal">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-      <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta
+      name="description"
+      content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp."
+    />
+    <meta name="theme-color" content="#00061f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://monte-sinai.netlify.app/contato" />
+    <meta property="og:url" content="https://monte-sinai.netlify.app/contato" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:image:secure_url" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <meta property="og:image:alt" content="Monte Sinai - água, gás e produtos de limpeza" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Contato | Monte Sinai" />
+    <meta
+      name="twitter:description"
+      content="Fale com a Monte Sinai pelo WhatsApp e finalize pedidos de água, gás e produtos de limpeza."
+    />
+    <meta name="twitter:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Monte Sinai" />
+    <meta property="og:title" content="Contato | Monte Sinai" />
+    <meta
+      property="og:description"
+      content="Fale com a Monte Sinai pelo WhatsApp e finalize pedidos de água, gás e limpeza."
+    />
+    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
+    <title>Contato | Monte Sinai</title>
+    <link rel="manifest" href="../site.webmanifest" />
+    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
+    <link rel="stylesheet" href="../css/style.css?v=20260523-15" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabase.js?v=20260520-4"></script>
+    <script defer src="../js/script.js?v=20260524-auth-photo-metadata"></script>
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container nav-inner">
+        <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
+          <img
+            class="brand-logo"
+            src="../assets/brand/v2/monte-sinai-logo-v2.png"
+            alt="Monte Sinai"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+          />
+        </a>
+        <nav class="nav-menu" aria-label="Navegação principal">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </nav>
+        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="mobile-menu">
+      <a href="../index.html">Início</a>
+      <a href="produtos.html">Produtos</a>
+      <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+      <a href="catalogo.html">Catálogo</a>
+      <a href="sobre.html">Sobre</a>
+      <a href="contato.html">Contato</a>
     </div>
-  </header>
 
-  <div class="mobile-menu">
-    <a href="../index.html">Início</a>
-    <a href="produtos.html">Produtos</a>
-    <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-    <a href="contato.html">Contato</a>
-  </div>
+    <main>
+      <section class="hero container hero-small">
+        <div class="hero-content">
+          <div class="hero-copy">
+            <span class="eyebrow">Fale com a gente</span>
+            <h1>Contato rápido para pedidos e informações</h1>
+            <p>
+              Chame pelo WhatsApp, envie dúvidas ou finalize seu pedido pelo carrinho. O atendimento segue direto com a
+              Monte Sinai.
+            </p>
+            <div class="hero-actions">
+              <a
+                class="btn btn-primary"
+                href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+fazer+um+pedido"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <i class="fa-brands fa-whatsapp"></i>
+                Abrir WhatsApp
+              </a>
+              <a class="btn btn-secondary" href="produtos.html#todos-produtos">
+                <i class="fa-solid fa-basket-shopping"></i>
+                Ver produtos
+              </a>
+            </div>
+          </div>
 
-  <main>
-    <section class="hero container hero-small">
-      <div class="hero-content">
-        <div class="hero-copy">
-          <span class="eyebrow">Fale com a gente</span>
-          <h1>Contato rápido para pedidos e informações</h1>
-          <p>Chame pelo WhatsApp, envie dúvidas ou finalize seu pedido pelo carrinho. O atendimento segue direto com a Monte Sinai.</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+fazer+um+pedido" target="_blank" rel="noreferrer">
+          <div class="contact-card">
+            <div class="contact-item">
               <i class="fa-brands fa-whatsapp"></i>
-              Abrir WhatsApp
-            </a>
-            <a class="btn btn-secondary" href="produtos.html#todos-produtos">
-              <i class="fa-solid fa-basket-shopping"></i>
-              Ver produtos
-            </a>
-          </div>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-item">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div>
-              <h3>WhatsApp principal</h3>
-              <a href="https://wa.me/5511960928234" target="_blank" rel="noreferrer">(11) 96092-8234</a>
+              <div>
+                <h3>WhatsApp principal</h3>
+                <a href="https://wa.me/5511960928234" target="_blank" rel="noreferrer">(11) 96092-8234</a>
+              </div>
             </div>
-          </div>
-          <div class="contact-item">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div>
-              <h3>WhatsApp alternativo</h3>
-              <a href="https://wa.me/5511982690871" target="_blank" rel="noreferrer">(11) 98269-0871</a>
+            <div class="contact-item">
+              <i class="fa-brands fa-whatsapp"></i>
+              <div>
+                <h3>WhatsApp alternativo</h3>
+                <a href="https://wa.me/5511982690871" target="_blank" rel="noreferrer">(11) 98269-0871</a>
+              </div>
             </div>
-          </div>
-          <div class="contact-item">
-            <i class="fa-solid fa-envelope"></i>
-            <div>
-              <h3>Email</h3>
-              <a href="mailto:contato@montesinai.com.br">contato@montesinai.com.br</a>
+            <div class="contact-item">
+              <i class="fa-solid fa-envelope"></i>
+              <div>
+                <h3>Email</h3>
+                <a href="mailto:contato@montesinai.com.br">contato@montesinai.com.br</a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="section container">
-      <div class="section-head">
-        <span class="eyebrow">Atendimento</span>
-        <h2>Como funciona o pedido</h2>
-      </div>
-      <div class="contact-grid">
-        <div class="contact-box">
-          <h3>Escolha os produtos</h3>
-          <p>Entre no catálogo, filtre por categoria e adicione os itens necessários ao carrinho.</p>
+      <section class="section container">
+        <div class="section-head">
+          <span class="eyebrow">Atendimento</span>
+          <h2>Como funciona o pedido</h2>
         </div>
-        <div class="contact-box">
-          <h3>Informe seus dados</h3>
-          <p>No pagamento, preencha nome, telefone, endereço e observações de entrega.</p>
+        <div class="contact-grid">
+          <div class="contact-box">
+            <h3>Escolha os produtos</h3>
+            <p>Entre no catálogo, filtre por categoria e adicione os itens necessários ao carrinho.</p>
+          </div>
+          <div class="contact-box">
+            <h3>Informe seus dados</h3>
+            <p>No pagamento, preencha nome, telefone, endereço e observações de entrega.</p>
+          </div>
+          <div class="contact-box">
+            <h3>Confirme no WhatsApp</h3>
+            <p>O pedido é enviado com total calculado para a Monte Sinai confirmar prazo e pagamento.</p>
+          </div>
         </div>
-        <div class="contact-box">
-          <h3>Confirme no WhatsApp</h3>
-          <p>O pedido é enviado com total calculado para a Monte Sinai confirmar prazo e pagamento.</p>
+      </section>
+
+      <section class="section container served-area-section">
+        <div class="section-head">
+          <span class="eyebrow"><span data-served-neighborhoods-count>0</span> bairros atendidos</span>
+          <h2>Area de bairros atendidos</h2>
+          <p>Confira os bairros configurados no painel. Para uma rua especifica, chame no WhatsApp.</p>
+        </div>
+        <div class="neighborhood-list" data-served-neighborhoods></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <div>
+          <h3>Monte Sinai</h3>
+          <p>ì disposição para atender sua casa com eficiência.</p>
+        </div>
+        <div class="footer-links">
+          <a href="../index.html">Início</a>
+          <a href="produtos.html">Produtos</a>
+          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
+          <a href="catalogo.html">Catálogo</a>
+          <a href="sobre.html">Sobre</a>
+          <a href="contato.html">Contato</a>
+        </div>
+        <div class="footer-social">
+          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
         </div>
       </div>
-    </section>
+      <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
+    </footer>
 
-    <section class="section container served-area-section">
-      <div class="section-head">
-        <span class="eyebrow"><span data-served-neighborhoods-count>0</span> bairros atendidos</span>
-        <h2>Area de bairros atendidos</h2>
-        <p>Confira os bairros configurados no painel. Para uma rua especifica, chame no WhatsApp.</p>
-      </div>
-      <div class="neighborhood-list" data-served-neighborhoods></div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="container footer-inner">
-      <div>
-        <h3>Monte Sinai</h3>
-        <p>ì disposição para atender sua casa com eficiência.</p>
-      </div>
-      <div class="footer-links">
-        <a href="../index.html">Início</a>
-        <a href="produtos.html">Produtos</a>
-        <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="sobre.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </div>
-      <div class="footer-social">
-        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-        <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-      </div>
-    </div>
-    <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-  </footer>
-
-  <a class="whatsapp-float" href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento" target="_blank" rel="noreferrer">
-    <i class="fa-brands fa-whatsapp"></i>
-    <span>WhatsApp</span>
-  </a>
-</body>
+    <a
+      class="whatsapp-float"
+      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class="fa-brands fa-whatsapp"></i>
+      <span>WhatsApp</span>
+    </a>
+  </body>
 </html>

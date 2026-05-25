@@ -18,11 +18,11 @@ O arquivo `netlify.toml` tambem configura rotas bonitas, headers de seguranca, c
 
 1. No SQL Editor do Supabase, execute `supabase/schema-pedidos.sql`.
 2. Execute `supabase/seed-produtos.sql` para popular ou atualizar os produtos iniciais quando necessario.
-3. Execute `supabase/admin-acesso.sql` para liberar o painel administrativo.
+3. Execute `supabase/20260524-base-rbac-permissoes.sql` para criar a base oficial de cargos e liberar o painel administrativo.
 4. Execute `supabase/storage-produtos.sql` para criar o bucket publico `produtos` e permitir upload somente para administradores.
 5. Confirme se `js/supabase.js` esta com a URL do projeto e a chave publica anon/publishable corretas.
 
-Se o banco ja existia antes desta versao, execute tambem as migracoes idempotentes `ofertas-kits-produtos.sql`, `promocoes-estoque-cupons.sql`, `site-configuracoes.sql` e `checkout-visitante-admin-roles.sql`.
+Se o banco ja existia antes desta versao, execute tambem as migracoes idempotentes `ofertas-kits-produtos.sql`, `promocoes-estoque-cupons.sql`, `site-configuracoes.sql` e `checkout-visitante-admin-roles.sql`. Depois delas, reexecute `supabase/20260524-base-rbac-permissoes.sql` para garantir que policies, grants e cargos canonicos continuem corretos.
 
 `supabase/seed-produtos.sql` deve ser usado somente quando for necessario repor ou atualizar o catalogo inicial. Ele usa `public.produtos`, atualiza produtos existentes pelo campo `nome` e nao apaga produtos ja cadastrados.
 
@@ -76,7 +76,7 @@ O painel permite:
 - controlar nome da loja, logo, cor principal, textos da home, aviso, WhatsApp, Pix, entrega, bairros atendidos e secoes da vitrine;
 - usar o modo programador no desktop com diagnostico de Supabase, cache, versoes, exportacao e checklist tecnico.
 
-Para liberar acesso, o usuario precisa existir no Auth/Profiles e ter `profiles.is_admin = true` ou `profiles.admin_role` como `developer`, `owner` ou `staff`. O email `marcelol527319@gmail.com` fica como `developer`. Troque o placeholder da Patricia em `supabase/checkout-visitante-admin-roles.sql` quando souber o email dela.
+Para liberar acesso, o usuario precisa existir no Auth/Profiles e ter `profiles.role` como `equipe`, `motoboy`, `admin` ou `developer`. `equipe` atua em pedidos, `motoboy` atua em entregas, e `admin/developer` gerenciam produtos, configuracoes e equipe. A base canonica fica em `supabase/20260524-base-rbac-permissoes.sql`: `marcelol527319@gmail.com` vira `developer`, `marcelo52731@gmail.com` e `patriciapaula01234@gmail.com` viram `admin`, e `marcelosorrisu527@gmail.com` fica como `cliente`.
 
 ## Antes de vender
 

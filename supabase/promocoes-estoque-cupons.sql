@@ -1,5 +1,5 @@
 -- Promocoes, cupons, estoque e status operacional da Monte Sinai.
--- Execute depois de schema-pedidos.sql e admin-acesso.sql.
+-- Execute depois de schema-pedidos.sql e 20260524-base-rbac-permissoes.sql.
 
 begin;
 

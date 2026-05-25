@@ -132,19 +132,21 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const ORDER_STATUS_OPTIONS = ['Recebido', 'Preparando', 'Saiu para entrega', 'Entregue', 'Cancelado'];
   const PAYMENT_STATUS_OPTIONS = ['Pendente', 'Pago', 'Cancelado'];
-  // Emergency fallback mapping for admin emails. Do NOT rely on this in production.
-  const FALLBACK_ADMIN_EMAILS = (window && window.__FALLBACK_ADMIN_EMAILS__) || {};
-  function getFallbackRoleForEmail(email = '') {
-    try {
-      return String(FALLBACK_ADMIN_EMAILS[(email || '').toLowerCase()] || '').trim();
-    } catch (e) {
-      return '';
-    }
-  }
+  const ADMIN_ROLES = ['cliente', 'equipe', 'motoboy', 'admin', 'developer'];
+  const ADMIN_PANEL_ROLES = ['equipe', 'motoboy', 'admin', 'developer'];
+  const ADMIN_FULL_PANEL_ROLES = ['admin', 'developer'];
+  const ADMIN_ROLE_LABELS = {
+    cliente: 'Cliente',
+    equipe: 'Equipe',
+    motoboy: 'Entregas',
+    admin: 'Administrador',
+    developer: 'Desenvolvedor',
+  };
   const PRODUCT_IMAGE_BUCKET = 'produtos';
   const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
   const ADMIN_PANEL_HREF = '/pages/painel.html';
-  const PRODUCT_BASE_SELECT = 'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
+  const PRODUCT_BASE_SELECT =
+    'id, nome, preco, imagem, categoria, descricao, ativo, estoque, estoque_minimo, created_at, updated_at';
   const PRODUCT_EXTENDED_SELECT = `${PRODUCT_BASE_SELECT}, tipo, destaque, oferta_ativa, preco_promocional, oferta_inicio, oferta_fim, kit_itens, catalogo_visivel, loja_visivel, catalogo_ordem, descricao_detalhada, catalogo_destaque`;
   const PUBLIC_PRODUCT_VIEW = 'vw_catalogo_publico';
   const PUBLIC_PRODUCT_VARIATION_VIEW = 'vw_catalogo_variacoes_publicas';
@@ -204,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let appliedCoupon = loadJSON(STORAGE.coupon, null);
   let currentUser = loadJSON(STORAGE.user, null);
   if (currentUser?.provider !== 'Supabase Auth') currentUser = null;
+  else if (currentUser) currentUser = sanitizeProfileUser(currentUser);
   let ownerConfig = { ...DEFAULT_OWNER, ...loadJSON(STORAGE.owner, {}) };
   let siteConfig = { ...DEFAULT_SITE_CONFIG, ...loadJSON(STORAGE.site, {}) };
   let remoteOrdersCache = [];
@@ -669,13 +672,31 @@ document.addEventListener('DOMContentLoaded', () => {
     saveJSON(STORAGE.cart, cart);
   }
 
+  function isUnsafeProfilePhotoValue(value = '') {
+    const photo = String(value || '').trim();
+    if (!photo) return false;
+    if (/^(data:image|data:|blob:)/i.test(photo)) return true;
+    if (photo.length > 2048) return true;
+    return photo.length > 512 && /^[A-Za-z0-9+/=\s]+$/.test(photo);
+  }
+
+  function cleanProfilePhotoUrl(value = '') {
+    const photo = String(value || '').trim();
+    return isUnsafeProfilePhotoValue(photo) ? '' : photo;
+  }
+
+  function sanitizeProfileUser(user) {
+    return user ? { ...user, photo: cleanProfilePhotoUrl(user.photo) } : user;
+  }
+
   function saveUser(user) {
     adminProfileCache = null;
-    currentUser = user;
+    const safeUser = sanitizeProfileUser(user);
+    currentUser = safeUser;
     let saved = true;
-    if (user) {
-      saved = saveJSON(STORAGE.user, user);
-      rememberProfile(user);
+    if (safeUser) {
+      saved = saveJSON(STORAGE.user, safeUser);
+      rememberProfile(safeUser);
     } else {
       localStorage.removeItem(STORAGE.user);
       setAdminPanelLinksVisible(false);
@@ -740,7 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nick: user.nick || '',
       phone: user.phone || '',
       address: user.address || '',
-      photo: user.photo || '',
+      photo: cleanProfilePhotoUrl(user.photo),
       provider: user.provider || 'Supabase Auth',
       passwordSaved: user.passwordSaved ?? savedSession,
       updatedAt: user.updatedAt || new Date().toISOString(),
@@ -948,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nick: meta.nick || '',
       phone: meta.phone || '',
       address: meta.address || '',
-      photo: meta.photo || meta.avatar_url || '',
+      photo: cleanProfilePhotoUrl(meta.photo || meta.avatar_url || ''),
       provider: 'Supabase Auth',
       updatedAt: meta.updatedAt || user.updated_at || '',
     };
@@ -1124,31 +1145,42 @@ document.addEventListener('DOMContentLoaded', () => {
       .toLowerCase();
   }
 
-  function knownAdminRoleForEmail(email = '') {
-    return getFallbackRoleForEmail(email) || '';
+  function parseCurrentProfileRpcData(rawData) {
+    let data = rawData;
+    for (let i = 0; i < 3; i += 1) {
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (_error) {
+          return null;
+        }
+        continue;
+      }
+      if (Array.isArray(data)) {
+        data = data[0] || null;
+        continue;
+      }
+      if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'app_current_profile')) {
+        data = data.app_current_profile;
+        continue;
+      }
+      break;
+    }
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
   }
 
   function adminRole(profile = adminProfileCache) {
-    // Prefer explicit profile role
-    const role = normalizeText(profile?.admin_role || profile?.role || '');
-    if (role) return role;
-    return profile?.is_admin ? 'owner' : 'customer';
+    const role = normalizeText(profile?.role || '');
+    if (!ADMIN_ROLES.includes(role) && profile?.is_admin === true) return 'admin';
+    return ADMIN_ROLES.includes(role) ? role : 'cliente';
   }
 
   function isDeveloperProfile(profile = adminProfileCache) {
-    if (adminRole(profile) === 'developer') return true;
-    return false;
+    return adminRole(profile) === 'developer';
   }
 
   function roleLabel(role = adminRole()) {
-    return (
-      {
-        developer: 'Desenvolvedor / Presidente',
-        owner: 'Proprietário',
-        staff: 'Equipe',
-        customer: 'Cliente',
-      }[role] || 'Administrador'
-    );
+    return ADMIN_ROLE_LABELS[role] || 'Cliente';
   }
 
   function formatDateTimeLocalInput(value) {
@@ -1186,9 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function variationOfferData(raw = {}) {
     const enabled = Boolean(raw.oferta_ativa ?? raw.offerActive);
-    const promo = parsePrice(
-      raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice,
-    );
+    const promo = parsePrice(raw.preco_promocional ?? raw.promotionalPrice ?? raw.promoPrice);
     const start = raw.oferta_inicio || raw.offerStartsAt;
     const end = raw.oferta_fim || raw.offerEndsAt;
     const now = Date.now();
@@ -1263,11 +1293,6 @@ document.addEventListener('DOMContentLoaded', () => {
       text.includes('could not find') ||
       text.includes('pgrst204')
     );
-  }
-
-  function isMissingProfileRoleError(error) {
-    const text = normalizeText(`${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`);
-    return text.includes('admin_role') || text.includes('could not find') || text.includes('pgrst204');
   }
 
   function isMissingNotificationTableError(error) {
@@ -1432,7 +1457,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function normalizeProductVariation(raw = {}, product = {}) {
     const name = String(raw.nome ?? raw.name ?? '').trim();
     const image = resolveProductImagePath(raw.imagem ?? raw.image ?? '', name || product.name || '');
-    const originalPrice = parsePrice(raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price ?? product.price ?? 0);
+    const originalPrice = parsePrice(
+      raw.preco_original ?? raw.originalPrice ?? raw.preco ?? raw.price ?? product.price ?? 0,
+    );
     const offer = variationOfferData(raw);
     const stock =
       raw.estoque === null || raw.stock === null || raw.estoque === ''
@@ -1671,9 +1698,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearPublicProductShell() {
     if (!['index.html', 'produtos.html', 'catalogo.html', 'promocoes.html'].includes(currentPage())) return;
     productIndex = [];
-    qsa('#todos-produtos .section-head, #todos-produtos .grid-produtos, [data-product-rail] .product-card, [data-promotions-grid] .product-card').forEach((node) =>
-      node.remove(),
-    );
+    qsa(
+      '#todos-produtos .section-head, #todos-produtos .grid-produtos, [data-product-rail] .product-card, [data-promotions-grid] .product-card',
+    ).forEach((node) => node.remove());
   }
 
   function pruneCartUnavailableProducts(products = []) {
@@ -1744,7 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function upsertProfileRecord(user = null, source = currentUser || {}) {
     const client = ordersClient();
     const authUser = user || (await currentAuthUser());
-    if (!client || !authUser?.id) return null;
+    if (!client || !authUser?.id || !isUUID(authUser.id)) return null;
 
     const profile = {
       id: authUser.id,
@@ -1753,31 +1780,41 @@ document.addEventListener('DOMContentLoaded', () => {
       apelido: source.nick || '',
       telefone: source.phone || '',
       endereco: source.address || '',
-      foto: source.photo || '',
+      foto: cleanProfilePhotoUrl(source.photo),
     };
 
-    let columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin, admin_role';
-    let { data: existing, error: lookupError } = await client
-      .from('profiles')
-      .select(columns)
-      .eq('id', authUser.id)
-      .maybeSingle();
+    const columns = 'id, email, nome, apelido, telefone, endereco, foto, role';
+    const basicColumns = 'id, email, nome, apelido, telefone, endereco, foto';
+    let existing = null;
+    let lookupError = null;
 
-    if (lookupError && isMissingProfileRoleError(lookupError)) {
-      columns = 'id, email, nome, apelido, telefone, endereco, foto, is_admin';
-      const fallback = await client.from('profiles').select(columns).eq('id', authUser.id).maybeSingle();
-      existing = fallback.data;
-      lookupError = fallback.error;
+    for (const selectColumns of [columns, basicColumns]) {
+      const { data, error } = await client.from('profiles').select(selectColumns).eq('id', authUser.id).maybeSingle();
+      if (error) {
+        lookupError = error;
+        continue;
+      }
+      existing = data ? { ...data, _fields: selectColumns.split(',').map((field) => field.trim()) } : data;
+      lookupError = null;
+      break;
     }
 
     if (lookupError) throw lookupError;
-    if (existing?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(existing))) return existing;
+    if (existing && adminRole(existing) !== 'cliente') return existing;
 
-    const query = existing
-      ? client.from('profiles').update(profile).eq('id', authUser.id)
-      : client.from('profiles').insert(profile);
+    const writeProfile = (selectColumns) => {
+      const query = existing
+        ? client.from('profiles').update(profile).eq('id', authUser.id)
+        : client.from('profiles').insert(profile);
+      return query.select(selectColumns).single();
+    };
 
-    const { data, error } = await query.select(columns).single();
+    let { data, error } = await writeProfile(columns);
+    if (error) {
+      const fallback = await writeProfile(basicColumns);
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error) throw error;
     return data;
   }
@@ -1789,19 +1826,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn(`[Supabase] Login ok, mas nao foi possivel sincronizar ${context}.`, error);
       return null;
     }
-  }
-
-  function fallbackAdminProfileFromAuthUser(authUser = null) {
-    const role = knownAdminRoleForEmail(authUser?.email);
-    if (!role) return null;
-    return {
-      id: authUser.id || '',
-      email: authUser.email || '',
-      nome: authMetadata(authUser).name || authMetadata(authUser).full_name || '',
-      is_admin: true,
-      admin_role: role,
-      __emailFallback: true,
-    };
   }
 
   async function upsertCheckoutAddress(userId, customer) {
@@ -1823,53 +1847,42 @@ document.addEventListener('DOMContentLoaded', () => {
   async function currentAdminProfile({ force = false } = {}) {
     if (adminProfileCache && !force) return adminProfileCache;
 
-    const client = ordersClient();
+    const client = authClient();
     if (!client) return null;
 
     await authReady.catch(() => null);
     const authUser = await currentAuthUser().catch(() => null);
-    if (!authUser?.id) return null;
+    if (!authUser?.id || !isUUID(authUser.id)) return null;
 
-    let { data, error } = await client
-      .from('profiles')
-      .select('id, email, nome, is_admin, admin_role')
-      .eq('id', authUser.id)
-      .maybeSingle();
-
-    if (error && isMissingProfileRoleError(error)) {
-      const fallback = await client
-        .from('profiles')
-        .select('id, email, nome, is_admin')
-        .eq('id', authUser.id)
-        .maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-    }
-
-    if (error) {
-      const fallback = fallbackAdminProfileFromAuthUser(authUser);
-      if (fallback) {
-        console.warn('[Admin] Perfil admin nao foi lido no Supabase; usando fallback por email conhecido.', error);
-        adminProfileCache = fallback;
-        return adminProfileCache;
+    try {
+      if (typeof client.rpc !== 'function') return null;
+      const { data: rpcData, error } = await client.rpc('app_current_profile', {});
+      if (error) {
+        console.warn('[Supabase] app_current_profile falhou. Link admin sera ocultado.', error);
+        return null;
       }
-      throw error;
-    }
+      const data = parseCurrentProfileRpcData(rpcData);
+      if (!data?.id) return null;
 
-    if (data) {
-      adminProfileCache = { ...data, email: data.email || authUser.email || '' };
+      const role = adminRole(data);
+
+      adminProfileCache = {
+        id: data.id || authUser.id,
+        email: data.email || authUser.email || '',
+        nome: data.nome || authMetadata(authUser).name || authUser.email || '',
+        role,
+        is_admin: data.is_admin === true || role === 'admin' || role === 'developer',
+      };
       return adminProfileCache;
+    } catch (err) {
+      console.warn('[Supabase] erro inesperado ao validar perfil via RPC.', err);
+      return null;
     }
-
-    adminProfileCache =
-      (await safeUpsertProfileRecord(authUser, userFromAuthUser(authUser), 'perfil admin')) ||
-      fallbackAdminProfileFromAuthUser(authUser);
-    return adminProfileCache;
   }
 
   async function isCurrentUserAdmin({ force = true } = {}) {
     const profile = await currentAdminProfile({ force });
-    return Boolean(profile?.is_admin || ['developer', 'owner', 'staff'].includes(adminRole(profile)));
+    return ADMIN_PANEL_ROLES.includes(adminRole(profile));
   }
 
   async function loadProductVariations(client, products = []) {
@@ -1885,7 +1898,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error) {
       if (error.code === 'PGRST205' || isMissingProductVariationTableError(error)) {
-        console.info('[Supabase] View publica de variacoes ausente. Execute a migracao da etapa 7 para liberar opcoes sem expor estoque.');
+        console.info(
+          '[Supabase] View publica de variacoes ausente. Execute a migracao da etapa 7 para liberar opcoes sem expor estoque.',
+        );
         return [];
       }
       throw error;
@@ -2230,7 +2245,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (term && blob.includes(term)) entries.push({ product: normalized, option });
       });
     });
-    searchSuggestionProducts(query, limit).forEach((product) => entries.push({ product: normalizeProduct(product), option: null }));
+    searchSuggestionProducts(query, limit).forEach((product) =>
+      entries.push({ product: normalizeProduct(product), option: null }),
+    );
     const seen = new Set();
     return entries
       .filter((entry) => {
@@ -2452,7 +2469,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function productAssetPath(product, card = productCatalogCard(product)) {
     const productImage = resolveProductImagePath(product?.image || '', product?.name || '');
     if (productImage) return productImage;
-    if (product?.id && !String(product.id).startsWith('local-') && Object.prototype.hasOwnProperty.call(product, 'image')) {
+    if (
+      product?.id &&
+      !String(product.id).startsWith('local-') &&
+      Object.prototype.hasOwnProperty.call(product, 'image')
+    ) {
       return '';
     }
 
@@ -2657,9 +2678,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const card = productCatalogCard(activeSearchProduct);
     const description = productDescription(activeSearchProduct, card);
     const options = productOptions(activeSearchProduct, card);
-    const preferredOption = options.find((option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''));
+    const preferredOption = options.find(
+      (option) => String(option.id) === String(activeSearchProduct.preferredVariationId || ''),
+    );
     const firstOption = preferredOption || options[0] || { price: activeSearchProduct.price || 0 };
-    const image = getImagemProdutoSelecionada(activeSearchProduct, activeSearchProduct.hasVariations ? firstOption : null);
+    const image = getImagemProdutoSelecionada(
+      activeSearchProduct,
+      activeSearchProduct.hasVariations ? firstOption : null,
+    );
     const resultButtons =
       productSearchResults.length > 1
         ? `
@@ -2736,7 +2762,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (price) price.textContent = formatMoney(selected.price || activeSearchProduct.price);
       const imageEl = qs('.product-image', content);
       const selectedImage = getImagemProdutoSelecionada(activeSearchProduct, selected);
-      if (imageEl && selectedImage) setProductImageElement(imageEl, selectedImage, selected?.updatedAt || activeSearchProduct.updatedAt);
+      if (imageEl && selectedImage)
+        setProductImageElement(imageEl, selectedImage, selected?.updatedAt || activeSearchProduct.updatedAt);
       if (stockLine) {
         const text = customerAvailabilityText(activeSearchProduct, selected);
         stockLine.textContent = text;
@@ -2851,6 +2878,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function adminPanelHref() {
+    const role = adminRole();
+    if (role === 'motoboy') return `${ADMIN_PANEL_HREF}#entregas`;
+    if (role === 'equipe') return `${ADMIN_PANEL_HREF}#pedidos`;
     return ADMIN_PANEL_HREF;
   }
 
@@ -2928,7 +2958,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function productStockState(product = {}) {
-    if (product.indisponivel === true || product.unavailable === true || product.pode_comprar === false || product.canBuy === false)
+    if (
+      product.indisponivel === true ||
+      product.unavailable === true ||
+      product.pode_comprar === false ||
+      product.canBuy === false
+    )
       return 'out';
     const stock = productStockLevel(product);
     const limit = productLowStockLimit(product);
@@ -2948,7 +2983,10 @@ document.addEventListener('DOMContentLoaded', () => {
     )
       return 'out';
     const stock = variation.stock;
-    if ((stock === null || stock === undefined || stock === '') && (variation.pode_comprar === true || variation.canBuy === true))
+    if (
+      (stock === null || stock === undefined || stock === '') &&
+      (variation.pode_comprar === true || variation.canBuy === true)
+    )
       return 'ok';
     if (stock === null || stock === undefined || stock === '') return 'untracked';
     const value = Number(stock);
@@ -3015,8 +3053,44 @@ document.addEventListener('DOMContentLoaded', () => {
     return index >= 0 ? clean.slice(index) : clean.replace(/^\.\.\//, '').replace(/^\.\//, '');
   }
 
+  function productStoragePathFromValue(src = '') {
+    const raw = String(src || '').trim();
+    if (!raw) return '';
+    let clean = raw.replaceAll('\\', '/');
+
+    const publicMarker = '/storage/v1/object/public/';
+    const markerIndex = clean.indexOf(publicMarker);
+    if (markerIndex >= 0) {
+      clean = clean.slice(markerIndex + publicMarker.length);
+    }
+
+    clean = clean
+      .replace(/^https?:\/\/[^/]+\/?/i, '')
+      .replace(/^storage\/v1\/object\/public\//i, '')
+      .replace(/^object\/public\//i, '')
+      .replace(/^public\//i, '')
+      .replace(/^\/+/, '')
+      .split(/[?#]/)[0];
+
+    while (clean.toLowerCase().startsWith(`${PRODUCT_IMAGE_BUCKET.toLowerCase()}/`)) {
+      clean = clean.slice(PRODUCT_IMAGE_BUCKET.length + 1);
+    }
+
+    return /^(produto|variacao)\/[a-z0-9-]+\/[a-z0-9.-]+$/i.test(clean) ? clean : '';
+  }
+
+  function publicProductStorageUrl(path = '') {
+    const cleanPath = productStoragePathFromValue(path);
+    if (!cleanPath) return '';
+    const client = supabaseProductClient();
+    const { data } = client?.storage?.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(cleanPath) || {};
+    return data?.publicUrl || '';
+  }
+
   function resolveProductImagePath(src, productName = '') {
     if (!src) return '';
+    const storagePath = productStoragePathFromValue(src);
+    if (storagePath) return publicProductStorageUrl(storagePath) || src;
     if (/^(https?:|data:|blob:)/.test(src)) return src;
 
     const clean = String(src).trim().replaceAll('\\', '/').replace(/^\/+/, '');
@@ -3766,12 +3840,11 @@ document.addEventListener('DOMContentLoaded', () => {
     qsa('[data-client-orders-link]').forEach((link) => {
       if (!(link instanceof HTMLAnchorElement)) return;
       link.href = ordersHref();
-      const badge = count > 0
-        ? `<span class="admin-order-badge" data-client-order-count>${count}</span>`
-        : '<span class="admin-order-badge is-empty" data-client-order-count hidden aria-hidden="true"></span>';
-      link.innerHTML = admin
-        ? `<span class="nav-orders-label">Controle</span>${badge}`
-        : 'Pedidos';
+      const badge =
+        count > 0
+          ? `<span class="admin-order-badge" data-client-order-count>${count}</span>`
+          : '<span class="admin-order-badge is-empty" data-client-order-count hidden aria-hidden="true"></span>';
+      link.innerHTML = admin ? `<span class="nav-orders-label">Controle</span>${badge}` : 'Pedidos';
       link.classList.toggle('nav-orders-link', admin);
       link.classList.toggle('has-pending-orders', admin && count > 0);
       link.setAttribute('aria-label', admin ? 'Controlar pedidos dos clientes' : 'Ver meus pedidos');
@@ -4032,8 +4105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'index.html') return 'home';
       if (page === 'produtos.html') return 'store';
       if (page === 'promocoes.html') return 'promos';
-      if (['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(page))
-        return 'account';
+      if (['perfil.html', 'editar-perfil.html', 'configuracoes.html'].includes(page)) return 'account';
       return '';
     })();
 
@@ -4564,7 +4636,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function optionOutOfStock(option = {}) {
-    if (option.unavailable === true || option.indisponivel === true || option.canBuy === false || option.pode_comprar === false)
+    if (
+      option.unavailable === true ||
+      option.indisponivel === true ||
+      option.canBuy === false ||
+      option.pode_comprar === false
+    )
       return true;
     const stock = option.stock;
     return stock !== null && stock !== undefined && stock !== '' && Number(stock) <= 0;
@@ -4596,11 +4673,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function productSelectionKey(product = {}) {
     const normalized = product?.name || product?.nome ? normalizeProduct(product) : product || {};
-    return String(normalized.id || product?.id || product?.productId || normalized.name || product?.name || product?.nome || '').trim();
+    return String(
+      normalized.id || product?.id || product?.productId || normalized.name || product?.name || product?.nome || '',
+    ).trim();
   }
 
   function productSelectionKeyFromElement(element) {
-    const card = element?.closest?.('.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel, .catalog-product');
+    const card = element?.closest?.(
+      '.product-card, .full-catalog-item, .catalog-detail-copy, .catalog-detail-panel, .catalog-product',
+    );
     return String(
       card?.dataset.catalogDetailKey ||
         card?.dataset.catalogProductKey ||
@@ -4635,7 +4716,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (cardKey !== key) return;
       const select = qs('.product-option', card);
       if (!select || select === sourceSelect) return;
-      const match = [...select.options].find((option) => String(option.dataset.variationId || option.value || '') === String(variationId));
+      const match = [...select.options].find(
+        (option) => String(option.dataset.variationId || option.value || '') === String(variationId),
+      );
       if (!match) return;
       select.value = match.value;
       updateSelectedVariationUI(select, { sync: false });
@@ -4647,7 +4730,9 @@ document.addEventListener('DOMContentLoaded', () => {
       .map((option) => {
         const image = getImagemProdutoSelecionada(product, option);
         const selected =
-          selectedVariationId && String(option.id || option.value || '') === String(selectedVariationId) ? ' selected' : '';
+          selectedVariationId && String(option.id || option.value || '') === String(selectedVariationId)
+            ? ' selected'
+            : '';
         return `<option value="${escapeHTML(option.value)}" title="${escapeHTML(optionPriceLabel(option, product))}" data-variation-id="${escapeHTML(option.id)}" data-variation-name="${escapeHTML(option.name || option.label)}" data-price="${escapeHTML(option.price)}" data-original-price="${escapeHTML(option.originalPrice || option.price)}" data-offer-active="${option.offerActive ? 'true' : 'false'}" data-offer-ends-at="${escapeHTML(option.offerEndsAt || '')}" data-updated-at="${escapeHTML(option.updatedAt || product.updatedAt || '')}" data-stock="" data-available="${optionOutOfStock(option) ? 'false' : 'true'}" data-image="${escapeHTML(image)}"${selected}>${escapeHTML(optionSelectLabel(option))}</option>`;
       })
       .join('');
@@ -4663,7 +4748,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function selectedVariationState(option, card) {
     const button = card?.querySelector('.btn-add-cart');
-    const productId = button?.dataset.productId || card?.dataset.productId || productSelectionKeyFromElement(card) || '';
+    const productId =
+      button?.dataset.productId || card?.dataset.productId || productSelectionKeyFromElement(card) || '';
     const variationId = option?.dataset.variationId || button?.dataset.variationId || '';
     const product = productId
       ? productIndex.find((item) => String(normalizeProduct(item).id) === String(productId))
@@ -4784,7 +4870,8 @@ document.addEventListener('DOMContentLoaded', () => {
     card.dataset.catalogVariationName = state.name || '';
     card.dataset.catalogVariationImage = state.image || '';
     const detailTrigger =
-      card.querySelector('[data-catalog-detail]') || card.closest('[data-catalog-detail-key], [data-catalog-product-key]');
+      card.querySelector('[data-catalog-detail]') ||
+      card.closest('[data-catalog-detail-key], [data-catalog-product-key]');
     if (detailTrigger && state.variationId) {
       detailTrigger.dataset.catalogVariationId = state.variationId;
       detailTrigger.dataset.catalogVariationName = state.name || '';
@@ -4834,7 +4921,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectHTML = hasOptions
       ? `
           <select class="product-option ${rail ? '' : 'product-option-compact'}" aria-label="${escapeHTML(
-            normalized.name.includes('Desinfetante') ? 'Escolher fragrancia do desinfetante' : 'Escolher opcao do produto',
+            normalized.name.includes('Desinfetante')
+              ? 'Escolher fragrancia do desinfetante'
+              : 'Escolher opcao do produto',
           )}">
             ${productOptionsHTML(productOptionsList, normalized, selectedVariationId)}
           </select>
@@ -4984,14 +5073,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .map((option) => [option.name, option.label, option.sabor, option.marca].filter(Boolean).join(' '))
       .join(' ');
     const searchable = normalizeText(
-      [
-        normalized.name,
-        normalized.category,
-        normalized.description,
-        normalized.terms,
-        normalized.kitItems,
-        optionTerms,
-      ]
+      [normalized.name, normalized.category, normalized.description, normalized.terms, normalized.kitItems, optionTerms]
         .filter(Boolean)
         .join(' '),
     );
@@ -5000,9 +5082,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getFilteredPublicProducts() {
-    const products = publicProductsState.allProducts.length
-      ? publicProductsState.allProducts
-      : publicStoreProducts();
+    const products = publicProductsState.allProducts.length ? publicProductsState.allProducts : publicStoreProducts();
     const selectedCategory = publicProductsState.selectedCategory || 'all';
     const searchTerm = publicProductsState.searchTerm || '';
 
@@ -5039,7 +5119,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const isLoading = publicProductsState.loading && !publicProductsState.loaded && !productIndex.length;
     grid.replaceChildren();
     if (!isLoading) {
-      grid.insertAdjacentHTML('beforeend', products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''));
+      grid.insertAdjacentHTML(
+        'beforeend',
+        products.map((product) => publicProductCardHTML(product, { layout: 'store' })).join(''),
+      );
     }
 
     const container = publicProductsContainer();
@@ -5161,7 +5244,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const offers = storeProducts()
       .map((product) => {
         const normalized = normalizeProduct(product);
-        const optionOffers = (normalized.options || []).filter((option) => option.offerActive && !optionOutOfStock(option));
+        const optionOffers = (normalized.options || []).filter(
+          (option) => option.offerActive && !optionOutOfStock(option),
+        );
         if (!optionOffers.length) return normalized;
         return {
           ...normalized,
@@ -5238,7 +5323,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return (!term || blob.includes(term)) && fullCatalogMatchesFilter(normalized, activeFilter);
     });
 
-    const recommended = storePage && activeFilter === 'all' && !term ? visible.filter((product) => isRecommendedProduct(product)) : [];
+    const recommended =
+      storePage && activeFilter === 'all' && !term ? visible.filter((product) => isRecommendedProduct(product)) : [];
     const recommendedSection = recommended.length
       ? `
         <section class="full-catalog-category full-catalog-category--recommended" data-full-catalog-category="recommended">
@@ -5288,9 +5374,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = productOptions(normalized);
     const hasOptions = normalized.hasVariations && options.length > 0;
     const firstOption = hasOptions ? selectedVariationForProduct(normalized, options) || options[0] : null;
-    const unavailable = normalized.canBuy === false || normalized.stockState === 'out' || (hasOptions && options.every((option) => optionOutOfStock(option)));
+    const unavailable =
+      normalized.canBuy === false ||
+      normalized.stockState === 'out' ||
+      (hasOptions && options.every((option) => optionOutOfStock(option)));
     const image = getImagemProdutoSelecionada(normalized, hasOptions ? firstOption : null);
-    const imageSrc = imageRenderHref(image, hasOptions ? firstOption?.updatedAt || normalized.updatedAt : normalized.updatedAt);
+    const imageSrc = imageRenderHref(
+      image,
+      hasOptions ? firstOption?.updatedAt || normalized.updatedAt : normalized.updatedAt,
+    );
 
     return `
       <article class="simple-catalog-row catalog-product ${unavailable ? 'is-out-of-stock' : ''}" data-simple-catalog-product data-name="${escapeHTML(normalized.name)}" data-category="${escapeHTML(normalized.categorySlug)}" data-category-label="${escapeHTML(normalized.category)}" data-terms="${escapeHTML(normalized.terms)}" data-product-id="${escapeHTML(normalized.id)}">
@@ -5402,11 +5494,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = productOptions(normalized);
     const productKey = productSelectionKey(normalized);
     const savedVariationId = selectedVariationId || selectedVariationByProductKey[productKey] || '';
-    const selectedOption =
-      (savedVariationId && options.find((option) => String(option.id || option.value || '') === String(savedVariationId))) ||
+    const selectedOption = (savedVariationId &&
+      options.find((option) => String(option.id || option.value || '') === String(savedVariationId))) ||
       selectedVariationForProduct(normalized, options) ||
-      options[0] ||
-      { price: normalized.price };
+      options[0] || { price: normalized.price };
     const hasOptions = normalized.hasVariations && options.length > 0;
     const selectedOutOfStock = hasOptions ? optionOutOfStock(selectedOption) : outOfStock;
     const displayImage = getImagemProdutoSelecionada(normalized, hasOptions ? selectedOption : null);
@@ -5456,18 +5547,18 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class="fa-solid fa-arrow-left"></i>
               Voltar ao catalogo
             </button>
-            ${
-              `<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(selectedOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(selectedOption.id || '')}" data-variation-name="${escapeHTML(selectedOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
+            ${`<button class="btn ${selectedOutOfStock ? 'btn-esgotado' : 'btn-primary'} btn-add-cart" type="button" ${selectedOutOfStock ? 'disabled' : ''} data-name="${escapeHTML(normalized.name)}" data-price="${escapeHTML(selectedOption.price || normalized.price)}" data-image="${escapeHTML(displayImage)}" data-product-id="${escapeHTML(normalized.id)}" data-variation-id="${escapeHTML(selectedOption.id || '')}" data-variation-name="${escapeHTML(selectedOption.name || '')}" data-stock="" data-available="${selectedOutOfStock ? 'false' : 'true'}">
               <i class="fa-solid fa-cart-plus"></i>
               ${selectedOutOfStock ? 'Indisponivel' : 'Adicionar ao carrinho'}
-            </button>`
-            }
+            </button>`}
           </div>
         </div>
       `;
       const select = qs('.product-option', body);
       if (select && selectedOption?.id) {
-        const match = [...select.options].find((item) => String(item.dataset.variationId || '') === String(selectedOption.id));
+        const match = [...select.options].find(
+          (item) => String(item.dataset.variationId || '') === String(selectedOption.id),
+        );
         if (match) select.value = match.value;
       }
       refreshOfferCountdowns(body);
@@ -5643,7 +5734,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailButton = event.target.closest('[data-catalog-detail]');
         if (detailButton) {
           event.preventDefault();
-          openCatalogDetailModal(detailButton.dataset.catalogDetail || '', detailButton.dataset.catalogVariationId || '');
+          openCatalogDetailModal(
+            detailButton.dataset.catalogDetail || '',
+            detailButton.dataset.catalogVariationId || '',
+          );
           return;
         }
 
@@ -5669,7 +5763,10 @@ document.addEventListener('DOMContentLoaded', () => {
           card?.querySelector('.product-image')?.getAttribute('src') ||
           button.dataset.image ||
           getImagemProdutoSelecionada(
-            productIndex.find((item) => String(normalizeProduct(item).id) === String(button.dataset.productId || card?.dataset.productId || '')) || {},
+            productIndex.find(
+              (item) =>
+                String(normalizeProduct(item).id) === String(button.dataset.productId || card?.dataset.productId || ''),
+            ) || {},
             selectedState || null,
           ) ||
           '',
@@ -6318,10 +6415,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (product.hasVariations) return (product.options || []).some((option) => !optionOutOfStock(option));
         return product.stockState !== 'out';
       });
-    return [
-      ...active.filter((product) => product.recommended || product.highlight || product.offerActive),
-      ...active,
-    ]
+    return [...active.filter((product) => product.recommended || product.highlight || product.offerActive), ...active]
       .filter((product, index, list) => list.findIndex((item) => String(item.id) === String(product.id)) === index)
       .slice(0, 3);
   }
@@ -6617,7 +6711,7 @@ document.addEventListener('DOMContentLoaded', () => {
             password,
             options: {
               emailRedirectTo: authRedirectUrl('perfil.html'),
-              data: { name, phone, address, nick: '', photo: '' },
+              data: { name, phone, address, nick: '' },
             },
           });
           if (error) throw error;
@@ -7867,7 +7961,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nick: qs('#edit-nick')?.value.trim() || '',
         phone: qs('#edit-phone')?.value.trim() || '',
         address: qs('#edit-address')?.value.trim() || '',
-        photo: preview?.src?.startsWith('data:') ? preview.src : currentUser.photo,
+        photo: cleanProfilePhotoUrl(preview?.src || '') || cleanProfilePhotoUrl(currentUser.photo),
         provider: 'Supabase Auth',
         updatedAt: new Date().toISOString(),
       };
@@ -7890,13 +7984,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nick: updated.nick,
             phone: updated.phone,
             address: updated.address,
-            photo: updated.photo || '',
             updatedAt: updated.updatedAt,
           },
         });
         if (error) throw error;
 
-        const savedUser = userFromAuthUser(data.user);
+        const savedUser = { ...userFromAuthUser(data.user), photo: updated.photo };
         if (!savedUser?.email) throw new Error('Perfil não retornado pelo Supabase.');
         saveUser(savedUser);
         await safeUpsertProfileRecord(data.user, savedUser, 'edicao de perfil');
@@ -8221,7 +8314,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const developer = isDeveloperProfile(profile);
     document.body.dataset.adminRole = role;
     document.body.classList.toggle('admin-developer', developer);
-    document.body.classList.toggle('admin-owner', role === 'owner' || role === 'staff');
+    document.body.classList.toggle('admin-owner', role === 'admin' || role === 'developer');
     qsa('[data-developer-only]').forEach((element) => {
       element.classList.toggle('hidden', !developer);
       element.hidden = !developer;
@@ -10195,7 +10288,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function subscribeCustomerOrdersRealtime() {
     const client = ordersClient();
-    if (!client?.channel || customerOrdersRealtimeChannel || !['pedidos.html', 'perfil.html'].includes(currentPage())) return;
+    if (!client?.channel || customerOrdersRealtimeChannel || !['pedidos.html', 'perfil.html'].includes(currentPage()))
+      return;
     try {
       customerOrdersRealtimeChannel = client
         .channel('monte-sinai-customer-orders')
@@ -10425,10 +10519,15 @@ document.addEventListener('DOMContentLoaded', () => {
       { label: 'Entrega', status: 'Saiu para entrega', icon: 'fa-truck-fast' },
       { label: 'Entregue', status: 'Entregue', icon: 'fa-circle-check' },
     ];
-    const steps = canceled ? [...normalSteps, { label: 'Cancelado', status: 'Cancelado', icon: 'fa-circle-xmark' }] : normalSteps;
+    const steps = canceled
+      ? [...normalSteps, { label: 'Cancelado', status: 'Cancelado', icon: 'fa-circle-xmark' }]
+      : normalSteps;
     const currentIndex = canceled
       ? steps.length - 1
-      : Math.max(0, normalSteps.findIndex((step) => step.status === displayStatus));
+      : Math.max(
+          0,
+          normalSteps.findIndex((step) => step.status === displayStatus),
+        );
     const progress = steps.length > 1 ? Math.round((currentIndex / (steps.length - 1)) * 100) : 0;
     return steps
       .map((step, index) => {
