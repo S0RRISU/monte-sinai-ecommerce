@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const ORDER_STATUS = {
     pendente: { label: 'Recebido', db: 'recebido', column: 'lista-pendentes' },
-    preparo: { label: 'Em Separacao', db: 'em_separacao', column: 'lista-preparo' },
+    preparo: { label: 'Em separação', db: 'em_separacao', column: 'lista-preparo' },
     entrega: { label: 'Saiu para Entrega', db: 'saiu_para_entrega', column: 'lista-entrega' },
     entregue: { label: 'Entregue', db: 'entregue', column: 'lista-entregues' },
     cancelado: { label: 'Cancelado', db: 'cancelado', column: 'lista-cancelados' },
@@ -1105,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const canceled = statusUi === 'cancelado';
     const normalSteps = [
       { key: 'pendente', label: 'Recebido', icon: 'fa-receipt' },
-      { key: 'preparo', label: 'Separacao', icon: 'fa-box-open' },
+      { key: 'preparo', label: 'Separação', icon: 'fa-box-open' },
       { key: 'entrega', label: 'Entrega', icon: 'fa-truck-fast' },
       { key: 'entregue', label: 'Entregue', icon: 'fa-circle-check' },
     ];

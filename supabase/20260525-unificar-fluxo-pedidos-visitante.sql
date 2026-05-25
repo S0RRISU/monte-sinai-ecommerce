@@ -11,11 +11,24 @@ immutable
 as $$
   select case
     when lower(coalesce(p_status, '')) in ('recebido', 'pedido enviado', 'pendente') then 'recebido'
-    when lower(coalesce(p_status, '')) in ('em_separacao', 'em separacao', 'preparando', 'em preparo') then 'em_separacao'
+    when lower(coalesce(p_status, '')) in ('em_separacao', 'em separacao', 'em separação', 'preparando', 'em preparo') then 'em_separacao'
     when lower(coalesce(p_status, '')) in ('saiu_para_entrega', 'saiu para entrega') then 'saiu_para_entrega'
     when lower(coalesce(p_status, '')) in ('entregue') then 'entregue'
     when lower(coalesce(p_status, '')) in ('cancelado', 'cancelada') then 'cancelado'
     else 'recebido'
+  end;
+$$;
+
+create or replace function public.normalize_phone_digits(p_phone text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when length(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g')) in (12, 13)
+      and left(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 2) = '55'
+    then substr(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 3)
+    else regexp_replace(coalesce(p_phone, ''), '\D', '', 'g')
   end;
 $$;
 
@@ -65,6 +78,7 @@ declare
   order_row public.pedidos%rowtype;
   clean_code text := upper(btrim(coalesce(p_codigo, '')));
   clean_phone text := regexp_replace(coalesce(p_cliente_telefone, ''), '\D', '', 'g');
+  clean_phone_local text := public.normalize_phone_digits(p_cliente_telefone);
   items jsonb;
 begin
   if clean_code = '' or length(clean_phone) < 10 then
@@ -75,7 +89,10 @@ begin
   into order_row
   from public.pedidos
   where upper(codigo) = clean_code
-    and regexp_replace(coalesce(cliente_telefone, ''), '\D', '', 'g') = clean_phone
+    and (
+      regexp_replace(coalesce(cliente_telefone, ''), '\D', '', 'g') = clean_phone
+      or public.normalize_phone_digits(cliente_telefone) = clean_phone_local
+    )
   limit 1;
 
   if not found then
@@ -193,6 +210,7 @@ grant execute on function public.admin_update_order(uuid, text, text, boolean) t
 alter table public.pedidos enable row level security;
 alter table public.pedido_itens enable row level security;
 
+grant usage on schema public to anon, authenticated;
 grant select, update, delete on public.pedidos to authenticated;
 grant select on public.pedido_itens to authenticated;
 grant execute on function public.create_order(jsonb, jsonb) to anon;

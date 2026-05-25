@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const ORDER_STATUS_CANONICAL = {
     recebido: 'Recebido',
-    em_separacao: 'Em separacao',
+    em_separacao: 'Em separação',
     saiu_para_entrega: 'Saiu para entrega',
     entregue: 'Entregue',
     cancelado: 'Cancelado',
@@ -1034,9 +1034,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function checkoutFriendlyError(error, fallback = 'Nao consegui salvar o pedido no Supabase. Tente novamente.') {
-    const message = normalizeText(`${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`);
+    const rawMessage = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''}`;
+    const message = normalizeText(rawMessage);
+    if (message.includes('permission denied') || message.includes('42501') || message.includes('rls')) {
+      return 'Pedido nao salvo: revise as permissoes anon/RLS do SQL de pedidos no Supabase.';
+    }
     if (message.includes('create_order') || message.includes('function') || message.includes('rpc')) {
-      return 'Finalize a atualizacao do SQL no Supabase antes de vender. O carrinho foi mantido.';
+      return 'Pedido nao salvo: execute o SQL atualizado de pedidos no Supabase.';
+    }
+    if (message.includes('dados obrigatorios') || message.includes('not-null') || message.includes('null value')) {
+      return 'Confira nome, WhatsApp, endereco, pagamento e itens do carrinho antes de finalizar.';
     }
     if (message.includes('estoque insuficiente') || message.includes('produto do pedido nao esta disponivel')) {
       return 'Um produto ficou indisponivel. Confira o carrinho e tente novamente.';
@@ -1141,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return (
       {
         Recebido: 'is-status-received',
-        'Em separacao': 'is-status-preparing',
+        'Em separação': 'is-status-preparing',
         'Saiu para entrega': 'is-status-delivery',
         Entregue: 'is-status-delivered',
         Cancelado: 'is-status-canceled',
@@ -1788,6 +1795,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return data?.user || null;
   }
 
+  async function currentAuthUserOptional() {
+    const client = authClient();
+    if (!client?.auth) return null;
+
+    const sessionResult = await client.auth.getSession().catch(() => null);
+    if (!sessionResult?.data?.session) return null;
+
+    const { data, error } = await client.auth.getUser();
+    if (error) {
+      console.warn('[Supabase] Sessao encontrada, mas nao foi possivel validar o usuario.', error);
+      return null;
+    }
+    return data?.user || null;
+  }
+
   async function upsertProfileRecord(user = null, source = currentUser || {}) {
     const client = ordersClient();
     const authUser = user || (await currentAuthUser());
@@ -2172,6 +2194,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function onlyDigits(value) {
     return String(value ?? '').replace(/\D/g, '');
+  }
+
+  function localPhoneDigits(value) {
+    const digits = onlyDigits(value);
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) return digits.slice(2);
+    return digits;
   }
 
   function currentPage() {
@@ -4009,7 +4037,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (eyebrow) eyebrow.textContent = 'Acompanhamento';
       if (title) title.textContent = 'Meus pedidos';
       if (text)
-        text.textContent = 'Veja o status que a loja atualiza: recebido, em separacao, saiu para entrega e entregue.';
+        text.textContent = 'Veja o status que a loja atualiza: recebido, em separação, saiu para entrega e entregue.';
       if (panelEyebrow) panelEyebrow.textContent = 'Histórico';
       if (panelTitle) panelTitle.innerHTML = '<i class="fa-solid fa-clipboard-list"></i> Pedidos vinculados ao cliente';
       if (panelText)
@@ -7004,20 +7032,36 @@ document.addEventListener('DOMContentLoaded', () => {
     return customer;
   }
 
+  function setCheckoutError(message = '') {
+    const form = qs('#payment-form');
+    if (!form) return;
+    let box = qs('[data-checkout-error]', form);
+    if (!message) {
+      box?.remove();
+      return;
+    }
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'payment-note-box checkout-error-message';
+      box.dataset.checkoutError = '';
+      const actions = qs('.checkout-actions', form);
+      form.insertBefore(box, actions || null);
+    }
+    box.setAttribute('role', 'alert');
+    box.innerHTML = `<strong>Pedido nao salvo</strong><p>${escapeHTML(message)}</p>`;
+  }
+
   async function finalizarPedido() {
     if (!cart.length) {
       showToast('Seu carrinho está vazio.');
       return;
     }
 
+    setCheckoutError('');
+
     await authReady.catch(() => null);
     const client = ordersClient();
-    let authUser = null;
-    try {
-      authUser = await currentAuthUser();
-    } catch (error) {
-      console.warn('[Supabase] Nao foi possivel conferir usuario autenticado.', error);
-    }
+    const authUser = await currentAuthUserOptional();
 
     const customer = collectCheckoutCustomer();
     if (!customer) return;
@@ -7058,8 +7102,14 @@ document.addEventListener('DOMContentLoaded', () => {
       await saveOrder(order, authUser);
       savedInSupabase = true;
     } catch (error) {
-      console.error('[Supabase] Erro ao salvar pedido:', error);
+      console.error('[Supabase] Erro ao salvar pedido via create_order.', {
+        error,
+        orderPayload: orderPayload(order),
+        itemsCount: order.items.length,
+        isAuthenticated: Boolean(authUser?.id),
+      });
       checkoutWarning = checkoutFriendlyError(error);
+      setCheckoutError(checkoutWarning);
       showToast(checkoutWarning || 'Nao consegui salvar o pedido no Supabase. Tente novamente.', {
         type: 'error',
         title: 'Pedido nao salvo',
@@ -7091,7 +7141,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }</p>
           ${
             savedInSupabase
-              ? `<a class="btn btn-primary" href="${ordersHref()}?codigo=${encodeURIComponent(order.id)}&telefone=${encodeURIComponent(onlyDigits(order.customer.phone))}">
+              ? `<a class="btn btn-primary" href="${ordersHref()}?codigo=${encodeURIComponent(order.id)}&telefone=${encodeURIComponent(localPhoneDigits(order.customer.phone))}">
             <i class="fa-solid fa-location-dot"></i>
             Acompanhar pedido
           </a>`
@@ -7184,11 +7234,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveOrderThroughRpc(order) {
     const client = ordersClient();
+    const payload = orderPayload(order);
+    const items = orderItemsPayload(order);
     const { data, error } = await client.rpc('create_order', {
-      order_payload: orderPayload(order),
-      items_payload: orderItemsPayload(order),
+      order_payload: payload,
+      items_payload: items,
     });
-    if (error) throw error;
+    if (error) {
+      console.error('[Supabase] create_order retornou erro.', {
+        error,
+        orderPayload: payload,
+        itemsCount: items.length,
+      });
+      throw error;
+    }
     return data || {};
   }
 
@@ -7209,6 +7268,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextRemote = orderHasRemoteIdentity(nextOrder);
     const currentRemote = orderHasRemoteIdentity(currentOrder);
     if (nextRemote !== currentRemote) return nextRemote ? nextOrder : currentOrder;
+    if (nextOrder.remoteFresh === true && currentOrder.remoteFresh !== true) return nextOrder;
+    if (currentOrder.remoteFresh === true && nextOrder.remoteFresh !== true) return currentOrder;
 
     const nextTime = new Date(nextOrder.createdAt || nextOrder.created_at || 0).getTime();
     const currentTime = new Date(currentOrder.createdAt || currentOrder.created_at || 0).getTime();
@@ -10284,6 +10345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       paymentStatus: normalizePaymentStatus(raw.paymentStatus || raw.pagamento_status),
       confirmed: Boolean(raw.confirmed ?? raw.confirmado),
       customerType: raw.customerType || raw.cliente_tipo || 'visitante',
+      remoteFresh: Boolean(raw.remoteFresh),
     };
   }
 
@@ -10291,21 +10353,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const client = ordersClient();
     const cleanCode = String(code || '').trim();
     const cleanPhone = onlyDigits(phone || '');
+    const localPhone = localPhoneDigits(phone || '');
     if (!client) throw new Error('Supabase indisponivel.');
-    if (!cleanCode || cleanPhone.length < 10)
+    if (!cleanCode || localPhone.length < 10)
       throw new Error('Informe o codigo do pedido e o WhatsApp usado na compra.');
 
     const { data, error } = await client.rpc('track_order', {
       p_codigo: cleanCode,
       p_cliente_telefone: cleanPhone,
     });
-    if (error) throw error;
-    return trackedOrderFromPayload(data || {});
+    if (error) {
+      console.warn('[Supabase] track_order nao localizou/atualizou o pedido.', {
+        error,
+        codigo: cleanCode,
+        telefoneDigits: cleanPhone,
+        telefoneLocalDigits: localPhone,
+      });
+      throw error;
+    }
+    return trackedOrderFromPayload({ ...(data || {}), remoteFresh: true });
   }
 
   function rememberTrackedOrder(order) {
     if (!order?.id) return;
-    saveOrderLocally(order);
+    saveOrderLocally({ ...order, remoteFresh: true });
   }
 
   async function refreshLocalOrdersFromSupabase() {
@@ -10316,18 +10387,24 @@ document.addEventListener('DOMContentLoaded', () => {
       localOrders.map(async (order) => {
         const code = order.id || order.codigo || '';
         const phone = order.customer?.phone || '';
-        if (!code || onlyDigits(phone).length < 10) return order;
+        if (!code || localPhoneDigits(phone).length < 10) return order;
         try {
           return await trackOrderByCode(code, phone);
-        } catch (_error) {
+        } catch (error) {
+          console.warn('[Pedidos] Mantendo cache local porque track_order falhou para um pedido salvo.', {
+            codigo: code,
+            telefoneDigits: onlyDigits(phone),
+            telefoneLocalDigits: localPhoneDigits(phone),
+            error,
+          });
           return order;
         }
       }),
     );
 
-    const merged = dedupeOrders([...refreshed, ...localOrders]);
+    const merged = dedupeOrders([...refreshed, ...localOrders]).map((order) => ({ ...order, remoteFresh: false }));
     saveJSON(STORAGE.orders, merged.slice(0, 20));
-    return merged;
+    return dedupeOrders([...refreshed, ...merged]);
   }
 
   function subscribeCustomerOrdersRealtime() {
@@ -10559,7 +10636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const canceled = displayStatus === 'Cancelado';
     const normalSteps = [
       { label: 'Recebido', status: ORDER_STATUS_CANONICAL.recebido, icon: 'fa-receipt' },
-      { label: 'Separacao', status: ORDER_STATUS_CANONICAL.em_separacao, icon: 'fa-box-open' },
+      { label: 'Separação', status: ORDER_STATUS_CANONICAL.em_separacao, icon: 'fa-box-open' },
       { label: 'Entrega', status: ORDER_STATUS_CANONICAL.saiu_para_entrega, icon: 'fa-truck-fast' },
       { label: 'Entregue', status: ORDER_STATUS_CANONICAL.entregue, icon: 'fa-circle-check' },
     ];

@@ -14884,6 +14884,11 @@ body.light-mode .search-field .search-suggestions {
   color: #fecaca;
 }
 
+.checkout-error-message {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .order-card-actions {
   display: flex;
   flex-wrap: wrap;
