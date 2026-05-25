@@ -32501,19 +32501,32 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock {
     align-items: center !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    column-gap: 6px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 78px minmax(0, 1fr) minmax(0, 1fr) !important;
+    overflow: visible !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart),
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > a,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock > button:not(.dock-cart) {
+    position: relative !important;
+    z-index: 2 !important;
   }
 
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty,
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
   body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.active,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.is-empty,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart.has-items,
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock button.dock-cart.cart-visible-items {
     align-self: center !important;
     justify-self: center !important;
+    z-index: 5 !important;
     width: 78px !important;
     min-width: 78px !important;
     max-width: 78px !important;
@@ -32534,6 +32547,19 @@ html[data-theme] body:not(.admin-shell-body):not(.auth-body).cart-open .mobile-m
   html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count] {
     top: -4px !important;
     right: -2px !important;
+    pointer-events: none !important;
+  }
+
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count].is-empty,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count].is-empty {
+    display: none !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count].is-empty,
+  html[data-theme] body:not(.admin-shell-body):not(.auth-body) .mobile-quick-dock .dock-cart [data-cart-count].is-empty {
+    display: none !important;
   }
 }
 
