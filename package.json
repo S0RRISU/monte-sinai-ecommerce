@@ -4,7 +4,7 @@
   "private": true,
   "description": "Static Monte Sinai storefront checks.",
   "scripts": {
-    "check:js": "node --check js/script.js && node --check js/admin.js",
+    "check:js": "node --check js/supabase.js && node --check js/config.js && node --check js/state.js && node --check js/supabase-client.js && node --check js/supabase-services.js && node --check js/cart.js && node --check js/products.js && node --check js/search.js && node --check js/auth.js && node --check js/profile.js && node --check js/orders.js && node --check js/checkout.js && node --check js/admin.js && node --check js/ui.js && node --check js/app.js",
     "check:python": "python -m py_compile gerar_foto.py tools/update_asset_refs.py",
     "check:assets": "python tools/update_asset_refs.py --check",
     "test": "npm run check:js && npm run check:python && npm run check:assets"

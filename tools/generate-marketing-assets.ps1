@@ -198,7 +198,7 @@ function New-Canvas([int]$w, [int]$h, [bool]$transparent = $false) {
 
 $canvas = New-Canvas 1160 430 $true
 Draw-Logo $canvas.Graphics 60 30 1.45
-$canvas.Bitmap.Save((Join-Path $brandDir 'monte-sinai-logo-3d.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+$canvas.Bitmap.Save((Join-Path $brandDir 'monte-sinai-logo-marketing.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $canvas.Graphics.Dispose()
 $canvas.Bitmap.Dispose()
 

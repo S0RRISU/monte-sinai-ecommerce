@@ -2,259 +2,29 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
-    />
-    <meta
-      name="description"
-      content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp."
-    />
-    <meta name="theme-color" content="#00061f" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Finalize seu pedido Monte Sinai com entrega local e WhatsApp." />
+    <meta name="theme-color" content="#061833" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Monte Sinai" />
-    <meta property="og:title" content="Pagamento | Monte Sinai" />
-    <meta property="og:description" content="Revise seu carrinho e finalize seu pedido com a Monte Sinai." />
-    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
     <title>Pagamento | Monte Sinai</title>
     <link rel="manifest" href="../site.webmanifest" />
-    <link rel="icon" type="image/png" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
-    <link rel="apple-touch-icon" href="../assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="icon" type="image/png" href="../assets/brand/icons/monte-sinai-icon-transparente-192.png" />
+    <link rel="apple-touch-icon" href="../assets/brand/icons/monte-sinai-icon-transparente-192.png" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
-    <link rel="stylesheet" href="../css/style.css?v=20260525-order-flow-2" />
+    <link rel="stylesheet" href="../css/reset.css" />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <link rel="stylesheet" href="../css/states.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabase.js?v=20260520-4"></script>
-    <script defer src="../js/script.js?v=20260525-order-flow-2"></script>
+    <script src="../js/supabase.js"></script>
+    <script type="module" src="../js/app.js"></script>
   </head>
-  <body>
-    <header class="navbar">
-      <div class="container nav-inner">
-        <a class="brand" href="../index.html" aria-label="Monte Sinai - início">
-          <img
-            class="brand-logo"
-            src="../assets/brand/v2/monte-sinai-logo-v2.png"
-            alt="Monte Sinai"
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </a>
-        <nav class="nav-menu" aria-label="Navegação principal">
-          <a href="../index.html">Início</a>
-          <a href="produtos.html">Produtos</a>
-          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-          <a href="catalogo.html">Catálogo</a>
-          <a href="sobre.html">Sobre</a>
-          <a href="contato.html">Contato</a>
-        </nav>
-        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-          <i class="fa-solid fa-bars"></i>
-        </button>
-      </div>
-    </header>
-
-    <div class="mobile-menu">
-      <a href="../index.html">Início</a>
-      <a href="produtos.html">Produtos</a>
-      <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-      <a href="catalogo.html">Catálogo</a>
-      <a href="sobre.html">Sobre</a>
-      <a href="contato.html">Contato</a>
-    </div>
-
-    <main class="payment-page container">
-      <section class="payment-hero checkout-hero">
-        <div class="section-head">
-          <span class="eyebrow">Finalização segura</span>
-          <h1>Finalize seu pedido do seu jeito</h1>
-          <p>
-            Finalize como visitante ou entre para usar dados salvos. Escolha pagar na entrega ou encaminhar pelo
-            WhatsApp.
-          </p>
-        </div>
-      </section>
-
-      <section class="checkout-layout">
-        <aside class="checkout-order-panel">
-          <div class="checkout-panel-head">
-            <span class="eyebrow">Resumo</span>
-            <h2>Seu pedido</h2>
-          </div>
-          <div id="payment-summary"></div>
-          <div id="payment-empty" class="hidden">
-            Seu carrinho está vazio. Volte para a página de produtos e adicione itens.
-            <div class="settings-actions empty-actions">
-              <a class="btn btn-primary" href="produtos.html#todos-produtos">Ver produtos</a>
-            </div>
-          </div>
-        </aside>
-
-        <section class="checkout-main-panel">
-          <div class="checkout-account-card" id="checkout-account-card">
-            <div>
-              <span class="eyebrow">Conta do cliente</span>
-              <h2>Dados para entrega</h2>
-              <p id="checkout-account-text">
-                Login e opcional. Como visitante, basta preencher os dados de entrega abaixo.
-              </p>
-            </div>
-            <div class="checkout-account-actions">
-              <a class="btn btn-secondary" href="login.html" data-account-login>
-                <i class="fa-solid fa-right-to-bracket"></i>
-                Entrar
-              </a>
-            </div>
-          </div>
-
-          <form id="payment-form" class="checkout-form checkout-pro">
-            <div class="customer-fields" id="customer-fields">
-              <div class="payment-note-box payment-note-large">
-                <strong>Taxa de entrega de R$ 3,00 adicionada ao valor final.</strong>
-                <p>Entrega grátis em pedidos acima de R$ 50,00. Na compra de um gás, você ganha um brinde especial.</p>
-              </div>
-              <div class="form-group customer-switch">
-                <label>
-                  <input id="order-for-other" type="checkbox" />
-                  Pedido para outra pessoa
-                </label>
-              </div>
-              <div class="profile-info-box hidden" id="checkout-profile-box">
-                <p>Usando seus dados de login para preencher o pedido.</p>
-                <button class="btn btn-secondary" type="button" id="checkout-edit-customer">
-                  Alterar destinatário
-                </button>
-              </div>
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="payment-name">Nome do cliente</label>
-                  <input id="payment-name" type="text" placeholder="Seu nome" autocomplete="name" required />
-                </div>
-                <div class="form-group">
-                  <label for="payment-phone">Telefone</label>
-                  <input id="payment-phone" type="tel" placeholder="(11) 99999-9999" autocomplete="tel" required />
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="payment-address">Endereço de entrega</label>
-                <input
-                  id="payment-address"
-                  type="text"
-                  placeholder="Rua, número, bairro e cidade"
-                  autocomplete="street-address"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="payment-note">Observações</label>
-                <input id="payment-note" type="text" placeholder="Complemento, referência ou detalhe do pedido" />
-              </div>
-            </div>
-
-            <div class="payment-method-card">
-              <span class="eyebrow">Forma de pagamento</span>
-              <div class="payment-note-box">
-                <strong>Taxa de entrega de R$ 3,00 será adicionada ao total no fechamento do pedido.</strong>
-              </div>
-              <div class="payment-tabs" role="tablist" aria-label="Escolha a forma de pagamento">
-                <button class="payment-tab active" type="button" data-payment-option="delivery">
-                  <i class="fa-solid fa-hand-holding-dollar"></i>
-                  Pagar na entrega
-                </button>
-                <button class="payment-tab" type="button" data-payment-option="whatsapp">
-                  <i class="fa-brands fa-whatsapp"></i>
-                  WhatsApp
-                </button>
-              </div>
-
-              <div class="payment-panel active" data-payment-panel="delivery">
-                <div class="delivery-options">
-                  <label class="radio-card">
-                    <input type="radio" name="delivery-payment" value="Dinheiro na entrega" checked />
-                    <span><i class="fa-solid fa-money-bill-wave"></i> Dinheiro na entrega</span>
-                  </label>
-                  <label class="radio-card">
-                    <input type="radio" name="delivery-payment" value="Pix na entrega" />
-                    <span><i class="fa-solid fa-wallet"></i> Pix na entrega</span>
-                  </label>
-                  <label class="radio-card">
-                    <input type="radio" name="delivery-payment" value="Cartão na entrega" />
-                    <span><i class="fa-solid fa-credit-card"></i> Cartão na entrega</span>
-                  </label>
-                </div>
-                <p class="form-help-text">
-                  A taxa de entrega de R$ 3,00 é adicionada ao valor no momento da confirmação do pedido.
-                </p>
-              </div>
-
-              <div class="payment-panel" data-payment-panel="whatsapp">
-                <div class="whatsapp-checkout-card">
-                  <i class="fa-brands fa-whatsapp"></i>
-                  <div>
-                    <h3>Finalizar com atendimento humano</h3>
-                    <p>
-                      O site monta a mensagem com itens, total, endereço e forma de pagamento para a Monte Sinai
-                      confirmar tudo pelo WhatsApp.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="checkout-actions payment-actions">
-              <button id="payment-confirm" type="button" class="btn btn-primary">
-                <i class="fa-solid fa-lock"></i>
-                Finalizar pedido
-              </button>
-              <a class="btn btn-secondary" href="produtos.html#todos-produtos">
-                <i class="fa-solid fa-arrow-left"></i>
-                Continuar comprando
-              </a>
-            </div>
-          </form>
-        </section>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="container footer-inner">
-        <div>
-          <h3>Monte Sinai</h3>
-          <p>Entrega de água, gás e limpeza para sua casa.</p>
-        </div>
-        <div class="footer-links">
-          <a href="../index.html">Início</a>
-          <a href="produtos.html">Produtos</a>
-          <a href="pedidos.html" data-client-orders-link>Pedidos</a>
-          <a href="catalogo.html">Catálogo</a>
-          <a href="sobre.html">Sobre</a>
-          <a href="contato.html">Contato</a>
-        </div>
-        <div class="footer-social">
-          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-        </div>
-      </div>
-      <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-    </footer>
-
-    <a
-      class="whatsapp-float"
-      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <i class="fa-brands fa-whatsapp"></i>
-      <span>WhatsApp</span>
-    </a>
+  <body data-page="pagamento">
+    <div id="app"></div>
   </body>
 </html>

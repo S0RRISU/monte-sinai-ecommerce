@@ -122,14 +122,14 @@
   status = 200
 
 [[redirects]]
-  from = "/criar"
-  to = "/index.html"
-  status = 200
+from = "/criar"
+to = "/pages/criar.html"
+status = 200
 
 [[redirects]]
-  from = "/criar.html"
-  to = "/index.html"
-  status = 200
+from = "/criar.html"
+to = "/pages/criar.html"
+status = 200
 
 [[headers]]
   for = "/*"

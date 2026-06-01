@@ -1,515 +1,56 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Monte Sinai entrega água mineral, gás de cozinha e produtos de limpeza com pedido rápido pelo celular e atendimento pelo WhatsApp."
+      content="Monte Sinai entrega agua, gas e produtos de limpeza com carrinho online, atendimento pelo WhatsApp e painel conectado ao Supabase."
     />
-    <meta name="theme-color" content="#00061f" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#061833" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://monte-sinai.netlify.app/" />
-    <meta property="og:url" content="https://monte-sinai.netlify.app/" />
-    <meta property="og:locale" content="pt_BR" />
-    <meta property="og:image:secure_url" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
-    <meta property="og:image:alt" content="Monte Sinai - água, gás e produtos de limpeza" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Monte Sinai | Água, Gás e Limpeza" />
-    <meta
-      name="twitter:description"
-      content="Peça água mineral, gás de cozinha e produtos de limpeza com carrinho online, entrega local e atendimento pelo WhatsApp."
-    />
-    <meta name="twitter:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Monte Sinai" />
-    <meta property="og:title" content="Monte Sinai | Água, Gás e Limpeza" />
+    <meta property="og:title" content="Monte Sinai | Agua, Gas e Limpeza" />
+    <meta property="og:description" content="Peca agua, gas e limpeza com entrega local e atendimento direto." />
     <meta
-      property="og:description"
-      content="Peça água, gás e limpeza com carrinho simples, entrega local e atendimento direto."
+      property="og:image"
+      content="https://monte-sinai.netlify.app/assets/brand/monte-sinai-logo-transparente.png"
     />
-    <meta property="og:image" content="https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png" />
-    <title>Monte Sinai | Água, Gás e Limpeza</title>
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>Monte Sinai | Agua, Gas e Limpeza</title>
     <link rel="manifest" href="site.webmanifest" />
-    <link rel="icon" type="image/png" href="assets/brand/v2/monte-sinai-logo-v2.png" />
-    <link rel="apple-touch-icon" href="assets/brand/v2/monte-sinai-logo-v2.png" />
+    <link rel="icon" type="image/png" href="assets/brand/icons/monte-sinai-icon-transparente-192.png" />
+    <link rel="apple-touch-icon" href="assets/brand/icons/monte-sinai-icon-transparente-192.png" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="dns-prefetch" href="https://nnglqufeyergsgzafdek.supabase.co" />
-    <link rel="preload" as="image" href="assets/produtos/v2/agua-mineral-20l.png" fetchpriority="high" />
-    <link rel="preload" as="image" href="assets/produtos/v2/gas-p13.png" fetchpriority="high" />
-    <link rel="stylesheet" href="css/style.css?v=20260525-order-flow-2" />
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/states.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
-        "@id": "https://monte-sinai.netlify.app/#localbusiness",
         "name": "Monte Sinai",
         "url": "https://monte-sinai.netlify.app/",
-        "image": "https://monte-sinai.netlify.app/assets/hero/v2/hero-banner-v2.png",
-        "logo": "https://monte-sinai.netlify.app/assets/brand/v2/monte-sinai-logo-v2.png",
-        "description": "Entrega local de água mineral, gás de cozinha e produtos de limpeza com pedido online e atendimento pelo WhatsApp.",
+        "image": "https://monte-sinai.netlify.app/assets/brand/monte-sinai-logo-transparente.png",
+        "logo": "https://monte-sinai.netlify.app/assets/brand/monte-sinai-logo-transparente.png",
+        "description": "Entrega local de agua, gas e produtos de limpeza com pedido online e WhatsApp.",
         "telephone": "+55 11 96092-8234",
-        "email": "contato@montesinai.com.br",
-        "priceRange": "$$",
-        "areaServed": {
-          "@type": "AdministrativeArea",
-          "name": "São Paulo, BR"
-        },
-        "address": {
-          "@type": "PostalAddress",
-          "addressLocality": "São Paulo",
-          "addressRegion": "SP",
-          "addressCountry": "BR"
-        },
-        "sameAs": ["https://wa.me/5511960928234"],
-        "makesOffer": [
-          { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Água mineral 20L" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Gás de cozinha P13" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Produtos de limpeza" } }
-        ]
+        "areaServed": "Sao Paulo, BR"
       }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase.js?v=20260520-4"></script>
-    <script defer src="js/script.js?v=20260525-order-flow-2"></script>
+    <script src="js/supabase.js"></script>
+    <script type="module" src="js/app.js"></script>
   </head>
-  <body>
-    <header class="navbar">
-      <div class="container nav-inner">
-        <a class="brand" href="index.html" aria-label="Monte Sinai - início">
-          <img
-            class="brand-logo"
-            src="assets/brand/v2/monte-sinai-logo-v2.png"
-            alt="Monte Sinai"
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-          />
-        </a>
-        <nav class="nav-menu" aria-label="Navegação principal">
-          <a href="index.html">Início</a>
-          <a href="pages/produtos.html">Produtos</a>
-          <a href="pages/pedidos.html" data-client-orders-link>Pedidos</a>
-          <a href="pages/catalogo.html">Catálogo</a>
-          <a href="pages/sobre.html">Sobre</a>
-          <a href="pages/contato.html">Contato</a>
-        </nav>
-        <button class="mobile-menu-toggle" type="button" aria-label="Abrir menu">
-          <i class="fa-solid fa-bars"></i>
-        </button>
-      </div>
-    </header>
-
-    <div class="mobile-menu">
-      <a href="index.html">Início</a>
-      <a href="pages/produtos.html">Produtos</a>
-      <a href="pages/pedidos.html" data-client-orders-link>Pedidos</a>
-      <a href="pages/catalogo.html">Catálogo</a>
-      <a href="pages/sobre.html">Sobre</a>
-      <a href="pages/contato.html">Contato</a>
-    </div>
-
-    <main>
-      <section class="hero-home">
-        <div class="hero-orbit hero-orbit-one" aria-hidden="true"></div>
-        <div class="hero-orbit hero-orbit-two" aria-hidden="true"></div>
-        <div class="container hero-home-grid">
-          <div class="hero-home-content">
-            <span class="eyebrow">Entrega rápida, segura e local</span>
-            <h1>Monte Sinai leva água, gás e produtos de limpeza até você.</h1>
-            <p>
-              Escolha os produtos, monte o carrinho, entre com sua conta e finalize com pagamento na entrega ou
-              atendimento pelo WhatsApp.
-            </p>
-            <form class="hero-search" role="search" data-site-search-form>
-              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-              <input
-                type="search"
-                name="busca"
-                data-site-search-input
-                placeholder="Pesquisar água, gás, detergente..."
-              />
-              <button type="submit">Buscar</button>
-            </form>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="pages/produtos.html#todos-produtos">
-                <i class="fa-solid fa-basket-shopping"></i>
-                Comprar agora
-              </a>
-              <a class="btn btn-secondary" href="pages/login.html" data-account-cta>
-                <i class="fa-solid fa-user-check"></i>
-                Entrar ou cadastrar
-              </a>
-            </div>
-            <div class="trust-strip" aria-label="Diferenciais">
-              <div class="trust-item"><i class="fa-solid fa-truck-fast"></i><span>Entrega local</span></div>
-              <div class="trust-item"><i class="fa-solid fa-gift"></i><span>Brinde na compra de gás</span></div>
-              <div class="trust-item"><i class="fa-solid fa-star"></i><span>Frete grátis acima de R$ 50</span></div>
-            </div>
-          </div>
-
-          <div class="hero-3d-showcase" aria-label="Produtos em destaque">
-            <img
-              class="hero-3d-product hero-water"
-              src="assets/produtos/v2/agua-mineral-20l.png"
-              alt="Água mineral 20L"
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-            />
-            <img
-              class="hero-3d-product hero-gas"
-              src="assets/produtos/v2/gas-p13.png"
-              alt="Gás de cozinha P13"
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-            />
-            <img
-              class="hero-3d-product hero-cleaning"
-              src="assets/hero/v2/cleaning-products-v2.png"
-              alt="Produtos de limpeza"
-              loading="eager"
-              decoding="async"
-              fetchpriority="high"
-            />
-            <div class="hero-3d-badge">
-              <i class="fa-solid fa-bolt"></i>
-              <span>Pedido rápido</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section container">
-        <div class="section-head">
-          <span class="eyebrow">Loja completa</span>
-          <h2>Essenciais para abastecer e cuidar da casa</h2>
-          <p>
-            Água, gás, limpeza pesada, higiene e utensílios organizados para compra rápida no celular e no computador.
-          </p>
-        </div>
-        <div class="categories-grid">
-          <article class="category-card tilt-3d">
-            <img
-              class="category-thumb"
-              src="assets/hero/v2/delivery-bike-v2.png"
-              alt="Entrega rápida"
-              loading="lazy"
-              decoding="async"
-            />
-            <h3>Entrega rápida</h3>
-            <p>Pedido com dados organizados e envio direto para atendimento.</p>
-          </article>
-          <article class="category-card tilt-3d">
-            <img
-              class="category-thumb"
-              src="assets/produtos/v2/agua-mineral-20l.png"
-              alt="Água mineral"
-              loading="lazy"
-              decoding="async"
-            />
-            <h3>Água mineral</h3>
-            <p>Galão 20L recomendado para casa, comércio e reposição recorrente.</p>
-          </article>
-          <article class="category-card tilt-3d">
-            <img
-              class="category-thumb"
-              src="assets/produtos/v2/gas-p13.png"
-              alt="Gás de cozinha"
-              loading="lazy"
-              decoding="async"
-            />
-            <h3>Gás P13</h3>
-            <p>Botijão residencial com destaque no catálogo e finalização rápida.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section section-highlight product-showcase-section" id="mais-vendidos">
-        <div class="container">
-          <div class="section-head-row">
-            <div class="section-head">
-              <span class="eyebrow">Mais vendidos</span>
-              <h2>Role pelas laterais e escolha seus produtos</h2>
-              <p>
-                A vitrine mostra só alguns itens para manter a página leve. No final da rolagem você encontra o botão
-                para abrir o catálogo completo.
-              </p>
-            </div>
-            <div class="rail-controls" aria-label="Controles da vitrine">
-              <button class="icon-button" type="button" data-rail-scroll="prev" aria-label="Produtos anteriores">
-                <i class="fa-solid fa-chevron-left"></i>
-              </button>
-              <button class="icon-button" type="button" data-rail-scroll="next" aria-label="Próximos produtos">
-                <i class="fa-solid fa-chevron-right"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="product-rail" data-product-rail>
-            <article class="product-card rail-product is-recommended tilt-3d" data-name="Água mineral 20L">
-              <span class="recommended-badge">Recomendado</span>
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/agua-mineral-20l.png"
-                  alt="Água mineral 20L"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-droplet"></i></div>
-              <h3>Água mineral 20L</h3>
-              <p>Galão retornável para manter sua casa abastecida.</p>
-              <strong>R$ 15,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Água mineral 20L" data-price="15">
-                Adicionar
-              </button>
-            </article>
-
-            <article class="product-card rail-product is-recommended tilt-3d" data-name="Gás de cozinha P13">
-              <span class="recommended-badge">Recomendado</span>
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/gas-p13.png"
-                  alt="Gás de cozinha P13"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-fire-flame-simple"></i></div>
-              <h3>Gás de cozinha P13</h3>
-              <p>Escolha o tipo: Supergás R$ 125,00 ou Ultragás R$ 135,00.</p>
-              <select class="product-option" aria-label="Escolher tipo de gás">
-                <option value="Supergás" data-price="125">Supergás • R$ 125,00</option>
-                <option value="Ultragás" data-price="135">Ultragás • R$ 135,00</option>
-              </select>
-              <strong>R$ 125,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Gás de cozinha P13" data-price="125">
-                Adicionar
-              </button>
-            </article>
-
-            <article class="product-card rail-product tilt-3d" data-name="Detergente 2L">
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/detergente-2l.png"
-                  alt="Detergente 2L"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-bottle-droplet"></i></div>
-              <h3>Detergente 2L</h3>
-              <p>Neutro, econômico e pronto para louças e superfícies.</p>
-              <strong>R$ 16,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Detergente 2L" data-price="16">Adicionar</button>
-            </article>
-
-            <article class="product-card rail-product tilt-3d" data-name="Desinfetante 2L">
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/desinfetante-2l.png"
-                  alt="Desinfetante 2L"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-spray-can"></i></div>
-              <h3>Desinfetante 2L</h3>
-              <p>Escolha a fragrância para perfumar a limpeza.</p>
-              <select class="product-option" aria-label="Escolher fragrância do desinfetante">
-                <option value="Kaialque" data-price="5">Kaialque</option>
-                <option value="Violeta" data-price="5">Violeta</option>
-                <option value="Eucalipto" data-price="5">Eucalipto</option>
-                <option value="Pinho" data-price="5">Pinho</option>
-                <option value="Jasmim" data-price="5">Jasmim</option>
-                <option value="Talco" data-price="5">Talco</option>
-                <option value="Dama da Noite" data-price="5">Dama da Noite</option>
-                <option value="Palmolive" data-price="5">Palmolive</option>
-              </select>
-              <strong>R$ 5,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Desinfetante 2L" data-price="5">Adicionar</button>
-            </article>
-
-            <article class="product-card rail-product tilt-3d" data-name="Vassoura">
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/vassoura.png"
-                  alt="Vassoura"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-broom"></i></div>
-              <h3>Vassoura</h3>
-              <p>Para ambientes internos, externos e limpeza diária.</p>
-              <strong>R$ 26,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Vassoura" data-price="26">Adicionar</button>
-            </article>
-
-            <article class="product-card rail-product tilt-3d" data-name="Sabão Omo 2L">
-              <div class="product-media">
-                <img
-                  class="product-image"
-                  src="assets/produtos/v2/sabao-omo.png"
-                  alt="Sabão Omo 2L"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              <div class="product-icon"><i class="fa-solid fa-shirt"></i></div>
-              <h3>Sabão Omo 2L</h3>
-              <p>Sabão líquido para roupas limpas e perfumadas.</p>
-              <strong>R$ 22,00</strong>
-              <button class="btn btn-primary btn-add-cart" data-name="Sabão Omo 2L" data-price="22">Adicionar</button>
-            </article>
-
-            <a
-              class="more-card rail-product more-card-3d tilt-3d"
-              href="pages/produtos.html#todos-produtos"
-              aria-label="Ver mais produtos"
-            >
-              <div class="product-icon"><i class="fa-solid fa-arrow-right"></i></div>
-              <h3>Ver mais produtos</h3>
-              <p>Abra o catálogo completo com líquidos, químicos, utensílios e acessórios.</p>
-              <span class="btn btn-secondary">Ver catálogo completo</span>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section class="section container storefront-section">
-        <div class="section-head">
-          <span class="eyebrow">Compra por necessidade</span>
-          <h2>Atalhos para resolver a casa em poucos toques</h2>
-          <p>
-            Organizamos a loja como grandes distribuidores: categorias claras, pedido rápido, carrinho persistente e
-            atendimento direto para quem compra pelo celular.
-          </p>
-        </div>
-        <div class="storefront-grid">
-          <a class="storefront-card water-card" href="pages/produtos.html?q=agua#todos-produtos">
-            <span class="storefront-icon"><i class="fa-solid fa-droplet"></i></span>
-            <span class="storefront-copy">
-              <strong>Água mineral</strong>
-              <small>Galão 20L para casa e comércio</small>
-            </span>
-            <img
-              src="assets/produtos/site/v2/agua-mineral-20l.png"
-              alt="Água mineral 20L"
-              loading="lazy"
-              decoding="async"
-            />
-          </a>
-          <a class="storefront-card gas-card" href="pages/produtos.html?q=gas#todos-produtos">
-            <span class="storefront-icon"><i class="fa-solid fa-fire-flame-simple"></i></span>
-            <span class="storefront-copy">
-              <strong>Gás P13</strong>
-              <small>Supergás ou Ultragás com brinde</small>
-            </span>
-            <img src="assets/produtos/site/v2/gas-p13.png" alt="Gás de cozinha P13" loading="lazy" decoding="async" />
-          </a>
-          <a class="storefront-card cleaning-card" href="pages/produtos.html?q=limpeza#todos-produtos">
-            <span class="storefront-icon"><i class="fa-solid fa-spray-can-sparkles"></i></span>
-            <span class="storefront-copy">
-              <strong>Limpeza completa</strong>
-              <small>Produtos para banheiro, cozinha e piso</small>
-            </span>
-            <img
-              src="assets/hero/v2/cleaning-products-v2.png"
-              alt="Produtos de limpeza"
-              loading="lazy"
-              decoding="async"
-            />
-          </a>
-        </div>
-      </section>
-
-      <section class="section operations-band">
-        <div class="container operations-grid">
-          <article>
-            <i class="fa-solid fa-mobile-screen-button"></i>
-            <strong>Pedido mobile primeiro</strong>
-            <span>Busca, carrinho e finalização foram ajustados para iOS e Android.</span>
-          </article>
-          <article>
-            <i class="fa-solid fa-route"></i>
-            <strong>Pedido registrado com clareza</strong>
-            <span>O pedido fica salvo com itens, endereço, pagamento, total e status de atendimento.</span>
-          </article>
-          <article>
-            <i class="fa-solid fa-shield-heart"></i>
-            <strong>Confiança de distribuidora</strong>
-            <span>Visual consistente, categorias claras e contato sempre visível.</span>
-          </article>
-        </div>
-      </section>
-
-      <section class="section container about-cards">
-        <article class="info-card">
-          <h3>Perfil com pedidos</h3>
-          <p>O cliente salva seus dados, finaliza mais rápido e acompanha os pedidos pelo perfil.</p>
-        </article>
-        <article class="info-card">
-          <h3>Pagamento flexível</h3>
-          <p>Use pagamento na entrega ou WhatsApp, com frete grátis acima de R$ 50 e brinde na compra de gás.</p>
-        </article>
-        <article class="info-card">
-          <h3>Compra pelo celular</h3>
-          <p>Busca, carrinho e finalização foram pensados para pedido rápido em tela pequena.</p>
-        </article>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="container footer-inner">
-        <div>
-          <h3>Monte Sinai</h3>
-          <p>Água, gás e produtos de limpeza para sua casa.</p>
-        </div>
-        <div class="footer-links">
-          <a href="index.html">Início</a>
-          <a href="pages/produtos.html">Produtos</a>
-          <a href="pages/pedidos.html" data-client-orders-link>Pedidos</a>
-          <a href="pages/catalogo.html">Catálogo</a>
-          <a href="pages/sobre.html">Sobre</a>
-          <a href="pages/contato.html">Contato</a>
-        </div>
-        <div class="footer-social">
-          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-          <a href="https://wa.me/5511960928234" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-        </div>
-      </div>
-      <p class="footer-copy">© 2026 Monte Sinai. Todos os direitos reservados.</p>
-    </footer>
-
-    <a
-      class="whatsapp-float"
-      href="https://wa.me/5511960928234?text=Ol%C3%A1%2C+gostaria+de+um+or%C3%A7amento"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <i class="fa-brands fa-whatsapp"></i>
-      <span>WhatsApp</span>
-    </a>
+  <body data-page="home">
+    <div id="app"></div>
   </body>
 </html>

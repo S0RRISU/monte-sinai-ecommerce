@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     const name = payload.name || "cliente";
     const siteUrl = payload.siteUrl || "https://monte-sinai.netlify.app/";
     const installUrl = payload.installUrl || siteUrl;
-    const logoUrl = payload.logoUrl || `${siteUrl.replace(/\/$/, "")}/assets/brand/monte-sinai-logo-3d.png`;
+    const logoUrl = payload.logoUrl || `${siteUrl.replace(/\/$/, "")}/assets/brand/monte-sinai-logo-transparente.png`;
 
     const html = `
       <div style="margin:0;padding:0;background:#061126;font-family:Arial,Helvetica,sans-serif;color:#f8fbff;">

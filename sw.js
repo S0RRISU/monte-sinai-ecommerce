@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'monte-sinai-20260524-dock-admin-images';
+const CACHE_VERSION = 'monte-sinai-20260528-premium-foundation-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_MANIFEST_URL = '/assets/generated/v2/manifest.json';
@@ -11,20 +11,41 @@ const STATIC_ASSETS = [
   '/promocoes',
   '/sobre',
   '/contato',
-  '/css/style.css?v=20260524-dock-admin-images',
-  '/js/script.js?v=20260524-auth-photo-metadata',
-  '/js/supabase.js?v=20260520-4',
+  '/css/reset.css',
+  '/css/tokens.css',
+  '/css/base.css',
+  '/css/layout.css',
+  '/css/components.css',
+  '/css/states.css',
+  '/js/supabase.js',
+  '/js/config.js',
+  '/js/state.js',
+  '/js/supabase-client.js',
+  '/js/supabase-services.js',
+  '/js/cart.js',
+  '/js/products.js',
+  '/js/search.js',
+  '/js/auth.js',
+  '/js/profile.js',
+  '/js/orders.js',
+  '/js/checkout.js',
+  '/js/admin.js',
+  '/js/ui.js',
+  '/js/app.js',
   '/site.webmanifest',
   ASSET_MANIFEST_URL,
-  '/assets/brand/v2/monte-sinai-logo-v2.png',
-  '/assets/hero/v2/hero-banner-v2.png',
+  '/assets/brand/monte-sinai-logo-transparente.png',
+  '/assets/brand/icons/monte-sinai-icon-transparente-192.png',
+  '/assets/brand/icons/monte-sinai-icon-transparente-512.png',
   '/assets/produtos/v2/agua-mineral-20l.png',
-  '/assets/produtos/v2/gas-p13.png',
+  '/assets/produtos/v2/gas-p13.png'
 ];
 
 const PRIVATE_PATHS = [
   '/login',
   '/login.html',
+  '/criar',
+  '/criar.html',
   '/pagamento',
   '/pagamento.html',
   '/pedidos',
@@ -38,16 +59,17 @@ const PRIVATE_PATHS = [
   '/painel',
   '/painel.html',
   '/pages/login.html',
+  '/pages/criar.html',
   '/pages/pagamento.html',
   '/pages/pedidos.html',
   '/pages/perfil.html',
   '/pages/editar-perfil.html',
   '/pages/configuracoes.html',
-  '/pages/painel.html',
+  '/pages/painel.html'
 ];
 
 const FRESH_STATIC_FILE_RE = /\.(?:css|js)$/i;
-const STATIC_FILE_RE = /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|webmanifest)$/i;
+const STATIC_FILE_RE = /\.(?:css|js|png|jpg|jpeg|webp|svg|ico|webmanifest|json)$/i;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheStaticAssets().then(() => self.skipWaiting()));
@@ -61,10 +83,10 @@ self.addEventListener('activate', (event) => {
         Promise.all(
           keys
             .filter((key) => key.startsWith('monte-sinai-') && ![STATIC_CACHE, PAGE_CACHE].includes(key))
-            .map((key) => caches.delete(key)),
-        ),
+            .map((key) => caches.delete(key))
+        )
       )
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
   );
 });
 
@@ -101,6 +123,7 @@ async function networkFirst(request) {
     return (await cache.match(request)) || (await caches.match('/index.html'));
   }
 }
+
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request);
@@ -127,16 +150,12 @@ async function networkFirstStatic(request) {
 async function cacheStaticAssets() {
   const cache = await caches.open(STATIC_CACHE);
 
-  // Cache STATIC_ASSETS forcing network to bypass the browser HTTP cache.
-  for (const asset of STATIC_ASSETS) {
+  for (const path of STATIC_ASSETS) {
     try {
-      const req = new Request(asset, { cache: 'no-store' });
-      const res = await fetch(req);
-      if (res && res.ok) {
-        await cache.put(asset, res.clone());
-      }
-    } catch (e) {
-      // ignore individual asset failures
+      const response = await fetch(new Request(path, { cache: 'no-store' }));
+      if (response.ok) await cache.put(path, response.clone());
+    } catch (_error) {
+      // Individual cache misses must not block install.
     }
   }
 
@@ -146,21 +165,19 @@ async function cacheStaticAssets() {
     const manifest = await response.json();
     const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
     const urls = assets
-      .flatMap((asset) => [asset.new_path, asset.site_path])
+      .flatMap((item) => [item.new_path, item.site_path])
       .filter(Boolean)
       .map((path) => `/${String(path).replace(/^\/+/, '')}`);
 
-    // fetch each manifest asset with `no-store` and put into cache
     for (const url of urls) {
       try {
-        const req = new Request(url, { cache: 'no-store' });
-        const res = await fetch(req);
-        if (res && res.ok) await cache.put(url, res.clone());
-      } catch (e) {
-        // ignore failures per asset
+        const responseAsset = await fetch(new Request(url, { cache: 'no-store' }));
+        if (responseAsset.ok) await cache.put(url, responseAsset.clone());
+      } catch (_error) {
+        // Optional generated assets are cached opportunistically.
       }
     }
   } catch (_error) {
-    // O app continua instalavel mesmo se o manifest de assets ainda nao existir no primeiro deploy.
+    // The app remains installable without the generated asset manifest.
   }
 }

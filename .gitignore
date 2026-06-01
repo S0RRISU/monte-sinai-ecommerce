@@ -21,3 +21,4 @@ __pycache__/
 *.log
 *.tmp
 foto_produto*.jpg
+archive/visual-audit*/
