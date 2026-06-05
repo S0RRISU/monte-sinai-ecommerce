@@ -2,23 +2,29 @@
 Thumbs.db
 desktop.ini
 .env
+.env.local
+.env.*.local
 
 node_modules/
+.next/
+.turbo/
+.vercel/
 dist/
 build/
 .netlify/
 tmp/
+.tmp/
 .venv/
 generated/
 generated_test/
 generated_stability_test/
-!assets/generated/
-!assets/generated/v2/
-!assets/generated/v2/manifest.json
 __pycache__/
 *.pyc
 
 *.log
 *.tmp
+tsconfig.tsbuildinfo
+playwright-report/
+test-results/
 foto_produto*.jpg
 archive/visual-audit*/

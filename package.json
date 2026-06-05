@@ -1,12 +1,18 @@
 {
-  "name": "monte-sinai-static-site",
+  "name": "monte-sinai-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "Static Monte Sinai storefront checks.",
+  "description": "Monorepo Monte Sinai com site oficial Next e painel administrativo Next.",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "check:js": "node --check js/supabase.js && node --check js/config.js && node --check js/state.js && node --check js/supabase-client.js && node --check js/supabase-services.js && node --check js/cart.js && node --check js/products.js && node --check js/search.js && node --check js/auth.js && node --check js/profile.js && node --check js/orders.js && node --check js/checkout.js && node --check js/admin.js && node --check js/ui.js && node --check js/app.js",
-    "check:python": "python -m py_compile gerar_foto.py tools/update_asset_refs.py",
-    "check:assets": "python tools/update_asset_refs.py --check",
-    "test": "npm run check:js && npm run check:python && npm run check:assets"
+    "dev:web": "npm --workspace @monte-sinai/web run dev",
+    "dev:admin": "npm --workspace @monte-sinai/admin run dev",
+    "lint": "npm --workspace @monte-sinai/admin run lint && npm --workspace @monte-sinai/web run lint",
+    "typecheck": "npm --workspace @monte-sinai/admin run typecheck && npm --workspace @monte-sinai/web run typecheck",
+    "build": "npm --workspace @monte-sinai/admin run build && npm --workspace @monte-sinai/web run build",
+    "test": "npm --workspace @monte-sinai/admin run test && npm --workspace @monte-sinai/web run test",
+    "ready": "npm run lint && npm run typecheck && npm run build"
   }
 }

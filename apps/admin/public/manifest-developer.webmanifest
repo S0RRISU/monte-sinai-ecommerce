@@ -1,0 +1,50 @@
+{
+  "id": "/?app=developer",
+  "name": "Monte Sinai Desenvolvedor",
+  "short_name": "MS Dev",
+  "description": "App de desenvolvimento Monte Sinai para auditoria, logs, configuracoes e controle completo.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/dashboard?app=developer",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#020714",
+  "theme_color": "#19e6d0",
+  "categories": ["developer", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/brand/icons/monte-sinai-icon-transparente-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/icons/monte-sinai-icon-transparente-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Logs e auditoria",
+      "short_name": "Logs",
+      "url": "/logs?app=developer",
+      "icons": [{ "src": "/brand/icons/monte-sinai-icon-transparente-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Usuarios",
+      "short_name": "Usuarios",
+      "url": "/usuarios?app=developer",
+      "icons": [{ "src": "/brand/icons/monte-sinai-icon-transparente-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Configuracoes",
+      "short_name": "Config",
+      "url": "/configuracoes?app=developer",
+      "icons": [{ "src": "/brand/icons/monte-sinai-icon-transparente-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

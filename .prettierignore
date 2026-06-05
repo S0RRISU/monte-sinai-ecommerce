@@ -2,6 +2,11 @@
 .netlify
 .venv
 node_modules
+.next
+.turbo
+.tmp
+playwright-report
+test-results
 tmp
 generated
 generated_test
