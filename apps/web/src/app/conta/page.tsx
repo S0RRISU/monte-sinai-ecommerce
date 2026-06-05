@@ -4,10 +4,12 @@ import {
   Camera,
   ChevronRight,
   CreditCard,
+  ExternalLink,
   Gift,
   Heart,
   LogOut,
   MapPin,
+  MonitorCog,
   PackageCheck,
   Percent,
   Settings,
@@ -17,6 +19,7 @@ import {
   UserRound
 } from 'lucide-react';
 import { StoreShell } from '@/components/store/store-shell';
+import { adminPanelUrl } from '@/lib/admin-link';
 
 const quickAccess = [
   { label: 'Meus dados', text: 'Informações pessoais', href: '/conta', icon: UserRound },
@@ -114,6 +117,21 @@ export default function AccountPage() {
               </div>
             </section>
 
+            <section className="account-admin-card">
+              <span>
+                <MonitorCog className="size-7" />
+              </span>
+              <div>
+                <small>Equipe Monte Sinai</small>
+                <h2>Painel administrativo</h2>
+                <p>Abra o app separado para gerenciar pedidos, estoque, produtos e relatorios da loja.</p>
+              </div>
+              <a href={adminPanelUrl} target="_blank" rel="noreferrer">
+                Abrir painel
+                <ExternalLink className="size-4" />
+              </a>
+            </section>
+
             <section className="quick-access-section">
               <div className="account-section-title">
                 <h2>Acesso rápido</h2>
@@ -163,6 +181,14 @@ export default function AccountPage() {
               <p>Nossa equipe está pronta para ajudar.</p>
               <Link href="/configuracoes">Falar com atendimento</Link>
             </div>
+            <a className="sidebar-admin-link" href={adminPanelUrl} target="_blank" rel="noreferrer">
+              <MonitorCog className="size-5" />
+              <span>
+                <strong>Abrir painel</strong>
+                <small>Pedidos, produtos e estoque</small>
+              </span>
+              <ExternalLink className="size-5" />
+            </a>
           </aside>
         </div>
 
@@ -183,6 +209,14 @@ export default function AccountPage() {
             </span>
             <ChevronRight className="size-5" />
           </Link>
+          <a href={adminPanelUrl} target="_blank" rel="noreferrer" className="account-settings-row">
+            <MonitorCog className="size-6" />
+            <span>
+              <strong>Painel administrativo</strong>
+              <small>Acesso separado para a equipe da loja</small>
+            </span>
+            <ExternalLink className="size-5" />
+          </a>
           <button type="button" className="logout-row">
             <LogOut className="size-6" />
             <span>Sair da conta</span>

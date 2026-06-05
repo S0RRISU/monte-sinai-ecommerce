@@ -21,4 +21,4 @@ Publique `apps/admin` como um segundo site/app no Netlify.
 - Build command: `npm run build`
 - Publish directory: `.next`
 
-Depois de publicado, coloque a URL em `CONFIG.apps.adminUrl` no arquivo `js/config.js` da loja oficial.
+Depois de publicado, configure `NEXT_PUBLIC_STORE_URL` no painel e `NEXT_PUBLIC_ADMIN_URL` na loja oficial.

@@ -6,9 +6,11 @@ import {
   ChevronDown,
   ClipboardList,
   Clock,
+  ExternalLink,
   Mail,
   MapPin,
   MessageCircle,
+  MonitorCog,
   Search,
   ShieldCheck,
   Smartphone,
@@ -16,6 +18,7 @@ import {
   UserRound
 } from 'lucide-react';
 import { getStorefrontConfig } from '@/lib/storefront-data';
+import { adminPanelUrl } from '@/lib/admin-link';
 import { visibleStoreCategories, type StorefrontSiteConfig } from '@/lib/site-config';
 import { CartShortcut } from './cart-shortcut';
 import { CategoryIcon } from './category-icon';
@@ -145,6 +148,10 @@ export async function StoreShell({ children, minimalHeader = false }: { children
             <Link href="/pedidos">Pedidos</Link>
             <Link href="/carrinho">Carrinho</Link>
             <Link href="/conta">Conta</Link>
+            <a className="footer-admin-link" href={adminPanelUrl} target="_blank" rel="noreferrer">
+              Painel administrativo
+              <ExternalLink className="size-3" />
+            </a>
           </nav>
 
           <nav className="footer-column" aria-label="Categorias">
@@ -196,6 +203,9 @@ export async function StoreShell({ children, minimalHeader = false }: { children
                 {category.label}
               </Link>
             ))}
+            <a href={adminPanelUrl} target="_blank" rel="noreferrer">
+              Painel
+            </a>
           </div>
           <p className="footer-mobile-contact">
             <MessageCircle className="size-4" />
@@ -205,7 +215,10 @@ export async function StoreShell({ children, minimalHeader = false }: { children
 
         <div className="footer-bottom">
           <span>{siteConfig.name}</span>
-          <span>Compra simples, entrega local.</span>
+          <a className="footer-bottom-admin" href={adminPanelUrl} target="_blank" rel="noreferrer">
+            <MonitorCog className="size-4" />
+            Acesso do painel
+          </a>
         </div>
       </footer>
 

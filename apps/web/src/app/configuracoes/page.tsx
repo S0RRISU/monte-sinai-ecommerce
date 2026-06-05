@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   CreditCard,
+  ExternalLink,
   FileText,
   Headphones,
   HelpCircle,
@@ -13,12 +14,14 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
+  MonitorCog,
   Moon,
   ShieldCheck,
   Truck
 } from 'lucide-react';
 import { StoreShell } from '@/components/store/store-shell';
 import { ThemeSettings } from '@/components/store/theme-settings';
+import { adminPanelUrl } from '@/lib/admin-link';
 
 const sections = [
   {
@@ -121,6 +124,20 @@ export default function SettingsPage() {
             {sections.slice(1).map((section) => (
               <SettingsSection key={section.title} title={section.title} items={section.items} />
             ))}
+            <section className="settings-admin-card">
+              <span>
+                <MonitorCog className="size-6" />
+              </span>
+              <div>
+                <small>Equipe Monte Sinai</small>
+                <strong>Painel administrativo</strong>
+                <p>Abra o app do painel para gerenciar pedidos, produtos e estoque.</p>
+              </div>
+              <a href={adminPanelUrl} target="_blank" rel="noreferrer">
+                Abrir painel
+                <ExternalLink className="size-4" />
+              </a>
+            </section>
             <section className="settings-section">
               <div className="settings-list">
                 <button type="button" className="settings-list-row logout-settings-row">

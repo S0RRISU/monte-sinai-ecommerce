@@ -29,6 +29,16 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
+Configure tambem as URLs entre os apps:
+
+```text
+# apps/web
+NEXT_PUBLIC_ADMIN_URL=https://URL-DO-PAINEL
+
+# apps/admin
+NEXT_PUBLIC_STORE_URL=https://URL-DA-LOJA
+```
+
 Nao use service role no frontend.
 
 ## Validacao antes de publicar
