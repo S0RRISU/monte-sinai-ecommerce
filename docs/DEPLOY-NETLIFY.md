@@ -134,26 +134,30 @@ A CLI `netlify` e opcional. Se ela estiver instalada e autenticada, use estes co
 Loja:
 
 ```powershell
+Push-Location apps/web
 netlify sites:create --name monte-sinai-loja
 netlify link --name monte-sinai-loja
 netlify env:set NEXT_PUBLIC_SUPABASE_URL "https://SEU-PROJETO.supabase.co"
 netlify env:set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "SUA_CHAVE_PUBLISHABLE"
 netlify env:set NEXT_PUBLIC_ADMIN_URL "https://URL-DO-PAINEL-ADMIN"
 netlify deploy --build
+Pop-Location
 ```
 
 Painel:
 
 ```powershell
+Push-Location apps/admin
 netlify sites:create --name monte-sinai-admin
 netlify link --name monte-sinai-admin
 netlify env:set NEXT_PUBLIC_SUPABASE_URL "https://SEU-PROJETO.supabase.co"
 netlify env:set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "SUA_CHAVE_PUBLISHABLE"
 netlify env:set NEXT_PUBLIC_STORE_URL "https://URL-DA-LOJA-PUBLICA"
 netlify deploy --build
+Pop-Location
 ```
 
-Pelo monorepo, prefira configurar Base directory no painel do Netlify. Se usar CLI, confira no site criado se o Base directory ficou como `apps/web` ou `apps/admin` antes de publicar em producao.
+Pelo monorepo, prefira configurar Base directory no painel do Netlify. Se usar CLI, execute os comandos dentro do diretorio do app correto e confira no site criado se o Base directory ficou como `apps/web` ou `apps/admin` antes de publicar em producao.
 
 ## Validacao local antes de publicar
 
