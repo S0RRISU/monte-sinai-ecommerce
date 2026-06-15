@@ -1,3 +1,54 @@
+# Monte Sinai Ecommerce
+
+Sistema web completo para venda de água, gás e produtos de limpeza.
+
+## Tecnologias
+
+* HTML5
+* CSS3
+* JavaScript
+* Supabase
+* PostgreSQL
+* Netlify
+* GitHub
+
+## Principais Funcionalidades
+
+### Cliente
+
+* Login e cadastro
+* Carrinho de compras
+* Checkout por WhatsApp
+* Histórico de pedidos
+* Consulta de pedidos
+
+### Administração
+
+* Painel administrativo
+* Cadastro e edição de produtos
+* Controle de estoque
+* Gestão de pedidos
+* Controle de pagamentos
+* Upload de imagens
+
+### Recursos Técnicos
+
+* Autenticação
+* Banco de dados Supabase
+* Políticas RLS
+* PWA instalável
+* Responsividade Mobile, Tablet e Desktop
+* Deploy automatizado
+
+## Demonstração
+
+https://monte-sinai.netlify.app
+
+---
+
+# Documentação Técnica
+
+
 # Monte Sinai
 
 Site estatico da Monte Sinai para venda local de agua, gas e produtos de limpeza, com catalogo, carrinho, checkout por WhatsApp, autenticacao, pedidos e painel administrativo conectados ao Supabase.
