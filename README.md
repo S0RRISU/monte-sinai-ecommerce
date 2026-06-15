@@ -2,10 +2,20 @@
 
 Plataforma web completa para venda local de **água mineral, gás de cozinha e produtos de limpeza**.
 
-O projeto foi desenvolvido para uma operação real de comércio local, reunindo catálogo de produtos, autenticação de usuários, carrinho de compras, checkout via WhatsApp, painel administrativo, controle de estoque, pedidos, banco de dados em nuvem, permissões por cargo, PWA e deploy em produção.
+O projeto foi desenvolvido para atender uma operação real de comércio local, reunindo catálogo de produtos, autenticação de usuários, carrinho de compras, checkout via WhatsApp, gerenciamento de pedidos, controle de estoque, painel administrativo, banco de dados em nuvem, permissões por cargo, PWA e deploy em produção.
 
 🌐 **Demonstração:**
 https://monte-sinai.netlify.app
+
+---
+
+## 📌 Sobre o projeto
+
+O **Monte Sinai Ecommerce** é uma aplicação web criada para digitalizar o processo de venda local de água, gás e produtos de limpeza.
+
+A solução permite que clientes naveguem pelo catálogo, adicionem produtos ao carrinho, finalizem pedidos pelo WhatsApp e acompanhem seus pedidos. Ao mesmo tempo, a administração consegue gerenciar produtos, estoque, pedidos, pagamentos, imagens e configurações da loja através de um painel administrativo integrado.
+
+O sistema utiliza **Supabase** como backend principal, com banco de dados PostgreSQL, autenticação de usuários, policies de segurança, controle de permissões, armazenamento de imagens e funções para criação segura de pedidos.
 
 ---
 
@@ -13,62 +23,181 @@ https://monte-sinai.netlify.app
 
 ### 👤 Área do cliente
 
-* Cadastro e login de usuários
+* Cadastro de usuários
+* Login autenticado
+* Perfil do cliente
 * Catálogo de produtos
 * Carrinho de compras
 * Checkout via WhatsApp
+* Finalização de pedido como visitante
+* Finalização de pedido como cliente logado
 * Histórico de pedidos
-* Consulta de pedidos
+* Consulta de pedidos por código e WhatsApp
 
 ### 🛠️ Painel administrativo
 
 * Gestão de produtos
+* Cadastro de produtos
+* Edição de produtos
+* Exclusão de produtos
+* Ativação e desativação de produtos
+* Controle de preços
 * Controle de estoque
+* Alerta de estoque baixo
 * Gestão de pedidos
-* Controle de pagamento
-* Upload de imagens
+* Controle de status do pedido
+* Controle de status de pagamento
+* Upload de imagens para produtos
 * Configurações da loja
+* Controle de WhatsApp, Pix, entrega e bairros atendidos
+* Modo programador com diagnóstico técnico
 
 ### 🔐 Recursos técnicos
 
 * Supabase Auth
 * Banco PostgreSQL
+* Supabase Storage
 * Row Level Security (RLS)
 * Role Based Access Control (RBAC)
-* Supabase Storage
+* Função segura para criação de pedidos
+* Recalculo de totais no backend
+* Atualização de estoque
 * PWA instalável
 * Service Worker
-* Deploy com Netlify
+* Cache de arquivos estáticos
+* Deploy via Netlify
 
 ---
 
 ## 🧰 Tecnologias utilizadas
 
+### Front-end
+
 * HTML5
 * CSS3
 * JavaScript
+
+### Backend e banco de dados
+
 * Supabase
 * PostgreSQL
+* Supabase Auth
+* Supabase Storage
+* Supabase Edge Functions
+
+### Infraestrutura e publicação
+
 * GitHub
 * Netlify
+* Netlify TOML
 * PWA
+* Service Worker
+
+### Segurança e permissões
+
+* Row Level Security (RLS)
+* Role Based Access Control (RBAC)
+* Policies no Supabase
+* Controle de acesso por perfil
+
+---
+
+## 📷 Screenshots
+
+> Adicione aqui imagens do projeto para valorizar o repositório.
+
+Sugestões de imagens:
+
+* Home da loja
+* Catálogo de produtos
+* Carrinho de compras
+* Checkout
+* Tela de pedidos
+* Painel administrativo
+* Versão mobile
+
+Exemplo de estrutura:
+
+```md
+![Home da loja](assets/screenshots/home.png)
+![Painel administrativo](assets/screenshots/painel-admin.png)
+![Versão mobile](assets/screenshots/mobile.png)
+```
 
 ---
 
 # 📚 Documentação Técnica
 
+## 1. Visão geral da aplicação
 
-## Visão Geral
+O Monte Sinai Ecommerce é um site estático conectado ao Supabase para venda local de água, gás e produtos de limpeza.
 
-O Monte Sinai é um site estático conectado ao Supabase para venda local de água, gás e produtos de limpeza.
+A aplicação possui:
 
-A aplicação possui catálogo, carrinho, checkout por WhatsApp, autenticação, pedidos, painel administrativo, controle de estoque, upload de imagens e configurações operacionais da loja.
+* Catálogo de produtos
+* Carrinho de compras
+* Checkout por WhatsApp
+* Autenticação de usuários
+* Pedidos
+* Painel administrativo
+* Controle de estoque
+* Upload de imagens
+* Configurações operacionais da loja
+* PWA
+* Deploy em produção
 
-O sistema utiliza o Supabase como backend principal, com autenticação, banco PostgreSQL, policies de segurança, armazenamento de imagens e Edge Functions.
+O sistema utiliza o Supabase como backend principal, com autenticação, banco PostgreSQL, policies de segurança, armazenamento de imagens e funções de apoio.
 
 ---
 
-## Publicação no Netlify
+## 2. Estrutura principal do projeto
+
+A estrutura do projeto é organizada em pastas e arquivos responsáveis por interface, lógica, assets, banco de dados e automações.
+
+```txt
+/
+├── assets/
+│   ├── brand/
+│   ├── hero/
+│   └── produtos/
+│
+├── css/
+│   └── arquivos de estilo da aplicação
+│
+├── js/
+│   ├── supabase.js
+│   ├── script.js
+│   ├── admin.js
+│   ├── app-shell.js
+│   └── demais scripts da aplicação
+│
+├── pages/
+│   ├── painel.html
+│   ├── pedidos.html
+│   └── demais páginas internas
+│
+├── supabase/
+│   ├── schema-pedidos.sql
+│   ├── seed-produtos.sql
+│   ├── storage-produtos.sql
+│   ├── 20260524-base-rbac-permissoes.sql
+│   └── demais migrações
+│
+├── tools/
+│   └── scripts auxiliares
+│
+├── index.html
+├── netlify.toml
+├── package.json
+├── robots.txt
+├── sitemap.xml
+├── sw.js
+└── README.md
+```
+
+---
+
+## 3. Publicação no Netlify
 
 A publicação do projeto utiliza Netlify com configuração detectada pelo arquivo `netlify.toml`.
 
@@ -103,7 +232,7 @@ O arquivo `netlify.toml` configura:
 
 ---
 
-## Configuração do Supabase
+## 4. Configuração do Supabase
 
 A aplicação depende de scripts SQL para criação e atualização da estrutura do banco de dados.
 
@@ -118,35 +247,69 @@ supabase/20260524-base-rbac-permissoes.sql
 supabase/storage-produtos.sql
 ```
 
-### Função de cada script
+---
 
-#### `supabase/schema-pedidos.sql`
+### `supabase/schema-pedidos.sql`
 
-Define a estrutura principal relacionada a pedidos, clientes e itens.
+Script responsável pela estrutura principal relacionada a pedidos, clientes, itens e dados operacionais.
 
-#### `supabase/seed-produtos.sql`
+---
 
-Popula ou atualiza o catálogo inicial de produtos.
+### `supabase/seed-produtos.sql`
 
-Esse script utiliza a tabela `public.produtos`, atualiza produtos existentes pelo campo `nome` e não apaga produtos já cadastrados.
+Script responsável por popular ou atualizar o catálogo inicial de produtos.
 
-Deve ser usado somente quando for necessário repor ou atualizar o catálogo inicial.
+Esse script utiliza a tabela:
 
-#### `supabase/20260524-base-rbac-permissoes.sql`
+```txt
+public.produtos
+```
 
-Cria a base oficial de cargos e permissões do sistema.
+Ele atualiza produtos existentes pelo campo:
 
-Também libera o acesso ao painel administrativo para usuários com cargos autorizados.
+```txt
+nome
+```
 
-#### `supabase/storage-produtos.sql`
+E não apaga produtos já cadastrados.
 
-Cria o bucket público `produtos` no Supabase Storage.
+Esse arquivo deve ser usado somente quando for necessário repor ou atualizar o catálogo inicial.
+
+---
+
+### `supabase/20260524-base-rbac-permissoes.sql`
+
+Script responsável por criar a base oficial de cargos e permissões do sistema.
+
+Esse arquivo libera o acesso ao painel administrativo para usuários com cargos autorizados.
+
+A base de permissões utiliza cargos como:
+
+```txt
+cliente
+equipe
+motoboy
+admin
+developer
+```
+
+---
+
+### `supabase/storage-produtos.sql`
+
+Script responsável por criar o bucket público:
+
+```txt
+produtos
+```
+
+Esse bucket é utilizado para imagens dos produtos.
 
 O upload de imagens é permitido somente para usuários administrativos.
 
 ---
 
-## Migrações Complementares
+## 5. Migrações complementares
 
 Quando o banco já existe antes desta versão, também devem ser executadas as migrações idempotentes:
 
@@ -172,7 +335,7 @@ Essa etapa garante que:
 
 ---
 
-## Configuração do Cliente Supabase
+## 6. Configuração do cliente Supabase
 
 O arquivo responsável pela conexão com o Supabase é:
 
@@ -189,62 +352,9 @@ A aplicação web utiliza a chave pública do Supabase para operação no front-
 
 ---
 
-## Autenticação e Email
+# 🗄️ Estrutura no Supabase
 
-A autenticação utiliza Supabase Auth.
-
-### Configuração de email
-
-Em **Supabase > Authentication > Providers > Email**, a confirmação obrigatória de email pode ser desativada caso a loja queira permitir que o cliente entre logo após o cadastro.
-
-### Email de boas-vindas
-
-A aplicação suporta envio de email de boas-vindas através da Edge Function:
-
-```txt
-supabase/functions/send-welcome-email/index.ts
-```
-
-### Secrets necessários
-
-```txt
-RESEND_API_KEY
-WELCOME_FROM_EMAIL
-```
-
-### Comportamento da função
-
-A função `send-welcome-email` implementa:
-
-* Validação do JWT do usuário logado
-* Envio de email após cadastro autenticado
-* Botões para abrir a loja
-* Botão para instalar o app
-
-A verificação JWT da Edge Function deve permanecer ativa.
-
----
-
-## Instalação como PWA
-
-A tela de login possui botão **Instalar app**.
-
-Em navegadores compatíveis, o botão abre a instalação PWA.
-
-Em iPhone ou navegadores sem prompt de instalação, o sistema exibe instrução manual para instalação.
-
-A aplicação implementa:
-
-* Manifesto PWA
-* Service Worker
-* Cache de recursos
-* Instalação em dispositivos compatíveis
-
----
-
-# Estrutura no Supabase
-
-## Tabelas Principais
+## Tabelas principais
 
 O sistema utiliza as seguintes tabelas principais:
 
@@ -349,7 +459,7 @@ Armazena:
 
 ---
 
-## Tabelas Legadas
+## Tabelas legadas
 
 As tabelas antigas continuam preservadas apenas como legado:
 
@@ -377,7 +487,7 @@ As tabelas antigas não são apagadas.
 
 ---
 
-# Segurança
+# 🔐 Segurança
 
 ## Row Level Security (RLS)
 
@@ -394,7 +504,7 @@ As policies implementadas garantem que:
 
 ---
 
-## Criação Segura de Pedidos
+## Criação segura de pedidos
 
 Pedidos de visitantes e clientes logados são criados através da função segura:
 
@@ -420,7 +530,7 @@ user_id = null
 
 ---
 
-# Controle de Acesso (RBAC)
+# 🧑‍💼 Controle de Acesso (RBAC)
 
 A aplicação implementa controle de acesso baseado em papéis.
 
@@ -433,6 +543,8 @@ motoboy
 admin
 developer
 ```
+
+---
 
 ## Permissões por cargo
 
@@ -486,9 +598,66 @@ supabase/20260524-base-rbac-permissoes.sql
 
 ---
 
-# Fluxo do Pedido
+# 🔑 Autenticação e email
 
-## Fluxo do Cliente
+A autenticação utiliza Supabase Auth.
+
+## Configuração de email
+
+Em **Supabase > Authentication > Providers > Email**, a confirmação obrigatória de email pode ser desativada caso a loja queira permitir que o cliente entre logo após o cadastro.
+
+---
+
+## Email de boas-vindas
+
+A aplicação suporta envio de email de boas-vindas através da Edge Function:
+
+```txt
+supabase/functions/send-welcome-email/index.ts
+```
+
+### Secrets necessários
+
+```txt
+RESEND_API_KEY
+WELCOME_FROM_EMAIL
+```
+
+### Comportamento da função
+
+A função `send-welcome-email` implementa:
+
+* Validação do JWT do usuário logado
+* Envio de email após cadastro autenticado
+* Botões para abrir a loja
+* Botão para instalar o app
+
+A verificação JWT da Edge Function deve permanecer ativa.
+
+---
+
+# 📱 PWA
+
+A aplicação implementa recursos de Progressive Web App.
+
+## Recursos implementados
+
+* Manifesto PWA
+* Service Worker
+* Cache de recursos
+* Instalação em dispositivos compatíveis
+
+A tela de login possui botão **Instalar app**.
+
+Em navegadores compatíveis, o botão abre a instalação PWA.
+
+Em iPhone ou navegadores sem prompt de instalação, o sistema exibe instrução manual para instalação.
+
+---
+
+# 🛒 Fluxo do pedido
+
+## Fluxo do cliente
 
 1. O cliente acessa o catálogo.
 2. O cliente adiciona produtos ao carrinho.
@@ -502,9 +671,13 @@ supabase/20260524-base-rbac-permissoes.sql
 pages/pedidos.html
 ```
 
+---
+
 ## Pedido de cliente logado
 
 Clientes autenticados visualizam seus pedidos diretamente a partir do Supabase.
+
+---
 
 ## Pedido de visitante
 
@@ -515,7 +688,7 @@ Visitantes podem:
 
 ---
 
-# Painel Administrativo
+# 🛠️ Painel administrativo
 
 O lojista gerencia pedidos e produtos em:
 
@@ -523,7 +696,9 @@ O lojista gerencia pedidos e produtos em:
 pages/painel.html
 ```
 
-## Gestão de Pedidos
+---
+
+## Gestão de pedidos
 
 O painel administrativo implementa:
 
@@ -534,7 +709,9 @@ O painel administrativo implementa:
 * Confirmação de pedido recebido
 * Controle de pedidos logados e visitantes
 
-## Gestão de Produtos
+---
+
+## Gestão de produtos
 
 O painel administrativo implementa:
 
@@ -548,17 +725,23 @@ O painel administrativo implementa:
 * Controle de estoque
 * Alerta de estoque baixo
 
-## Upload de Imagens
+---
+
+## Upload de imagens
 
 O painel administrativo implementa envio de imagem para o Supabase Storage.
 
 Após o upload, a URL da imagem é salva no cadastro do produto.
 
-## Importação de Catálogo
+---
+
+## Importação de catálogo
 
 O painel permite importar o catálogo local inicial quando a tabela de produtos estiver vazia.
 
-## Configurações da Loja
+---
+
+## Configurações da loja
 
 O painel administrativo implementa controle de:
 
@@ -573,7 +756,9 @@ O painel administrativo implementa controle de:
 * Bairros atendidos
 * Seções da vitrine
 
-## Modo Programador
+---
+
+## Modo programador
 
 No desktop, o painel possui modo programador com:
 
@@ -585,7 +770,7 @@ No desktop, o painel possui modo programador com:
 
 ---
 
-# Checklist de Validação
+# ✅ Checklist de validação
 
 Antes de utilizar em produção, a aplicação deve ser validada nos seguintes cenários:
 
@@ -630,7 +815,7 @@ Antes de utilizar em produção, a aplicação deve ser validada nos seguintes c
 * Testar pedidos no painel
 * Testar modo programador no computador
 
-## SEO e Domínio
+## SEO e domínio
 
 Quando houver domínio próprio, ajustar o domínio utilizado em SEO e sitemap.
 
@@ -642,7 +827,7 @@ https://monte-sinai.netlify.app
 
 ---
 
-# Assets
+# 🖼️ Assets
 
 O projeto inclui imagens nas seguintes pastas:
 
@@ -651,6 +836,8 @@ assets/hero
 assets/brand
 assets/produtos
 ```
+
+---
 
 ## Geração de banners e peças locais
 
@@ -662,7 +849,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\generate-marketing-a
 
 ---
 
-# Geração de Imagens com IA
+# 🤖 Geração de imagens com IA
 
 Para gerar imagens avulsas ou atualizar o catálogo de produtos com IA, instalar as dependências:
 
@@ -670,11 +857,15 @@ Para gerar imagens avulsas ou atualizar o catálogo de produtos com IA, instalar
 python -m pip install -r requirements.txt
 ```
 
+---
+
 ## Gerar imagem avulsa
 
 ```powershell
 python .\gerar_foto.py --object "generic 3d product" --style 3d --views front,three_quarter --output-dir generated --base-name produto3d
 ```
+
+---
 
 ## Gerar catálogo
 
@@ -700,11 +891,15 @@ E atualiza:
 assets/generated/v2/manifest.json
 ```
 
+---
+
 ## Aplicar manifest nas páginas
 
 ```powershell
 python .\tools\update_asset_refs.py --write --check
 ```
+
+---
 
 ## Opções adicionais do gerador
 
@@ -724,6 +919,8 @@ Quando várias variações são geradas, também é criado um arquivo:
 *_preview.png
 ```
 
+---
+
 ## Otimizar imagens existentes
 
 ```powershell
@@ -738,7 +935,7 @@ GUIA-DESENVOLVEDOR.md
 
 ---
 
-# Publicação pelo VS Code
+# 🚀 Publicação pelo VS Code
 
 O projeto inclui a task:
 
@@ -752,6 +949,8 @@ Ela está configurada em:
 .vscode/tasks.json
 ```
 
+---
+
 ## Primeiro uso
 
 No primeiro uso, executar a task:
@@ -762,6 +961,8 @@ Netlify: login e vincular site
 
 Essa task realiza login na conta Netlify e vincula a pasta ao site correto.
 
+---
+
 ## Publicação de novas versões
 
 Após o vínculo inicial, executar:
@@ -771,6 +972,8 @@ Publicar site online (Netlify)
 ```
 
 Essa task envia a versão atual para produção.
+
+---
 
 ## Execução visual das tasks
 
@@ -784,7 +987,33 @@ Essa extensão exibe as tasks do workspace para execução rápida.
 
 ---
 
-# Status do Projeto
+# 🧪 Testes recomendados
+
+Antes de considerar uma versão pronta para produção, validar:
+
+* Links internos
+* Carregamento de CSS
+* Carregamento de JavaScript
+* Imagens
+* Responsividade mobile
+* Responsividade tablet
+* Responsividade desktop
+* Console do navegador
+* Fluxo de carrinho
+* Fluxo de checkout
+* Login
+* Cadastro
+* Pedidos
+* Painel administrativo
+* Upload de imagem
+* Status de pedido
+* Consulta de pedido visitante
+* PWA
+* Service Worker
+
+---
+
+# 📈 Status do projeto
 
 O projeto está em desenvolvimento contínuo.
 
@@ -802,20 +1031,20 @@ O projeto está em desenvolvimento contínuo.
 
 ---
 
-# Desenvolvedor
+# 🧑‍💻 Desenvolvedor
 
 Marcelo Lopes da Silva
 
 📍 São Paulo - SP
 
 GitHub:
-
-```txt
 https://github.com/S0RRISU
-```
 
 LinkedIn:
-
-```txt
 https://www.linkedin.com/in/marcelosil
-```
+
+---
+
+# 📄 Licença
+
+Projeto desenvolvido para fins de estudo, prática profissional e aplicação real em comércio local.
