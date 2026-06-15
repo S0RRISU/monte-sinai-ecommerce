@@ -1,108 +1,62 @@
-# Monte Sinai Ecommerce
+# 🚀 Monte Sinai Ecommerce
 
-Plataforma completa de ecommerce para venda local de água mineral, gás de cozinha e produtos de limpeza.
+Plataforma web completa para venda local de **água mineral, gás de cozinha e produtos de limpeza**.
 
-O projeto foi desenvolvido para uma operação real de comércio local, integrando catálogo de produtos, autenticação de usuários, carrinho, checkout via WhatsApp, pedidos, controle de estoque, painel administrativo, banco de dados em nuvem, permissões por cargo, PWA e publicação em produção via Netlify.
+O projeto foi desenvolvido para uma operação real de comércio local, reunindo catálogo de produtos, autenticação de usuários, carrinho de compras, checkout via WhatsApp, painel administrativo, controle de estoque, pedidos, banco de dados em nuvem, permissões por cargo, PWA e deploy em produção.
 
----
-
-## Demonstração
-
-🌐 https://monte-sinai.netlify.app
+🌐 **Demonstração:**
+https://monte-sinai.netlify.app
 
 ---
 
-## Tecnologias Utilizadas
+## 🧩 Principais recursos
 
-### Front-end
+### 👤 Área do cliente
+
+* Cadastro e login de usuários
+* Catálogo de produtos
+* Carrinho de compras
+* Checkout via WhatsApp
+* Histórico de pedidos
+* Consulta de pedidos
+
+### 🛠️ Painel administrativo
+
+* Gestão de produtos
+* Controle de estoque
+* Gestão de pedidos
+* Controle de pagamento
+* Upload de imagens
+* Configurações da loja
+
+### 🔐 Recursos técnicos
+
+* Supabase Auth
+* Banco PostgreSQL
+* Row Level Security (RLS)
+* Role Based Access Control (RBAC)
+* Supabase Storage
+* PWA instalável
+* Service Worker
+* Deploy com Netlify
+
+---
+
+## 🧰 Tecnologias utilizadas
 
 * HTML5
 * CSS3
 * JavaScript
-
-### Backend e Banco de Dados
-
 * Supabase
 * PostgreSQL
-* Supabase Auth
-* Supabase Storage
-* Supabase Edge Functions
-
-### Infraestrutura e Deploy
-
 * GitHub
 * Netlify
 * PWA
-* Service Worker
-* Netlify TOML
-
-### Segurança e Permissões
-
-* Row Level Security (RLS)
-* Role Based Access Control (RBAC)
-* Policies no Supabase
-* Controle de acesso por perfil
 
 ---
 
-## Principais Funcionalidades
+# 📚 Documentação Técnica
 
-### Área do Cliente
-
-O sistema implementa uma área voltada para clientes, permitindo navegação, compra e acompanhamento de pedidos.
-
-* Cadastro de usuários
-* Login com autenticação
-* Perfil do cliente
-* Catálogo de produtos
-* Carrinho de compras
-* Checkout por WhatsApp
-* Finalização de pedido como cliente logado
-* Finalização de pedido como visitante
-* Histórico de pedidos
-* Consulta de pedidos por código e WhatsApp
-
-### Área Administrativa
-
-O sistema implementa um painel administrativo para controle operacional da loja.
-
-* Listagem de pedidos
-* Alteração de status do pedido
-* Controle de status de pagamento
-* Confirmação de pedido recebido
-* Cadastro de produtos
-* Edição de produtos
-* Exclusão de produtos
-* Ativação e desativação de produtos
-* Controle de preço
-* Controle de estoque
-* Alerta de estoque baixo
-* Upload de imagem para produtos
-* Configuração de dados da loja
-* Configuração de WhatsApp, Pix, entrega e bairros atendidos
-* Controle das seções da vitrine
-* Modo programador com diagnóstico técnico
-
-### Recursos Técnicos
-
-A aplicação implementa recursos técnicos voltados para segurança, operação e escalabilidade.
-
-* Banco de dados PostgreSQL no Supabase
-* Autenticação com Supabase Auth
-* Políticas de segurança RLS
-* Controle de permissões por cargo
-* Função segura para criação de pedidos
-* Recalculo de totais no backend
-* Atualização de estoque
-* Supabase Storage para imagens
-* PWA instalável
-* Service Worker
-* Cache de arquivos estáticos
-* Deploy em produção via Netlify
-
----
-
-# Documentação Técnica
 
 ## Visão Geral
 
