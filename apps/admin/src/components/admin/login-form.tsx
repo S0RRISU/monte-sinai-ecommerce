@@ -48,6 +48,11 @@ export function LoginForm() {
           router.replace(nextPath);
           return;
         }
+        if (profile) {
+          await signOut();
+          if (!active) return;
+          setError('Esta conta nao tem permissao para acessar o painel.');
+        }
       } catch {
         // An expired or invalid session should fall back to the regular login form.
       }
@@ -94,6 +99,10 @@ export function LoginForm() {
     try {
       await signInWithPassword(email, password);
       const profile = await getCurrentProfile();
+      if (!profile || !canAccessAdmin(profile.role)) {
+        await signOut();
+        throw new Error('Esta conta nao tem permissao para acessar o painel.');
+      }
       rememberUser({
         email,
         name: profile?.name || email.split('@')[0],

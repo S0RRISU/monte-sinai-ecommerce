@@ -266,8 +266,9 @@ async function withModuleAccess(profile: AdminProfile) {
 
 export async function getCurrentProfile() {
   const client = getSupabaseClient();
-  const { data: sessionData } = await client.auth.getSession();
-  const user = sessionData.session?.user;
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) return null;
+  const user = userData.user;
   if (!user) return null;
   const userMetadata = asRecord(user.user_metadata);
   const metadataAvatar =
