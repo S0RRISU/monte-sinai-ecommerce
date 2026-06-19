@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test';
 test.describe('Monte Sinai official store', () => {
   test('renders the home storefront with choose-only product cards', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /agua, gas e limpeza para resolver seu dia/i })).toBeVisible();
-    await expect(page.getByLabel('Monte Sinai', { exact: true }).getByRole('link', { name: /comprar agora/i })).toBeVisible();
+    await expect(
+      page.getByLabel('Monte Sinai', { exact: true }).getByRole('link', { name: /comprar.*produtos de limpeza/i })
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: /escolher/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /adicionar/i })).toHaveCount(0);
   });
@@ -49,10 +50,10 @@ test.describe('Monte Sinai official store', () => {
   test('renders the secondary customer pages', async ({ page }) => {
     await page.goto('/carrinho');
     await expect(page.getByRole('heading', { name: /seu carrinho est/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /ver produtos/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /explorar produtos/i })).toBeVisible();
 
     await page.goto('/pedidos');
-    await expect(page.getByRole('heading', { name: /pedidos com status claro/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /acompanhe seu pedido em tempo real/i })).toBeVisible();
 
     await page.goto('/conta');
     await expect(page.getByRole('heading', { name: /entre na sua conta monte sinai/i })).toBeVisible();
