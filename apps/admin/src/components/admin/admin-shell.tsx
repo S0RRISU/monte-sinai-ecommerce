@@ -137,12 +137,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   async function handleSwitchAccount(nextEmail?: string) {
-    await signOut();
     const params = new URLSearchParams();
     params.set('next', pathname || '/dashboard');
     if (nextEmail) {
       params.set('account', nextEmail);
       params.set('auto', '1');
+    } else {
+      params.set('trocarConta', '1');
     }
     router.replace(`/login?${params.toString()}`);
   }
@@ -448,6 +449,7 @@ function AccountMenu({
   onSignOut: () => Promise<void>;
   onClose: () => void;
 }) {
+  const [switchPickerOpen, setSwitchPickerOpen] = useState(false);
   const otherAccounts = recentAccounts.filter((account) => account.email.toLowerCase() !== profileEmail.toLowerCase());
 
   return (
@@ -462,11 +464,11 @@ function AccountMenu({
           </div>
         </header>
 
-        <button type="button" className="admin-account-action" onClick={() => onSwitch()}>
+        <button type="button" className="admin-account-action" onClick={() => setSwitchPickerOpen(true)}>
           <UserRound className="size-4" />
           <span>
             <strong>Trocar de conta</strong>
-            <small>Ir para a tela de login com outra conta.</small>
+            <small>Escolher uma conta salva neste aparelho.</small>
           </span>
         </button>
 
@@ -492,6 +494,62 @@ function AccountMenu({
           </span>
         </button>
       </section>
+      {switchPickerOpen ? (
+        <section className="admin-account-switch-modal" role="dialog" aria-modal="true" aria-label="Trocar conta">
+          <button className="admin-account-switch-backdrop" type="button" aria-label="Fechar troca de conta" onClick={() => setSwitchPickerOpen(false)} />
+          <div className="admin-account-switch-card">
+            <header>
+              <span>
+                <UserRound className="size-5" />
+              </span>
+              <div>
+                <strong>Trocar conta</strong>
+                <p>Escolha sem sair da conta atual. A sessão só muda quando a nova entrada for confirmada.</p>
+              </div>
+              <button type="button" onClick={() => setSwitchPickerOpen(false)} aria-label="Fechar">
+                <X className="size-4" />
+              </button>
+            </header>
+
+            <div className="admin-account-switch-list">
+              {[{ email: profileEmail, name: profileName, avatarUrl }, ...otherAccounts]
+                .filter((account) => account.email)
+                .map((account) => {
+                  const current = account.email.toLowerCase() === profileEmail.toLowerCase();
+                  return (
+                    <button
+                      key={account.email}
+                      type="button"
+                      className={current ? 'is-current' : ''}
+                      onClick={() => {
+                        if (current) {
+                          setSwitchPickerOpen(false);
+                          return;
+                        }
+                        void onSwitch(account.email);
+                      }}
+                    >
+                      <ProfileAvatar name={account.name || account.email} avatarUrl={account.avatarUrl} />
+                      <span>
+                        <strong>{account.name || account.email.split('@')[0]}</strong>
+                        <small>{current ? 'Conta atual' : account.email}</small>
+                      </span>
+                      <ArrowUpRight className="size-4" />
+                    </button>
+                  );
+                })}
+            </div>
+
+            <button type="button" className="admin-account-switch-manual" onClick={() => onSwitch()}>
+              Usar outra conta manualmente
+            </button>
+
+            <p>
+              Para entrar sem digitar, use a senha salva do navegador ou o acesso por e-mail. O painel nao salva senha em texto.
+            </p>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

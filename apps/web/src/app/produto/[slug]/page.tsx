@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, BadgeCheck, MapPin, ShieldCheck, Star } from 'lucide-react';
 import { StoreShell } from '@/components/store/store-shell';
 import { ProductConfigurator } from '@/components/store/product-configurator';
-import { money, products } from '@/lib/store-data';
-import { getStorefrontProduct } from '@/lib/storefront-data';
+import { products } from '@/lib/store-data';
+import { getStorefrontConfig, getStorefrontProduct } from '@/lib/storefront-data';
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = await getStorefrontProduct(slug);
+  const [product, siteConfig] = await Promise.all([getStorefrontProduct(slug), getStorefrontConfig()]);
   if (!product) notFound();
   const galleryImages = Array.from(new Set([product.image, ...(product.images || [])].filter(Boolean)));
 
@@ -54,14 +54,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <span>Produto bem avaliado</span>
             </div>
 
-            <div className="product-price-panel">
-              <span>A partir de</span>
-              <strong>{money(product.price)}</strong>
-              {product.oldPrice ? <del>{money(product.oldPrice)}</del> : null}
-              <small>O valor muda se houver marca ou fragrância.</small>
-            </div>
-
-            <ProductConfigurator product={product} />
+            <ProductConfigurator
+              product={product}
+              storeOpen={siteConfig.storeOpen}
+              allowDelivery={siteConfig.allowDelivery}
+              businessHours={siteConfig.businessHours}
+            />
           </div>
         </section>
 

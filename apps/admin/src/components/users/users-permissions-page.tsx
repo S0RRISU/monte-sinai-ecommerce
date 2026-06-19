@@ -5,6 +5,7 @@ import {
   AlertCircle,
   CheckCircle2,
   LockKeyhole,
+  MailCheck,
   MoreVertical,
   RefreshCw,
   Search,
@@ -16,7 +17,7 @@ import {
   X,
   type LucideIcon
 } from 'lucide-react';
-import { fetchAdminUsers, fetchUserModulePermissions, setUserAccess, setUserModulePermission } from '@/lib/admin-services';
+import { fetchAdminUsers, fetchUserModulePermissions, sendUserPasswordRecovery, setUserAccess, setUserModulePermission } from '@/lib/admin-services';
 import { adminModules, type AdminModule } from '@/lib/module-access';
 import type { AdminRole, AdminUser, UserModulePermission } from '@/lib/types';
 import { useAdminStore } from '@/store/admin-store';
@@ -169,6 +170,20 @@ export function UsersPermissionsPage() {
     }
   }
 
+  async function handlePasswordRecovery(user: AdminUser) {
+    try {
+      setSaving(`recovery-${user.id}`);
+      setError('');
+      setSuccess('');
+      await sendUserPasswordRecovery(user.email);
+      setSuccess(`Enviei um link seguro de recuperacao para ${user.email}.`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Nao foi possivel enviar recuperacao de senha.');
+    } finally {
+      setSaving('');
+    }
+  }
+
   function permissionsCountAfter(module: AdminModule, enabled: boolean) {
     const next = permissions.map((permission) => (permission.module === module ? { ...permission, enabled } : permission));
     return next.filter((permission) => permission.enabled).length;
@@ -177,9 +192,9 @@ export function UsersPermissionsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Administração"
-        title="Usuários e permissões"
-        description="Gerencie usuários reais do site, equipe, hierarquia e módulos liberados."
+        eyebrow="Controle de acesso"
+        title="Usuários"
+        description="Central para controlar equipe, clientes, senhas, funções e permissões do painel."
         action={
           <button type="button" className="admin-button admin-button-soft" onClick={loadUsers} disabled={loading}>
             <RefreshCw className="size-4" />
@@ -199,12 +214,19 @@ export function UsersPermissionsPage() {
       {loading ? (
         <SkeletonPanel />
       ) : (
-        <div className={`admin-users-page ${selectedUser ? 'has-selection' : ''}`}>
-          <section className="admin-user-metrics">
-            <UserMetric icon={Users} label="Usuários" value={String(metrics.total)} tone="purple" />
-            <UserMetric icon={ShieldCheck} label="Funções" value={String(metrics.roles)} tone="blue" />
-            <UserMetric icon={UnlockKeyhole} label="Ativos" value={String(metrics.active)} tone="green" />
-            <UserMetric icon={LockKeyhole} label="Inativos" value={String(metrics.inactive)} tone="orange" />
+        <div className={`admin-users-page admin-users-control-page ${selectedUser ? 'has-selection' : ''}`}>
+          <section className="glass-card admin-users-command">
+            <div className="admin-users-command-copy">
+              <span>Central de usuários</span>
+              <h2>Controle quem entra, o que cada pessoa vê e como recupera acesso.</h2>
+              <p>Selecione um usuário para abrir o console com função, status, recuperação de senha e módulos liberados.</p>
+            </div>
+            <div className="admin-user-metrics">
+              <UserMetric icon={Users} label="Usuários" value={String(metrics.total)} tone="purple" />
+              <UserMetric icon={ShieldCheck} label="Funções" value={String(metrics.roles)} tone="blue" />
+              <UserMetric icon={UnlockKeyhole} label="Ativos" value={String(metrics.active)} tone="green" />
+              <UserMetric icon={LockKeyhole} label="Inativos" value={String(metrics.inactive)} tone="orange" />
+            </div>
           </section>
 
           <section className="glass-card admin-users-list-card">
@@ -223,15 +245,7 @@ export function UsersPermissionsPage() {
               </select>
             </div>
 
-            <div className="admin-users-table" role="table" aria-label="Usuários do site">
-              <div className="admin-users-head" role="row">
-                <span>Usuário</span>
-                <span>Função</span>
-                <span>Status</span>
-                <span>Último acesso</span>
-                <span />
-              </div>
-              <div className="admin-users-body">
+            <div className="admin-users-roster" aria-label="Usuários do site">
                 {filteredUsers.map((user) => (
                   <article key={user.id} className={`admin-user-row ${selectedUserId === user.id ? 'is-selected' : ''}`}>
                     <button type="button" className="admin-user-main-action" onClick={() => void handleSelectUser(user.id)}>
@@ -242,11 +256,19 @@ export function UsersPermissionsPage() {
                           <small>{user.email || 'Sem email'}</small>
                         </span>
                       </span>
+                      <span className="admin-user-card-status">
+                        <StatusPill active={user.active && user.role !== 'cliente'} muted={user.role === 'cliente'} />
+                      </span>
                     </button>
-                    <RoleBadge role={user.role} label={user.roleLabel} />
-                    <StatusPill active={user.active && user.role !== 'cliente'} muted={user.role === 'cliente'} />
-                    <span className="admin-user-last">{formatLastAccess(user.lastAccess)}</span>
-                    <div className="admin-user-row-actions">
+                    <div className="admin-user-card-meta">
+                      <RoleBadge role={user.role} label={user.roleLabel} />
+                      <span className="admin-user-module-pill">{user.moduleCount} módulos</span>
+                      <span className="admin-user-last">Acesso {formatLastAccess(user.lastAccess)}</span>
+                    </div>
+                    <div className="admin-user-card-actions">
+                      <button type="button" className="admin-user-open-button" onClick={() => void handleSelectUser(user.id)}>
+                        Controlar
+                      </button>
                       <button
                         type="button"
                         className="admin-user-menu-button"
@@ -293,7 +315,6 @@ export function UsersPermissionsPage() {
                   </article>
                 ))}
                 {!filteredUsers.length ? <p className="admin-empty-line p-4">Nenhum usuário encontrado.</p> : null}
-              </div>
             </div>
           </section>
 
@@ -309,6 +330,7 @@ export function UsersPermissionsPage() {
                 onRoleChange={handleRoleChange}
                 onActiveChange={handleActiveChange}
                 onPermissionChange={handlePermissionChange}
+                onPasswordRecovery={() => void handlePasswordRecovery(selectedUser)}
                 canManageDeveloper={canManageDeveloper}
                 assignableRoleOptions={assignableRoleOptions}
               />
@@ -335,6 +357,7 @@ function UserAccessDetail({
   onRoleChange,
   onActiveChange,
   onPermissionChange,
+  onPasswordRecovery,
   canManageDeveloper,
   assignableRoleOptions
 }: {
@@ -346,6 +369,7 @@ function UserAccessDetail({
   onRoleChange: (role: AdminRole) => void;
   onActiveChange: (active: boolean) => void;
   onPermissionChange: (module: AdminModule, enabled: boolean) => void;
+  onPasswordRecovery: () => void;
   canManageDeveloper: boolean;
   assignableRoleOptions: Array<{ value: AdminRole; label: string; helper: string }>;
 }) {
@@ -369,6 +393,7 @@ function UserAccessDetail({
         </button>
       </div>
 
+      <div className="admin-user-detail-scroll">
       <div className="admin-user-access-controls">
         <label>
           <span>Função</span>
@@ -395,6 +420,22 @@ function UserAccessDetail({
               : hasPanelAccess
                 ? 'Bloquear acesso ao painel'
                 : 'Liberar acesso ao painel'}
+        </button>
+      </div>
+
+      <div className="admin-user-security-card">
+        <span>
+          <LockKeyhole className="size-5" />
+        </span>
+        <div>
+          <strong>Senha protegida</strong>
+          <p>
+            A senha real nao aparece no painel. Se o usuario esquecer, envie um link seguro para ele criar uma nova senha.
+          </p>
+        </div>
+        <button type="button" onClick={onPasswordRecovery} disabled={!user.email || saving === `recovery-${user.id}`}>
+          <MailCheck className="size-4" />
+          {saving === `recovery-${user.id}` ? 'Enviando...' : 'Enviar recuperacao'}
         </button>
       </div>
 
@@ -449,6 +490,7 @@ function UserAccessDetail({
             );
           })
         )}
+      </div>
       </div>
     </aside>
   );

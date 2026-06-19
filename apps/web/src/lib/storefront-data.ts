@@ -86,6 +86,46 @@ function normalizeText(value: string) {
     .trim();
 }
 
+function compactSearchText(value: string) {
+  return normalizeText(value).replace(/\s+/g, '');
+}
+
+function levenshteinDistance(first: string, second: string) {
+  if (first === second) return 0;
+  if (!first.length) return second.length;
+  if (!second.length) return first.length;
+
+  const previous = Array.from({ length: second.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: second.length + 1 }, () => 0);
+
+  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
+    current[0] = firstIndex;
+    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
+      const cost = first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1;
+      current[secondIndex] = Math.min(
+        current[secondIndex - 1] + 1,
+        previous[secondIndex] + 1,
+        previous[secondIndex - 1] + cost
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+
+  return previous[second.length];
+}
+
+function fuzzyTokenMatch(token: string, searchableTokens: string[]) {
+  if (token.length <= 2) {
+    return searchableTokens.some((candidate) => candidate.startsWith(token));
+  }
+
+  return searchableTokens.some((candidate) => {
+    if (candidate.includes(token) || token.includes(candidate)) return true;
+    const limit = token.length <= 5 ? 1 : 2;
+    return levenshteinDistance(token, candidate) <= limit;
+  });
+}
+
 function slugify(value: string) {
   return (
     normalizeText(value)
@@ -97,9 +137,55 @@ function slugify(value: string) {
 function normalizeImage(value?: string | null, category?: ProductCategory) {
   const cleanValue = (value || '').trim();
   if (cleanValue.startsWith('http') || cleanValue.startsWith('/')) return cleanValue;
+  if (cleanValue.startsWith('assets/produtos/site/v2/') || cleanValue.startsWith('assets/produtos/v2/')) {
+    return `/products/${cleanValue.split('/').pop()}`;
+  }
   if (cleanValue.startsWith('assets/')) return `/${cleanValue}`;
   const fallback = categories.find((item) => item.id === category)?.image;
   return fallback || '/products/desinfetante-2l.png';
+}
+
+const officialImageAliases: Record<string, string> = {
+  'alcool-perfumado-1l': '/products/alcool-perfumado.png',
+  'gas-de-cozinha-p13': '/products/gas-p13.png',
+  'gas-p13-supergas': '/products/gas-p13.png',
+  'gas-p13-ultragas': '/products/gas-p13.png',
+  'limpa-aluminio-500ml': '/products/limpa-aluminio.png',
+  'escova-de-vaso-com-pote': '/products/escova-vaso.png',
+  'pedra-de-vaso-sanitario': '/products/pedra-vaso.png',
+  'pasta-de-brilho': '/products/pasta-brilho.png',
+  'prendedor-de-madeira': '/products/prendedor-madeira.png',
+  'prendedor-plastico': '/products/prendedor-plastico.png',
+  'prendedor-de-plastico': '/products/prendedor-plastico.png',
+  'rodo-grande': '/products/rodo-grande.png',
+  'rodo-pequeno': '/products/rodo-pequeno.png',
+  'rodinho-de-pia': '/products/rodinho-pia.png',
+  'saco-de-lixo': '/products/saco-lixo.png'
+};
+
+const officialImagesBySlug = new Map(products.map((product) => [product.slug, product.image]));
+const ignoredImageSlugTokens = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'e', 'uso', 'tradicional', 'diario', 'pesado']);
+
+function comparableImageSlug(value: string) {
+  return slugify(value)
+    .split('-')
+    .filter((token) => token && !ignoredImageSlugTokens.has(token))
+    .sort()
+    .join('-');
+}
+
+const officialImagesByComparableSlug = new Map(products.map((product) => [comparableImageSlug(product.slug), product.image]));
+
+function officialImageForProduct(name: string) {
+  const slug = slugify(name);
+  const exact = officialImagesBySlug.get(slug) || officialImageAliases[slug];
+  if (exact) return exact;
+
+  const comparable = officialImagesByComparableSlug.get(comparableImageSlug(name));
+  if (comparable) return comparable;
+
+  const partial = products.find((product) => slug.startsWith(`${product.slug}-`) || product.slug.startsWith(`${slug}-`));
+  return partial?.image;
 }
 
 function normalizeCategory(value?: string | null): { id: ProductCategory; label: string } {
@@ -216,8 +302,9 @@ async function fetchCatalogProducts(config: StorefrontSiteConfig = defaultSiteCo
     const originalPrice = asNumber(row.preco_original || row.preco);
     const hasDiscount = originalPrice > price;
     const dbVariations = uniqueCatalogVariations(variationsByProduct.get(row.id) || []);
-    const mainImage = normalizeImage(row.imagem, category.id);
-    const galleryImages = Array.from(new Set([mainImage, ...(imagesByProduct.get(row.id) || [])]));
+    const officialImage = officialImageForProduct(row.nome);
+    const mainImage = officialImage || normalizeImage(row.imagem, category.id);
+    const galleryImages = officialImage ? [officialImage] : Array.from(new Set([mainImage, ...(imagesByProduct.get(row.id) || [])]));
     const variations: ProductVariation[] = dbVariations.map((variation) => ({
       id: variation.id,
       label: variation.nome || 'Opcao',
@@ -277,6 +364,37 @@ export async function storefrontProductsByCategory(category?: string) {
   if (!category || category === 'todos') return catalogProducts;
   if (category === 'ofertas') return catalogProducts.filter((product) => product.offer || product.oldPrice);
   return catalogProducts.filter((product) => product.category === category);
+}
+
+export function searchStorefrontProducts(catalogProducts: Product[], query?: string) {
+  const term = normalizeText(query || '');
+  if (!term) return catalogProducts;
+
+  const queryTokens = term.split(' ').filter(Boolean);
+  const compactTerm = compactSearchText(query || '');
+
+  return catalogProducts
+    .map((product) => {
+      const haystack = normalizeText(
+        [
+          product.name,
+          product.shortName,
+          product.categoryLabel,
+          product.description,
+          product.unit,
+          ...(product.variations || []).map((variation) => `${variation.label} ${variation.helper}`)
+        ].join(' ')
+      );
+      const compactHaystack = haystack.replace(/\s+/g, '');
+      const searchableTokens = haystack.split(' ').filter(Boolean);
+      const exact = haystack.includes(term) || compactHaystack.includes(compactTerm);
+      const tokenMatches = queryTokens.filter((token) => fuzzyTokenMatch(token, searchableTokens)).length;
+      const score = exact ? 100 + tokenMatches : tokenMatches;
+      return { product, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((first, second) => second.score - first.score || first.product.name.localeCompare(second.product.name, 'pt-BR'))
+    .map(({ product }) => product);
 }
 
 export async function storefrontFeaturedProducts() {

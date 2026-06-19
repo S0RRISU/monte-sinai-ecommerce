@@ -1,29 +1,42 @@
 'use client';
 
 import Link from 'next/link';
-import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowRight, Minus, Plus, ShieldCheck, ShoppingCart, Trash2, Truck } from 'lucide-react';
 import { getCartTotals, useCartStore } from '@/lib/cart-store';
 import { money } from '@/lib/store-data';
 
-export function CartPageContent() {
+export function CartPageContent({
+  deliveryFee,
+  freeDeliveryMinimum,
+  allowDelivery
+}: {
+  deliveryFee: number;
+  freeDeliveryMinimum: number;
+  allowDelivery: boolean;
+}) {
   const items = useCartStore((state) => state.items);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
-  const totals = getCartTotals(items);
+  const totals = getCartTotals(items, { deliveryFee, freeDeliveryMinimum, allowDelivery });
+  const amountUntilFreeDelivery = Math.max(freeDeliveryMinimum - totals.subtotal, 0);
+  const freeDeliveryProgress = freeDeliveryMinimum > 0 ? Math.min((totals.subtotal / freeDeliveryMinimum) * 100, 100) : 100;
 
   if (!items.length) {
     return (
       <section className="cart-layout">
         <div className="cart-main-panel cart-empty-panel">
-          <ShoppingCart className="size-8" />
+          <span className="cart-empty-icon"><ShoppingCart className="size-8" /></span>
           <span>Carrinho</span>
           <h1>Seu carrinho esta vazio</h1>
-          <p>Escolha um produto para montar seu pedido.</p>
-          <Link href="/produtos">Ver produtos</Link>
+          <p>Adicione seus produtos e acompanhe quantidade, entrega e total em um unico lugar.</p>
+          <Link href="/produtos">Explorar produtos <ArrowRight className="size-4" /></Link>
         </div>
 
         <aside className="cart-summary-panel" aria-label="Resumo do carrinho">
-          <h2>Resumo</h2>
+          <div className="cart-summary-heading">
+            <span>Resumo</span>
+            <strong>0 itens</strong>
+          </div>
           <div>
             <span>Subtotal</span>
             <strong>{money(0)}</strong>
@@ -45,10 +58,11 @@ export function CartPageContent() {
       <div className="cart-items-panel">
         <div className="cart-title-row">
           <div>
-            <span>Carrinho</span>
-            <h1>Confira seu pedido</h1>
+            <span>Seu carrinho · {totals.quantity} {totals.quantity === 1 ? 'item' : 'itens'}</span>
+            <h1>Revise antes de finalizar</h1>
+            <p>Altere quantidades e confira cada produto do pedido.</p>
           </div>
-          <Link href="/produtos">Adicionar mais itens</Link>
+          <Link href="/produtos"><Plus className="size-4" /> Adicionar itens</Link>
         </div>
 
         <div className="cart-item-list">
@@ -95,7 +109,17 @@ export function CartPageContent() {
       </div>
 
       <aside className="cart-summary-panel" aria-label="Resumo do carrinho">
-        <h2>Resumo</h2>
+        <div className="cart-summary-heading">
+          <span>Resumo do pedido</span>
+          <strong>{totals.quantity} {totals.quantity === 1 ? 'item' : 'itens'}</strong>
+        </div>
+        {allowDelivery && freeDeliveryMinimum > 0 ? (
+          <div className="cart-delivery-progress">
+            <span><Truck className="size-4" /> Entrega</span>
+            <strong>{amountUntilFreeDelivery > 0 ? `Faltam ${money(amountUntilFreeDelivery)} para entrega gratis` : 'Entrega gratis liberada'}</strong>
+            <i aria-hidden="true"><b style={{ width: `${freeDeliveryProgress}%` }} /></i>
+          </div>
+        ) : null}
         <div>
           <span>Itens</span>
           <strong>{totals.quantity}</strong>
@@ -113,8 +137,9 @@ export function CartPageContent() {
           <strong>{money(totals.total)}</strong>
         </div>
         <Link className="summary-action" href="/checkout">
-          Finalizar pedido
+          Ir para o checkout <ArrowRight className="size-4" />
         </Link>
+        <p className="cart-secure-note"><ShieldCheck className="size-4" /> Seus dados sao confirmados antes do envio.</p>
       </aside>
     </section>
   );

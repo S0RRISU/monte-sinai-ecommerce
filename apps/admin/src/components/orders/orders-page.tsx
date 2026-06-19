@@ -29,6 +29,8 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { createManualOrder, deleteAdminOrder, fetchAdminOrders, fetchAdminProducts, updateOrderStatus } from '@/lib/admin-services';
+import { getSupabaseClient } from '@/lib/supabase';
+import { resolveAdminImageUrl } from '@/lib/assets';
 import { money, shortDate } from '@/lib/format';
 import { orderStatuses, paymentStatuses } from '@/lib/constants';
 import type { ManualOrderInput, Order, OrderOrigin, OrderStatus, PaymentStatus, Product } from '@/lib/types';
@@ -87,10 +89,17 @@ const originLabels: Record<OrderOrigin, string> = {
 };
 
 const originMeta: Record<OrderOrigin, { tone: string }> = {
-  site: { tone: '#0b57d0' },
-  presencial: { tone: '#0f766e' },
-  telefone: { tone: '#7c3aed' },
-  whatsapp: { tone: '#16a34a' }
+  site: { tone: 'var(--admin-accent)' },
+  presencial: { tone: 'var(--admin-accent)' },
+  telefone: { tone: 'var(--admin-accent)' },
+  whatsapp: { tone: 'var(--admin-accent)' }
+};
+
+const orderTone = {
+  primary: 'var(--admin-accent)',
+  warning: 'var(--admin-gold)',
+  complete: 'color-mix(in srgb, var(--admin-accent) 72%, var(--admin-text))',
+  muted: 'var(--admin-muted)'
 };
 
 const statusMeta: Record<OrderStatus, { label: string; short: string; icon: LucideIcon; tone: string; action?: { label: string; next: OrderStatus; icon: LucideIcon; className: string } }> = {
@@ -98,41 +107,41 @@ const statusMeta: Record<OrderStatus, { label: string; short: string; icon: Luci
     label: 'Recebidos',
     short: 'Recebido',
     icon: PackageCheck,
-    tone: '#2563eb',
+    tone: orderTone.primary,
     action: { label: 'Aceitar', next: 'Recebido', icon: CheckCircle2, className: 'ops-action-blue' }
   },
   Recebido: {
     label: 'Recebidos',
     short: 'Recebido',
     icon: PackageCheck,
-    tone: '#2563eb',
+    tone: orderTone.primary,
     action: { label: 'Separar', next: 'Em separação', icon: PackageCheck, className: 'ops-action-amber' }
   },
   'Em separação': {
     label: 'Em separação',
     short: 'Separação',
     icon: PackageCheck,
-    tone: '#f59e0b',
+    tone: orderTone.warning,
     action: { label: 'Despachar', next: 'A caminho', icon: Truck, className: 'ops-action-blue' }
   },
   'A caminho': {
     label: 'Em rota',
     short: 'Em rota',
     icon: Truck,
-    tone: '#2563eb',
+    tone: orderTone.primary,
     action: { label: 'Concluir', next: 'Entregue', icon: CheckCircle2, className: 'ops-action-green' }
   },
   Entregue: {
     label: 'Entregues',
     short: 'Entregue',
     icon: CheckCircle2,
-    tone: '#16a34a'
+    tone: orderTone.complete
   },
   Cancelado: {
     label: 'Cancelados',
     short: 'Cancelado',
     icon: Ban,
-    tone: '#ef4444'
+    tone: orderTone.muted
   }
 };
 
@@ -184,6 +193,28 @@ export function OrdersPage() {
     void loadOrders();
   }, [loadOrders]);
 
+  useEffect(() => {
+    const client = getSupabaseClient();
+    const ordersChannel = client
+      .channel('admin-orders-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+        void loadOrders();
+      })
+      .subscribe();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadOrders();
+    };
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      void client.removeChannel(ordersChannel);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [loadOrders]);
+
   const loadProducts = useCallback(async () => {
     try {
       setLoadingProducts(true);
@@ -223,12 +254,12 @@ export function OrdersPage() {
 
   const tabs = useMemo(
     () => [
-      { label: 'Todos', value: 'Todos' as StatusFilter, count: filteredBase.length, icon: PackageCheck, tone: '#0b57d0' },
-      { label: 'Recebidos', value: 'Recebido' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Recebido' || order.status === 'A confirmar').length, icon: PackageCheck, tone: '#2563eb' },
-      { label: 'Em separação', value: 'Em separação' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Em separação').length, icon: PackageCheck, tone: '#f59e0b' },
-      { label: 'Em rota', value: 'A caminho' as StatusFilter, count: filteredBase.filter((order) => order.status === 'A caminho').length, icon: Truck, tone: '#2563eb' },
-      { label: 'Entregues', value: 'Entregue' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Entregue').length, icon: CheckCircle2, tone: '#16a34a' },
-      { label: 'Cancelados', value: 'Cancelado' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Cancelado').length, icon: Ban, tone: '#ef4444' }
+      { label: 'Todos', value: 'Todos' as StatusFilter, count: filteredBase.length, icon: PackageCheck, tone: orderTone.primary },
+      { label: 'Recebidos', value: 'Recebido' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Recebido' || order.status === 'A confirmar').length, icon: PackageCheck, tone: orderTone.primary },
+      { label: 'Em separação', value: 'Em separação' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Em separação').length, icon: PackageCheck, tone: orderTone.warning },
+      { label: 'Em rota', value: 'A caminho' as StatusFilter, count: filteredBase.filter((order) => order.status === 'A caminho').length, icon: Truck, tone: orderTone.primary },
+      { label: 'Entregues', value: 'Entregue' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Entregue').length, icon: CheckCircle2, tone: orderTone.complete },
+      { label: 'Cancelados', value: 'Cancelado' as StatusFilter, count: filteredBase.filter((order) => order.status === 'Cancelado').length, icon: Ban, tone: orderTone.muted }
     ],
     [filteredBase]
   );
@@ -243,6 +274,10 @@ export function OrdersPage() {
       orders
         .filter((order) => order.status !== 'Entregue' && order.status !== 'Cancelado')
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [orders]
+  );
+  const recentOrder = useMemo(
+    () => [...orders].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] || null,
     [orders]
   );
 
@@ -281,7 +316,6 @@ export function OrdersPage() {
       await loadOrders();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Falha ao registrar venda presencial.');
-      throw createError;
     }
   }
 
@@ -445,6 +479,8 @@ export function OrdersPage() {
         })}
       </section>
 
+      <RecentOrderSummary order={recentOrder} onDetails={recentOrder ? () => openDetails(recentOrder) : undefined} />
+
       <UnresolvedOrdersSection
         orders={unresolvedOrders}
         savingId={savingId}
@@ -586,6 +622,35 @@ export function OrdersPage() {
           onSubmit={handleCreateManualOrder}
         />
       ) : null}
+    </section>
+  );
+}
+
+function RecentOrderSummary({ order, onDetails }: { order: Order | null; onDetails?: () => void }) {
+  return (
+    <section className="ops-recent-order" aria-label="Ultimo movimento de pedido">
+      <div>
+        <span className="ops-overview-kicker">Ultimo movimento</span>
+        {order ? (
+          <>
+            <strong>#{order.code}</strong>
+            <p>{order.customer.name || 'Cliente'} - {money(order.total)} - {shortDate(order.createdAt)}</p>
+          </>
+        ) : (
+          <>
+            <strong>Sem pedidos cadastrados</strong>
+            <p>O ultimo pedido aparecera aqui assim que for registrado.</p>
+          </>
+        )}
+      </div>
+      {order ? (
+        <div className="ops-recent-order-meta">
+          <span><OriginIcon origin={order.origin} /> {originLabel(order.origin)}</span>
+          <span><CreditCard className="size-4" /> {order.paymentStatus}</span>
+          <span><PackageCheck className="size-4" /> {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}</span>
+        </div>
+      ) : null}
+      {onDetails ? <button type="button" onClick={onDetails}>Ver detalhes</button> : null}
     </section>
   );
 }
@@ -768,7 +833,7 @@ function ManualSaleDialog({
             <div className="ops-sale-choice-list">
               {filteredChoices.map((choice) => (
                 <button key={choice.key} type="button" onClick={() => addToCart(choice)}>
-                  {choice.image ? <img src={choice.image} alt="" /> : <PackageCheck className="size-5" />}
+                  {choice.image ? <img src={resolveAdminImageUrl(choice.image)} alt="" /> : <PackageCheck className="size-5" />}
                   <span>
                     <strong>{choice.name}</strong>
                     <small>{choice.variationName || choice.category} · SKU {choice.sku || 'sem SKU'}</small>
@@ -964,7 +1029,7 @@ function OrderRow({ order, saving, onDetails, onStatusChange }: { order: Order; 
 function OriginPill({ origin }: { origin: OrderOrigin }) {
   const meta = originMeta[origin];
   return (
-    <span style={{ backgroundColor: `${meta.tone}14`, color: meta.tone }}>
+    <span className="ops-origin-pill" style={{ '--origin-tone': meta.tone } as CSSProperties}>
       {originLabel(origin)}
     </span>
   );

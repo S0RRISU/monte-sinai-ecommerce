@@ -4,14 +4,19 @@ import { CartPageContent } from '@/components/store/cart-page-content';
 import { ProductCard } from '@/components/store/product-card';
 import { StoreShell } from '@/components/store/store-shell';
 import { storefrontFeaturedProducts } from '@/lib/storefront-data';
+import { getStorefrontConfig } from '@/lib/storefront-data';
 
 export default async function CartPage() {
-  const suggestions = (await storefrontFeaturedProducts()).slice(0, 4);
+  const [suggestions, siteConfig] = await Promise.all([storefrontFeaturedProducts(), getStorefrontConfig()]);
 
   return (
     <StoreShell>
       <main className="store-main cart-page">
-        <CartPageContent />
+        <CartPageContent
+          deliveryFee={siteConfig.deliveryFee}
+          freeDeliveryMinimum={siteConfig.freeDeliveryMinimum}
+          allowDelivery={siteConfig.allowDelivery}
+        />
 
         <section className="checkout-preview">
           <article>
@@ -37,7 +42,7 @@ export default async function CartPage() {
             <Link href="/produtos">Ver todos</Link>
           </div>
           <div className="product-rail">
-            {suggestions.map((product) => (
+            {suggestions.slice(0, 4).map((product) => (
               <ProductCard key={product.slug} product={product} compact />
             ))}
           </div>

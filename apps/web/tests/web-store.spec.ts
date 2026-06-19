@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 test.describe('Monte Sinai official store', () => {
   test('renders the home storefront with choose-only product cards', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: /comprar água, gás e limpeza/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /agua, gas e limpeza para resolver seu dia/i })).toBeVisible();
+    await expect(page.getByLabel('Monte Sinai', { exact: true }).getByRole('link', { name: /comprar agora/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /escolher/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /adicionar/i })).toHaveCount(0);
   });
@@ -16,6 +17,12 @@ test.describe('Monte Sinai official store', () => {
     await expect(page).toHaveURL(/\/produto\//);
   });
 
+  test('filters products from the storefront search', async ({ page }) => {
+    await page.goto('/produtos?q=gas');
+    await expect(page.getByRole('heading', { name: /busca por "gas"/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /escolher/i }).first()).toBeVisible();
+  });
+
   test('keeps the old catalog route pointing to the products page', async ({ page }) => {
     await page.goto('/catalogo?categoria=gas');
     await expect(page).toHaveURL(/\/produtos\?categoria=gas/);
@@ -23,14 +30,17 @@ test.describe('Monte Sinai official store', () => {
   });
 
   test('renders gas product variation selection', async ({ page }) => {
-    await page.goto('/produto/gas-p13');
-    await expect(page.getByRole('heading', { name: /g.s p13/i })).toBeVisible();
+    await page.goto('/produtos?categoria=gas');
+    await page.getByRole('link', { name: /escolher/i }).first().click();
+    await expect(page).toHaveURL(/\/produto\//);
     await expect(page.getByRole('button', { name: /supergas/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /ultragas/i })).toBeVisible();
   });
 
   test('renders desinfetante fragrance selection', async ({ page }) => {
-    await page.goto('/produto/desinfetante-2l');
+    await page.goto('/produtos?q=desinfetante');
+    await page.getByRole('link', { name: /escolher/i }).first().click();
+    await expect(page).toHaveURL(/\/produto\//);
     await expect(page.getByRole('heading', { name: /desinfetante 2l/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /violeta/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /eucalipto/i })).toBeVisible();
@@ -42,14 +52,21 @@ test.describe('Monte Sinai official store', () => {
     await expect(page.getByRole('link', { name: /ver produtos/i })).toBeVisible();
 
     await page.goto('/pedidos');
-    await expect(page.getByRole('heading', { name: /acompanhe suas compras/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /pedidos com status claro/i })).toBeVisible();
 
     await page.goto('/conta');
-    await expect(page.getByRole('heading', { name: /minha conta/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /configurações da conta/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /entre na sua conta monte sinai/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /entrar agora/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /configuracoes/i })).toBeVisible();
+    await expect(page.getByText(/painel administrativo|abrir painel|acesso do painel/i)).toHaveCount(0);
+
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: /entre na sua area monte sinai/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^entrar$/i }).last()).toBeVisible();
 
     await page.goto('/configuracoes');
-    await expect(page.getByRole('heading', { name: /configurações/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /configuracoes/i })).toBeVisible();
     await expect(page.getByRole('radio', { name: /sistema/i })).toBeVisible();
+    await expect(page.getByText(/painel administrativo|abrir painel|acesso do painel/i)).toHaveCount(0);
   });
 });

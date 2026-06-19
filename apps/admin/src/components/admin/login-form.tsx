@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Lock, LogIn, Mail, ShieldCheck, UserRound, Users } from 'lucide-react';
 import { getCurrentProfile, signInWithMagicLink, signInWithPassword, signOut } from '@/lib/admin-services';
 import { readRecentAdminUsers, rememberAdminUser, type RecentAdminAccount } from '@/lib/admin-accounts';
-import { storeConfig } from '@/lib/constants';
+import { officialStoreUrl, storeConfig } from '@/lib/constants';
 import { canAccessAdmin } from '@/lib/roles';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,8 +16,10 @@ export function LoginForm() {
   const blockedSession = searchParams.get('semAcesso') === '1';
   const switchingAccount = searchParams.get('trocarConta') === '1';
   const accountParam = searchParams.get('account') || '';
+  const expectedAccount = accountParam.trim().toLowerCase();
   const autoSwitch = searchParams.get('auto') === '1';
-  const [email, setEmail] = useState(accountParam);
+  const handoffRequested = searchParams.get('handoff') === '1';
+  const [email, setEmail] = useState(expectedAccount);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -26,6 +29,7 @@ export function LoginForm() {
   const [recentUsers, setRecentUsers] = useState<RecentAdminAccount[]>(() => {
     return readRecentAdminUsers();
   });
+  const visibleNotice = notice || (handoffRequested ? 'Aguardando a sessao segura enviada pela loja...' : '');
 
   useEffect(() => {
     let active = true;
@@ -40,6 +44,15 @@ export function LoginForm() {
         const profile = await getCurrentProfile();
         if (!active) return;
         if (profile && canAccessAdmin(profile.role)) {
+          const activeAccount = profile.email.trim().toLowerCase();
+          if (expectedAccount && activeAccount && activeAccount !== expectedAccount) {
+            await signOut();
+            if (!active) return;
+            setEmail(expectedAccount);
+            setNotice(`Sessao anterior do painel encerrada. Entre com ${expectedAccount}.`);
+            setCheckingSession(false);
+            return;
+          }
           rememberAdminUser({
             email: profile.email,
             name: profile.name,
@@ -64,7 +77,94 @@ export function LoginForm() {
     return () => {
       active = false;
     };
-  }, [autoSwitch, blockedSession, nextPath, router, switchingAccount]);
+  }, [autoSwitch, blockedSession, expectedAccount, nextPath, router, switchingAccount]);
+
+  useEffect(() => {
+    if (!handoffRequested) return;
+
+    const storeOrigins = getTrustedStoreOrigins();
+    let replyOrigin = storeOrigins[0] || '';
+    let active = true;
+    let readyInterval: number | null = null;
+    let fallbackTimer: number | null = null;
+
+    function postToStore(message: Record<string, unknown>) {
+      if (!window.opener || !storeOrigins.length) return;
+      const targets = replyOrigin ? [replyOrigin] : storeOrigins;
+      targets.forEach((origin) => {
+        window.opener?.postMessage(message, origin);
+      });
+    }
+
+    async function acceptHandoff(event: MessageEvent) {
+      if (!active || !isTrustedStoreOrigin(event.origin, storeOrigins)) return;
+      replyOrigin = event.origin;
+      const payload = parseHandoffPayload(event.data);
+      if (!payload) return;
+
+      if (expectedAccount && payload.email && payload.email !== expectedAccount) {
+        const message = `A loja enviou ${payload.email}, mas esta entrada espera ${expectedAccount}.`;
+        setError(message);
+        postToStore({ type: 'monte-sinai-admin-session-rejected', message });
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      setNotice('Validando sessao recebida da loja...');
+
+      try {
+        const client = getSupabaseClient();
+        const { error: sessionError } = await client.auth.setSession({
+          access_token: payload.accessToken,
+          refresh_token: payload.refreshToken
+        });
+
+        if (sessionError) throw sessionError;
+
+        const profile = await getCurrentProfile();
+        if (!profile || !canAccessAdmin(profile.role)) {
+          await signOut();
+          throw new Error('Esta conta nao tem permissao para acessar o painel.');
+        }
+
+        setRecentUsers((current) =>
+          rememberAdminUser(
+            {
+              email: profile.email,
+              name: profile.name,
+              avatarUrl: profile.avatarUrl
+            },
+            current
+          )
+        );
+        postToStore({ type: 'monte-sinai-admin-session-accepted' });
+        router.replace(nextPath);
+      } catch (handoffError) {
+        const message = handoffError instanceof Error ? handoffError.message : 'Nao foi possivel entrar automaticamente.';
+        setError(message);
+        postToStore({ type: 'monte-sinai-admin-session-rejected', message });
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    window.addEventListener('message', acceptHandoff);
+    readyInterval = window.setInterval(() => {
+      postToStore({ type: 'monte-sinai-admin-ready', account: expectedAccount });
+    }, 350);
+    postToStore({ type: 'monte-sinai-admin-ready', account: expectedAccount });
+    fallbackTimer = window.setTimeout(() => {
+      if (active) setNotice('Se a entrada automatica nao concluir, confirme a senha uma vez neste app.');
+    }, 7000);
+
+    return () => {
+      active = false;
+      window.removeEventListener('message', acceptHandoff);
+      if (readyInterval !== null) window.clearInterval(readyInterval);
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+    };
+  }, [expectedAccount, handoffRequested, nextPath, router]);
 
   function rememberUser(account: string | Partial<RecentAdminAccount>) {
     setRecentUsers((current) => rememberAdminUser(account, current));
@@ -74,22 +174,14 @@ export function LoginForm() {
     setEmail(account.email);
     setPassword('');
     setError('');
-    setNotice('');
+    setNotice('Conta selecionada. Se o navegador tiver a senha salva, confirme a entrada.');
   }
 
   async function handleSwitchUser() {
-    setLoading(true);
     setError('');
-    try {
-      await signOut();
-      setEmail('');
-      setPassword('');
-      setNotice('Sessao anterior encerrada. Escolha a conta correta para entrar.');
-    } catch (switchError) {
-      setError(switchError instanceof Error ? switchError.message : 'Nao foi possivel trocar de usuario.');
-    } finally {
-      setLoading(false);
-    }
+    setEmail('');
+    setPassword('');
+    setNotice('Escolha uma conta salva ou digite outro e-mail. A sessao atual so muda quando a nova entrada for confirmada.');
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -189,7 +281,7 @@ export function LoginForm() {
 
           {switchingAccount ? (
             <p className="admin-login-success">
-              Sessao anterior encerrada. Escolha a conta que deseja usar agora.
+              Escolha a conta que deseja usar. A sessao atual so muda quando a nova entrada for confirmada.
             </p>
           ) : null}
 
@@ -252,7 +344,7 @@ export function LoginForm() {
             </span>
           </label>
 
-          {notice ? <p className="admin-login-success">{notice}</p> : null}
+          {visibleNotice ? <p className="admin-login-success">{visibleNotice}</p> : null}
           {error ? <p className="admin-login-error">{error}</p> : null}
 
           <button className="admin-button admin-button-primary w-full" type="submit" disabled={loading}>
@@ -278,6 +370,51 @@ export function LoginForm() {
 function safeNextPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
   return value;
+}
+
+function getTrustedStoreOrigins() {
+  const origins = new Set<string>();
+  try {
+    const configured = new URL(officialStoreUrl, window.location.origin).origin;
+    origins.add(configured);
+
+    if (process.env.NODE_ENV === 'development') {
+      const url = new URL(configured);
+      if (url.hostname === '127.0.0.1') {
+        origins.add(`${url.protocol}//localhost${url.port ? `:${url.port}` : ''}`);
+      }
+      if (url.hostname === 'localhost') {
+        origins.add(`${url.protocol}//127.0.0.1${url.port ? `:${url.port}` : ''}`);
+      }
+    }
+  } catch {
+    // Keep the list empty; the handoff will fall back to regular login.
+  }
+
+  return Array.from(origins);
+}
+
+function isTrustedStoreOrigin(origin: string, trustedOrigins: string[]) {
+  return trustedOrigins.includes(origin);
+}
+
+function parseHandoffPayload(value: unknown) {
+  if (!value || typeof value !== 'object') return null;
+  const payload = value as {
+    type?: unknown;
+    email?: unknown;
+    accessToken?: unknown;
+    refreshToken?: unknown;
+  };
+
+  if (payload.type !== 'monte-sinai-admin-session') return null;
+  if (typeof payload.accessToken !== 'string' || typeof payload.refreshToken !== 'string') return null;
+
+  return {
+    email: typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '',
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken
+  };
 }
 
 function RecentAccountAvatar({ account }: { account: RecentAdminAccount }) {

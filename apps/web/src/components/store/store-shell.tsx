@@ -1,113 +1,85 @@
 import Link from 'next/link';
 import {
   AtSign,
-  BadgePercent,
-  Bell,
-  ChevronDown,
-  ClipboardList,
   Clock,
-  ExternalLink,
   Mail,
   MapPin,
   MessageCircle,
-  MonitorCog,
   Search,
   ShieldCheck,
   Smartphone,
   Truck,
-  UserRound
 } from 'lucide-react';
 import { getStorefrontConfig } from '@/lib/storefront-data';
-import { adminPanelUrl } from '@/lib/admin-link';
 import { visibleStoreCategories, type StorefrontSiteConfig } from '@/lib/site-config';
 import { CartShortcut } from './cart-shortcut';
-import { CategoryIcon } from './category-icon';
+import { DeliveryLocationChip } from './delivery-location-chip';
+import { HeaderAccountShortcut } from './header-account-shortcut';
 import { MobileBottomNav } from './mobile-bottom-nav';
+import { OrdersShortcut } from './orders-shortcut';
+import { StoreIndicatorsProvider } from './store-indicators';
+import { StoreMenu } from './store-menu';
+import { WhatsAppFloatingButton } from './whatsapp-floating-button';
 
-export async function StoreShell({ children, minimalHeader = false }: { children: React.ReactNode; minimalHeader?: boolean }) {
+export async function StoreShell({
+  children,
+  minimalHeader = false,
+  hideFooter = false,
+  hideMobileNav = false,
+  hideWhatsApp = false
+}: {
+  children: React.ReactNode;
+  minimalHeader?: boolean;
+  hideFooter?: boolean;
+  hideMobileNav?: boolean;
+  hideWhatsApp?: boolean;
+}) {
   const siteConfig = await getStorefrontConfig();
   const visibleCategories = visibleStoreCategories(siteConfig);
 
   return (
+    <StoreIndicatorsProvider>
     <div className={`store-shell ${minimalHeader ? 'is-minimal-shell' : ''}`}>
       <TopNotice config={siteConfig} />
       <header className="store-header">
         <div className="store-header-row">
+          <StoreMenu categories={visibleCategories} config={siteConfig} />
+
           <Link className="store-logo" href="/" aria-label={`${siteConfig.name} inicio`}>
             <img src="/brand/monte-sinai-logo-transparente.png" alt={siteConfig.name} />
           </Link>
 
-          <button className="address-chip" type="button">
-            <MapPin className="size-5" />
-            <span>
-              <strong>
-                <span className="address-desktop-text">Entregar em:</span>
-                <span className="address-mobile-text">{siteConfig.deliveryAreas || siteConfig.address || 'Cobertura local'}</span>
-              </strong>
-              <small>
-                <span className="address-desktop-text">{siteConfig.deliveryAreas || 'Consulte cobertura'}</span>
-                <span className="address-mobile-text">{siteConfig.address || siteConfig.businessHours}</span>
-              </small>
-            </span>
-            <ChevronDown className="address-chevron size-4" />
-          </button>
+          <DeliveryLocationChip
+            deliveryAreas={siteConfig.deliveryAreas}
+            storeAddress={siteConfig.address}
+            businessHours={siteConfig.businessHours}
+          />
 
-          <button className="mobile-notification" type="button" aria-label="Notificacoes">
-            <Bell className="size-5" />
-            <span aria-hidden="true" />
-          </button>
-
-          <div className="search-box" role="search">
-            <input aria-label="Buscar produtos" placeholder="Busque por produtos, marcas e muito mais..." suppressHydrationWarning />
-            <button type="button" className="search-submit" aria-label="Buscar">
+          <form className="search-box" role="search" action="/produtos">
+            <input name="q" aria-label="Buscar produtos" placeholder="Busque por produtos, marcas e muito mais..." suppressHydrationWarning />
+            <button type="submit" className="search-submit" aria-label="Buscar">
               <Search className="size-5" />
             </button>
-          </div>
+          </form>
 
           <nav className="header-shortcuts" aria-label="Acoes da loja">
-            <Link href="/produtos?categoria=ofertas" className="shortcut-link">
-              <BadgePercent className="size-5" />
-              <span>
-                <strong>Ofertas</strong>
-                <small>da semana</small>
-              </span>
-            </Link>
-            <Link href="/pedidos" className="shortcut-link">
-              <ClipboardList className="size-5" />
-              <span>
-                <strong>Meus pedidos</strong>
-                <small>Acompanhe</small>
-              </span>
-            </Link>
+            <OrdersShortcut />
             <CartShortcut />
-            <Link href="/conta" className="shortcut-link">
-              <UserRound className="size-5" />
-              <span>
-                <strong>Minha conta</strong>
-                <small>Entrar / Cadastrar</small>
-              </span>
-            </Link>
+            <HeaderAccountShortcut />
           </nav>
         </div>
 
-        <label className="mobile-search">
-          <Search className="size-5" />
-          <input placeholder="Buscar agua, gas, limpeza..." suppressHydrationWarning />
-        </label>
-
-        <nav className="category-nav" aria-label="Categorias principais">
-          {visibleCategories.map((category) => (
-            <Link key={category.id} href={`/produtos?categoria=${category.id}`} className="category-tab">
-              <CategoryIcon category={category.id} />
-              <span>{category.label}</span>
-            </Link>
-          ))}
-        </nav>
+        <form className="mobile-search" role="search" action="/produtos">
+          <input name="q" aria-label="Buscar produtos" placeholder="Buscar agua, gas, limpeza..." suppressHydrationWarning />
+          <button type="submit" className="mobile-search-submit" aria-label="Buscar">
+            <Search className="size-5" />
+          </button>
+        </form>
       </header>
 
       {children}
 
-      <footer className="store-footer">
+      {hideFooter ? null : <footer className="store-footer">
         <section className="footer-service-row" aria-label="Diferenciais Monte Sinai">
           <article>
             <Truck className="size-5" />
@@ -143,15 +115,12 @@ export async function StoreShell({ children, minimalHeader = false }: { children
 
           <nav className="footer-column" aria-label="Links da loja">
             <h2>Loja</h2>
+            <Link href="/sobre">Sobre</Link>
             <Link href="/produtos">Produtos</Link>
             <Link href="/produtos?categoria=ofertas">Ofertas</Link>
             <Link href="/pedidos">Pedidos</Link>
             <Link href="/carrinho">Carrinho</Link>
-            <Link href="/conta">Conta</Link>
-            <a className="footer-admin-link" href={adminPanelUrl} target="_blank" rel="noreferrer">
-              Painel administrativo
-              <ExternalLink className="size-3" />
-            </a>
+            <Link href="/conta">Area do cliente</Link>
           </nav>
 
           <nav className="footer-column" aria-label="Categorias">
@@ -203,9 +172,6 @@ export async function StoreShell({ children, minimalHeader = false }: { children
                 {category.label}
               </Link>
             ))}
-            <a href={adminPanelUrl} target="_blank" rel="noreferrer">
-              Painel
-            </a>
           </div>
           <p className="footer-mobile-contact">
             <MessageCircle className="size-4" />
@@ -215,15 +181,13 @@ export async function StoreShell({ children, minimalHeader = false }: { children
 
         <div className="footer-bottom">
           <span>{siteConfig.name}</span>
-          <a className="footer-bottom-admin" href={adminPanelUrl} target="_blank" rel="noreferrer">
-            <MonitorCog className="size-4" />
-            Acesso do painel
-          </a>
         </div>
-      </footer>
+      </footer>}
 
-      <MobileBottomNav />
+      {hideMobileNav ? null : <MobileBottomNav />}
+      {hideWhatsApp ? null : <WhatsAppFloatingButton phone={siteConfig.whatsapp} />}
     </div>
+    </StoreIndicatorsProvider>
   );
 }
 

@@ -20,6 +20,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { fullDate, money, shortDate } from '@/lib/format';
+import { resolveAdminImageUrl } from '@/lib/assets';
 import type { Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { downloadOrderReceipt } from './order-receipt';
 
@@ -378,7 +379,7 @@ function PaymentControls({
 
 function ProductThumb({ item }: { item: Order['items'][number] }) {
   if (item.image) {
-    return <img src={item.image} alt="" className="size-12 rounded-2xl border border-blue-100 object-cover md:size-14" />;
+    return <img src={resolveAdminImageUrl(item.image)} alt="" className="size-12 rounded-2xl border border-blue-100 object-cover md:size-14" />;
   }
 
   return (

@@ -23,6 +23,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { deleteProduct, fetchAdminProducts, saveProduct } from '@/lib/admin-services';
+import { resolveAdminImageUrl } from '@/lib/assets';
 import { money } from '@/lib/format';
 import type { Product } from '@/lib/types';
 import { useAdminStore } from '@/store/admin-store';
@@ -454,7 +455,7 @@ function ProductRow({
   return (
     <article className={`ops-product-row ${low ? 'is-low' : ''}`}>
       <div className="ops-product-image">
-        {product.image ? <img src={product.image} alt={product.name} /> : <Package className="size-9" />}
+        {product.image ? <img src={resolveAdminImageUrl(product.image)} alt={product.name} /> : <Package className="size-9" />}
       </div>
 
       <div className="ops-product-info">

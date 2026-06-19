@@ -1,8 +1,9 @@
 'use client';
 
 import { getSupabaseClient } from './supabase';
+import { resolveAdminImageUrl } from './assets';
 import { slugify } from './format';
-import { storeConfig } from './constants';
+import { officialStoreUrl, storeConfig } from './constants';
 import { defaultModuleAccess, normalizeModuleAccess, type AdminModule } from './module-access';
 import { canonicalRole } from './roles';
 import type {
@@ -394,6 +395,16 @@ export async function setUserAccess(userId: string, role: AdminRole, active: boo
   return row ? mapAdminUser(row as JsonRecord) : null;
 }
 
+export async function sendUserPasswordRecovery(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) throw new Error('Este usuario nao tem e-mail cadastrado.');
+
+  const redirectTo = `${officialStoreUrl.replace(/\/$/, '')}/login?recovery=1`;
+  const client = getSupabaseClient();
+  const { error } = await client.auth.resetPasswordForEmail(cleanEmail, { redirectTo });
+  if (error) throwSupabaseError(error, 'Nao foi possivel enviar recuperacao de senha.');
+}
+
 function mapOrderItem(row: JsonRecord = {}): Order['items'][number] {
   return {
     id: asString(row.id) || asString(row.produto_id) || asString(row.nome),
@@ -403,7 +414,7 @@ function mapOrderItem(row: JsonRecord = {}): Order['items'][number] {
     quantity: asNumber(row.quantidade, 1),
     price: asNumber(row.preco_unitario),
     total: asNumber(row.total),
-    image: asString(row.imagem)
+    image: resolveAdminImageUrl(asString(row.imagem))
   };
 }
 
@@ -445,7 +456,7 @@ function mapVariation(row: JsonRecord = {}): ProductVariation {
     promoPrice: row.preco_promocional === null || row.preco_promocional === undefined ? null : asNumber(row.preco_promocional),
     stock: row.estoque === null || row.estoque === undefined ? null : asNumber(row.estoque),
     minStock: asNumber(row.estoque_minimo, 0),
-    image: asString(row.imagem),
+    image: resolveAdminImageUrl(asString(row.imagem)),
     offerActive: asBoolean(row.oferta_ativa),
     active: row.ativo !== false
   };
@@ -457,8 +468,8 @@ function mapProduct(row: JsonRecord = {}, variations: ProductVariation[] = [], i
     name: asString(row.nome, 'Produto'),
     category: asString(row.categoria, 'Produtos'),
     description: asString(row.descricao_detalhada) || asString(row.descricao),
-    image: asString(row.imagem),
-    images,
+    image: resolveAdminImageUrl(asString(row.imagem)),
+    images: images.map((image) => resolveAdminImageUrl(image)),
     price: asNumber(row.preco),
     promoPrice: row.preco_promocional === null || row.preco_promocional === undefined ? null : asNumber(row.preco_promocional),
     stock: row.estoque === null || row.estoque === undefined ? null : asNumber(row.estoque),
@@ -552,8 +563,7 @@ export async function updateOrderStatus(orderId: string, payload: { status?: Ord
 
 export async function deleteAdminOrder(orderId: string) {
   const client = getSupabaseClient();
-  const callRpc = client.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-  const { data, error } = await callRpc('admin_delete_order', { p_id: orderId });
+  const { data, error } = await client.rpc('admin_delete_order', { p_id: orderId });
 
   if (error) {
     if (isMissingRpc(error, 'admin_delete_order')) {
@@ -613,13 +623,17 @@ export async function createManualOrder(input: ManualOrderInput) {
     imagem: item.image || ''
   }));
 
-  const callRpc = client.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-  const { data, error } = await callRpc('create_order', {
+  const { data, error } = await client.rpc('admin_create_manual_order', {
     order_payload: payload,
     items_payload: items
   });
 
-  if (error) throwSupabaseError(error, 'Nao foi possivel registrar a venda presencial.');
+  if (error) {
+    if (isMissingRpc(error, 'admin_create_manual_order')) {
+      throw new Error('Rode o SQL supabase/20260617-admin-venda-presencial.sql para ativar venda presencial pelo painel.');
+    }
+    throwSupabaseError(error, 'Nao foi possivel registrar a venda presencial.');
+  }
   return data as { order_id?: string; codigo?: string; total?: number } | null;
 }
 

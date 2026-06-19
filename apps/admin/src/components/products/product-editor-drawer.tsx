@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { registerStockMovements, saveProduct, uploadProductImage } from '@/lib/admin-services';
+import { resolveAdminImageUrl } from '@/lib/assets';
 import { money } from '@/lib/format';
 import type { Product, StockMovementInput } from '@/lib/types';
 import { useAdminStore } from '@/store/admin-store';
@@ -283,7 +284,7 @@ export function ProductEditorDrawer({
                 <div>
                   <span className="mb-2 block text-xs font-black uppercase tracking-[0.04em] text-slate-600">Capa</span>
                   <div className="grid min-h-[138px] place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    {watched.image ? <img className="max-h-[122px] object-contain p-2" src={watched.image} alt={watched.name || 'Produto'} /> : <ImagePlus className="size-9 text-slate-300" />}
+                    {watched.image ? <img className="max-h-[122px] object-contain p-2" src={resolveAdminImageUrl(watched.image)} alt={watched.name || 'Produto'} /> : <ImagePlus className="size-9 text-slate-300" />}
                   </div>
                 </div>
                 <div className="grid content-center gap-2">
@@ -331,7 +332,7 @@ export function ProductEditorDrawer({
                     {productImages.map((image, index) => (
                       <article key={`${image}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                         <div className="grid aspect-square place-items-center bg-white">
-                          <img className="h-full w-full object-contain p-2" src={image} alt={`Foto extra ${index + 1} de ${watched.name || 'produto'}`} />
+                          <img className="h-full w-full object-contain p-2" src={resolveAdminImageUrl(image)} alt={`Foto extra ${index + 1} de ${watched.name || 'produto'}`} />
                         </div>
                         <div className="grid gap-2 border-t border-slate-200 p-2">
                           <button type="button" className="rounded-xl border border-blue-200 bg-white px-2 py-2 text-xs font-black text-blue-700" onClick={() => setGalleryImageAsMain(image)}>
@@ -456,7 +457,7 @@ export function ProductEditorDrawer({
                             <span className="mb-2 mt-4 block text-xs font-black uppercase tracking-[0.04em] text-slate-600">Imagem da variacao {index + 1}</span>
                             <div className="product-variation-photo grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-[104px_minmax(0,1fr)]">
                               <div className="grid size-24 place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                                {variation.image ? <img className="h-full w-full object-contain p-1" src={variation.image} alt={variation.name || `Variacao ${index + 1}`} /> : <ImagePlus className="size-7 text-slate-400" />}
+                                {variation.image ? <img className="h-full w-full object-contain p-1" src={resolveAdminImageUrl(variation.image)} alt={variation.name || `Variacao ${index + 1}`} /> : <ImagePlus className="size-7 text-slate-400" />}
                               </div>
                               <div className="grid gap-2">
                                 <label className="admin-button admin-button-soft cursor-pointer justify-center">
@@ -500,7 +501,7 @@ export function ProductEditorDrawer({
               <h3 className="text-sm font-black text-slate-950">Previa do produto</h3>
               <div className="mt-4 rounded-2xl border border-slate-200 p-4 text-center">
                 <div className="mx-auto grid size-44 place-items-center rounded-2xl bg-slate-50">
-                  {watched.image ? <img className="max-h-40 object-contain" src={watched.image} alt={watched.name || 'Produto'} /> : <ImagePlus className="size-12 text-slate-300" />}
+                  {watched.image ? <img className="max-h-40 object-contain" src={resolveAdminImageUrl(watched.image)} alt={watched.name || 'Produto'} /> : <ImagePlus className="size-12 text-slate-300" />}
                 </div>
                 <h4 className="mt-4 text-base font-black text-slate-950">{watched.name || 'Nome do produto'}</h4>
                 <p className="mt-1 text-lg font-black text-emerald-600">{money(previewPrice)}</p>
@@ -579,7 +580,7 @@ function ProductView({ product, onEdit, onClose }: { product: Product; onEdit?: 
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                   {galleryImages.map((image) => (
                     <button key={image} type="button" className={`grid size-16 shrink-0 place-items-center rounded-xl border bg-white ${displayImage === image ? 'border-teal-700 ring-2 ring-teal-100' : 'border-slate-200'}`} onClick={() => setSelectedImage(image)} aria-label="Selecionar imagem">
-                      <img className="max-h-14 object-contain p-1" src={image} alt="" />
+                      <img className="max-h-14 object-contain p-1" src={resolveAdminImageUrl(image)} alt="" />
                     </button>
                   ))}
                 </div>
@@ -642,7 +643,7 @@ function ProductView({ product, onEdit, onClose }: { product: Product; onEdit?: 
                     return (
                       <div key={variation.id || index} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[58px_minmax(0,1fr)_auto]">
                         <div className="grid size-14 place-items-center rounded-xl border border-slate-200 bg-white">
-                          {variation.image ? <img className="max-h-12 object-contain p-1" src={variation.image} alt={variation.name} /> : <ImagePlus className="size-5 text-slate-300" />}
+                          {variation.image ? <img className="max-h-12 object-contain p-1" src={resolveAdminImageUrl(variation.image)} alt={variation.name} /> : <ImagePlus className="size-5 text-slate-300" />}
                         </div>
                         <div className="min-w-0">
                           <strong className="block truncate text-sm font-black text-slate-950">{variation.name}</strong>

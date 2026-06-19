@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 type ResolvedTheme = 'light' | 'dark';
@@ -34,7 +34,6 @@ export function applyThemePreference(preference: ThemePreference) {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const [preference, setPreference] = useState<ThemePreference>(() => readThemePreference());
-  const resolvedTheme = resolveTheme(preference);
 
   useEffect(() => {
     applyThemePreference(preference);
@@ -57,23 +56,24 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   }, [preference]);
 
   function toggleTheme() {
-    const nextPreference = resolvedTheme === 'dark' ? 'light' : 'dark';
+    const nextPreference: ThemePreference = preference === 'system' ? 'light' : preference === 'light' ? 'dark' : 'system';
     setPreference(nextPreference);
     window.dispatchEvent(new CustomEvent<ThemePreference>(themePreferenceEvent, { detail: nextPreference }));
   }
 
-  const isDark = resolvedTheme === 'dark';
+  const label = preference === 'system' ? 'Sistema' : preference === 'dark' ? 'Escuro' : 'Claro';
+  const nextLabel = preference === 'system' ? 'claro' : preference === 'light' ? 'escuro' : 'sistema';
 
   return (
     <button
       className={`theme-toggle ${className || ''}`}
       type="button"
       onClick={toggleTheme}
-      aria-label={isDark ? 'Usar modo claro' : 'Usar modo noturno'}
-      title={isDark ? 'Modo claro' : 'Modo noturno'}
+      aria-label={`Modo atual: ${label}. Alterar para ${nextLabel}`}
+      title={`Modo atual: ${label}`}
     >
-      {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
-      <span>{isDark ? 'Claro' : 'Noite'}</span>
+      {preference === 'system' ? <Monitor className="size-5" /> : preference === 'dark' ? <Moon className="size-5" /> : <Sun className="size-5" />}
+      <span>{label}</span>
     </button>
   );
 }

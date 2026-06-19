@@ -1,5 +1,14 @@
 import Link from 'next/link';
-import { ChevronRight, Headphones, LockKeyhole, ShieldCheck, Truck } from 'lucide-react';
+import {
+  ChevronRight,
+  Droplets,
+  Flame,
+  Headphones,
+  LockKeyhole,
+  Sparkles,
+  ShoppingCart,
+  Truck
+} from 'lucide-react';
 import type { Product } from '@/lib/store-data';
 import { getStorefrontConfig, storefrontFeaturedProducts, storefrontOfferProducts } from '@/lib/storefront-data';
 import { visibleStoreCategories } from '@/lib/site-config';
@@ -16,7 +25,7 @@ export async function HomeSections() {
   return (
     <main className="store-main">
       <HeroSection />
-      <BenefitsStrip />
+      <CategoryTiles />
       {config.showFeaturedSection ? <ProductRail title="Mais pedidos" href="/produtos" products={featuredProducts} /> : null}
       {config.showOffersSection ? (
         <>
@@ -24,29 +33,63 @@ export async function HomeSections() {
           <ProductRail title="Ofertas da semana" href="/produtos?categoria=ofertas" products={offerProducts} />
         </>
       ) : null}
+      <HomeFeatureCards />
+      <BenefitsStrip />
     </main>
   );
 }
 
 function HeroSection() {
   return (
-    <section className="hero-section hero-image-section" aria-label="Monte Sinai">
-      <Link href="/produtos" className="hero-image-link" aria-label="Comprar água, gás e limpeza">
+    <section className="hero-section home-banner-hero" aria-label="Monte Sinai">
+      <Link href="/produtos" className="home-banner-link" aria-label="Comprar água, gás e produtos de limpeza">
         <picture>
           <source media="(max-width: 680px)" srcSet="/hero/monte-sinai-hero-mobile.png" />
           <source media="(max-width: 1024px)" srcSet="/hero/monte-sinai-hero-tablet.png" />
           <img src="/hero/monte-sinai-hero-desktop.png" alt="Monte Sinai: água, gás e limpeza na sua porta" />
         </picture>
+        <span className="home-banner-kicker">
+          <Sparkles className="size-4" />
+          Loja online
+        </span>
+        <span className="hero-image-cta home-banner-cta" aria-hidden="true">
+          <span className="hero-image-cta-icon">
+            <ShoppingCart className="size-5" />
+          </span>
+          Comprar agora
+        </span>
       </Link>
+    </section>
+  );
+}
+
+function HomeFeatureCards() {
+  const features = [
+    { icon: Droplets, title: 'Água 20L', text: 'Reposição para casa, comércio e rotina.' },
+    { icon: Flame, title: 'Gás P13', text: 'Pedido direto com acompanhamento do status.' },
+    { icon: Sparkles, title: 'Limpeza', text: 'Produtos essenciais em uma compra só.' }
+  ];
+
+  return (
+    <section className="home-feature-cards" aria-label="Destaques da loja">
+      {features.map((feature) => (
+        <Link key={feature.title} href="/produtos">
+          <feature.icon className="size-6" />
+          <span>
+            <strong>{feature.title}</strong>
+            <small>{feature.text}</small>
+          </span>
+          <ChevronRight className="size-4" />
+        </Link>
+      ))}
     </section>
   );
 }
 
 function BenefitsStrip() {
   const benefits = [
-    { icon: Truck, title: 'Entrega rápida', text: 'Chegou, pediu' },
-    { icon: ShieldCheck, title: 'Qualidade garantida', text: 'Produtos confiáveis' },
-    { icon: Headphones, title: 'Atendimento direto', text: 'É só chamar' },
+    { icon: Truck, title: 'Entrega local', text: 'Atendimento rápido na região' },
+    { icon: Headphones, title: 'Atendimento direto', text: 'Você fala com a loja' },
     { icon: LockKeyhole, title: 'Compra segura', text: 'Seus dados protegidos' }
   ];
 

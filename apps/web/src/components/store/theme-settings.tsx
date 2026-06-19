@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import {
   applyThemePreference,
@@ -16,22 +16,16 @@ const options: Array<{ value: ThemePreference; label: string; icon: typeof Monit
 ];
 
 export function ThemeSettings() {
-  const [preference, setPreference] = useState<ThemePreference>(() => readThemePreference());
+  const preference = useSyncExternalStore<ThemePreference>(subscribeToThemePreference, readThemePreference, () => 'system');
 
   useEffect(() => {
     applyThemePreference(preference);
     window.localStorage.setItem('monte-sinai-theme', preference);
-
-    const onPreferenceChange = (event: Event) => {
-      const customEvent = event as CustomEvent<ThemePreference>;
-      if (customEvent.detail) setPreference(customEvent.detail);
-    };
-    window.addEventListener(themePreferenceEvent, onPreferenceChange);
-    return () => window.removeEventListener(themePreferenceEvent, onPreferenceChange);
   }, [preference]);
 
   function selectPreference(nextPreference: ThemePreference) {
-    setPreference(nextPreference);
+    window.localStorage.setItem('monte-sinai-theme', nextPreference);
+    applyThemePreference(nextPreference);
     window.dispatchEvent(new CustomEvent<ThemePreference>(themePreferenceEvent, { detail: nextPreference }));
   }
 
@@ -53,4 +47,9 @@ export function ThemeSettings() {
       ))}
     </div>
   );
+}
+
+function subscribeToThemePreference(callback: () => void) {
+  window.addEventListener(themePreferenceEvent, callback);
+  return () => window.removeEventListener(themePreferenceEvent, callback);
 }

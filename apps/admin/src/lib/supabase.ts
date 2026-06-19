@@ -72,6 +72,19 @@ type AdminDatabase = {
         };
         Returns: TableRecord | null;
       };
+      admin_create_manual_order: {
+        Args: {
+          order_payload: TableRecord;
+          items_payload: TableRecord[];
+        };
+        Returns: TableRecord | null;
+      };
+      admin_delete_order: {
+        Args: {
+          p_id: string;
+        };
+        Returns: TableRecord | null;
+      };
       admin_registrar_movimentacao_estoque: {
         Args: {
           p_produto_id: string;

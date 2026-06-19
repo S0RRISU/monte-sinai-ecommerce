@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ClipboardList, CreditCard, MapPin, MessageCircle, Truck } from 'lucide-react';
 import { availablePayments, submitCheckoutOrder, type CheckoutFormData, type SavedOrder, validateCheckout } from '@/lib/checkout';
 import { getCartTotals, useCartStore } from '@/lib/cart-store';
+import { getSupabaseBrowserClient } from '@/lib/supabase-client';
 import { money } from '@/lib/store-data';
 import type { StorefrontSiteConfig } from '@/lib/site-config';
 
@@ -33,6 +34,26 @@ export function CheckoutPageContent({ siteConfig }: { siteConfig: StorefrontSite
   const [createdOrder, setCreatedOrder] = useState<SavedOrder | null>(null);
   const availableDeliveryOptions = siteConfig.allowDelivery ? deliveryOptions : ['Retirada na loja'];
   const totals = useMemo(() => getCartTotals(items, siteConfig), [items, siteConfig]);
+
+  useEffect(() => {
+    let active = true;
+    const supabase = getSupabaseBrowserClient();
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active || !data.user) return;
+      const metadata = data.user.user_metadata || {};
+      const metadataName = metadata.name || metadata.nome || metadata.full_name;
+      setForm((current) => ({
+        ...current,
+        email: current.email || data.user?.email || '',
+        name: current.name || (typeof metadataName === 'string' ? metadataName : '')
+      }));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function updateField(field: keyof CheckoutFormData, value: string) {
     setForm((current) => ({ ...current, [field]: value }));

@@ -58,14 +58,14 @@ const lightPaletteChoices: Array<{
   group: 'Simples' | 'Suaves' | 'Contrastados' | 'Diferenciados';
   colors: [string, string, string];
 }> = [
-  { value: 'clean', label: 'Branco limpo', group: 'Simples', colors: ['#ffffff', '#e5e7eb', '#0f766e'] },
-  { value: 'gray', label: 'Cinza claro', group: 'Simples', colors: ['#f1f3f5', '#cbd5e1', '#475569'] },
-  { value: 'mist', label: 'Nevoa', group: 'Suaves', colors: ['#f5f7fb', '#e2e8f0', '#64748b'] },
+  { value: 'clean', label: 'Clareza azul', group: 'Simples', colors: ['#f7faff', '#dbeafe', '#1d4ed8'] },
+  { value: 'gray', label: 'Monocromatico', group: 'Simples', colors: ['#eceff3', '#94a3b8', '#334155'] },
+  { value: 'mist', label: 'Lavanda', group: 'Suaves', colors: ['#f5f3ff', '#ddd6fe', '#7c3aed'] },
   { value: 'mint', label: 'Menta', group: 'Suaves', colors: ['#f0fdf4', '#bbf7d0', '#15803d'] },
   { value: 'sky', label: 'Ceu', group: 'Suaves', colors: ['#eff6ff', '#bfdbfe', '#2563eb'] },
   { value: 'rose', label: 'Rosa suave', group: 'Suaves', colors: ['#fff1f2', '#fecdd3', '#be123c'] },
-  { value: 'contrast', label: 'Preto no branco', group: 'Contrastados', colors: ['#ffffff', '#111827', '#000000'] },
-  { value: 'color', label: 'Cores vivas', group: 'Diferenciados', colors: ['#fff7ed', '#7c3aed', '#ea580c'] }
+  { value: 'contrast', label: 'Editorial', group: 'Contrastados', colors: ['#ffffff', '#111827', '#f59e0b'] },
+  { value: 'color', label: 'Aurora', group: 'Diferenciados', colors: ['#fff7ed', '#7c3aed', '#ea580c'] }
 ];
 
 const darkPaletteChoices: Array<{
@@ -74,9 +74,9 @@ const darkPaletteChoices: Array<{
   group: 'Simples' | 'Suaves' | 'Contrastados' | 'Diferenciados';
   colors: [string, string, string];
 }> = [
-  { value: 'black', label: 'Preto puro', group: 'Simples', colors: ['#000000', '#171717', '#ffffff'] },
+  { value: 'black', label: 'OLED', group: 'Simples', colors: ['#000000', '#171717', '#ffffff'] },
   { value: 'graphite', label: 'Grafite', group: 'Simples', colors: ['#111827', '#334155', '#94a3b8'] },
-  { value: 'soft', label: 'Noturno suave', group: 'Suaves', colors: ['#1c1c24', '#343442', '#a3a3b2'] },
+  { value: 'soft', label: 'Ametista', group: 'Suaves', colors: ['#171225', '#312e81', '#c4b5fd'] },
   { value: 'forest', label: 'Floresta', group: 'Suaves', colors: ['#071510', '#164e3a', '#34d399'] },
   { value: 'ocean', label: 'Oceano', group: 'Suaves', colors: ['#061525', '#164e63', '#38bdf8'] },
   { value: 'wine', label: 'Vinho', group: 'Diferenciados', colors: ['#1f0711', '#881337', '#fb7185'] },
@@ -148,6 +148,7 @@ export function AdminSettingsPage() {
   const [config, setConfig] = useState<AdminSiteConfig>(defaultConfig);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const selectedCategories = useMemo(
     () => new Set(config.visibleCategories.split(',').map((category) => category.trim()).filter(Boolean)),
@@ -176,6 +177,7 @@ export function AdminSettingsPage() {
   function updateConfig<K extends keyof AdminSiteConfig>(field: K, value: AdminSiteConfig[K]) {
     setConfig((current) => ({ ...current, [field]: value }));
     setSaved(false);
+    setDirty(true);
   }
 
   function toggleCategory(category: string) {
@@ -193,6 +195,7 @@ export function AdminSettingsPage() {
       const savedConfig = await saveSiteConfig(config);
       setConfig(savedConfig);
       setSaved(true);
+      setDirty(false);
       addNotification({
         title: 'Configuracoes salvas',
         detail: 'Painel, loja, vitrine, checkout e alertas foram atualizados.',
@@ -213,9 +216,9 @@ export function AdminSettingsPage() {
         description="Controle central do painel e da loja oficial."
         className="settings-page-header"
         action={
-          <button type="button" className="admin-button admin-button-primary" onClick={saveAll} disabled={saving}>
+          <button type="button" className="admin-button admin-button-primary" onClick={saveAll} disabled={saving || !dirty}>
             <Save className="size-4" />
-            {saving ? 'Salvando...' : 'Salvar alteracoes'}
+            {saving ? 'Salvando...' : dirty ? 'Salvar alteracoes' : 'Tudo salvo'}
           </button>
         }
       />
@@ -226,6 +229,29 @@ export function AdminSettingsPage() {
           <CheckCircle2 className="size-4" /> Alteracoes salvas
         </div>
       ) : null}
+
+      <section className="settings-overview-strip" aria-label="Resumo das configuracoes ativas">
+        <article>
+          <span>Operacao</span>
+          <strong>{config.storeOpen ? 'Loja aberta' : 'Loja pausada'}</strong>
+          <small>{config.allowDelivery ? 'Entrega habilitada' : 'Somente retirada'}</small>
+        </article>
+        <article>
+          <span>Pagamento</span>
+          <strong>{[config.acceptPix, config.acceptCash, config.acceptCard].filter(Boolean).length} modalidades</strong>
+          <small>Pix, dinheiro e cartao configuraveis</small>
+        </article>
+        <article>
+          <span>Vitrine</span>
+          <strong>{selectedCategories.size} categorias</strong>
+          <small>Visibilidade controlada pelo painel</small>
+        </article>
+        <article>
+          <span>Alteracoes</span>
+          <strong>{dirty ? 'Nao salvas' : 'Sincronizadas'}</strong>
+          <small>{dirty ? 'Use o botao Salvar alteracoes' : 'Configuracao atual aplicada'}</small>
+        </article>
+      </section>
 
       <div className="settings-workspace">
         <aside className="settings-navigation" aria-label="Categorias de configuracao">
@@ -613,7 +639,6 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 }
 
 async function switchAccount(router: ReturnType<typeof useRouter>, pathname: string) {
-  await signOut();
   const params = new URLSearchParams();
   params.set('next', pathname || '/dashboard');
   params.set('trocarConta', '1');

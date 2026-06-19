@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recuperar senha - Monte Sinai</title>
+  </head>
+  <body style="margin:0;background:#f3f7fb;font-family:Arial,Helvetica,sans-serif;color:#0f2747;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f7fb;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;overflow:hidden;border-radius:28px;background:#ffffff;border:1px solid #d8e7f5;box-shadow:0 18px 48px rgba(15,39,71,.12);">
+            <tr>
+              <td style="padding:30px 28px 18px;text-align:center;background:linear-gradient(135deg,#e9f6ff,#fff7d6);">
+                <img src="{{ .SiteURL }}/brand/monte-sinai-logo-transparente.png" width="190" alt="Monte Sinai" style="display:block;margin:0 auto 18px;max-width:190px;height:auto;" />
+                <div style="display:inline-block;border-radius:999px;background:#ffffffcc;border:1px solid #cfe2f4;color:#075fc9;padding:8px 14px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">
+                  Segurança da conta
+                </div>
+                <h1 style="margin:18px 0 8px;font-size:30px;line-height:1.08;color:#061a38;">
+                  Crie uma nova senha
+                </h1>
+                <p style="margin:0;color:#52657c;font-size:15px;line-height:1.6;">
+                  Recebemos uma solicitação para recuperar o acesso da sua conta Monte Sinai.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:26px 28px 30px;">
+                <p style="margin:0 0 18px;color:#344761;font-size:15px;line-height:1.65;">
+                  Clique no botão abaixo para abrir uma página segura e definir uma nova senha. Se você não pediu essa recuperação, ignore este e-mail.
+                </p>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:26px auto;">
+                  <tr>
+                    <td align="center" style="border-radius:999px;background:#006bff;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:15px 26px;border-radius:999px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:900;">
+                        Recuperar minha senha
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0;color:#64748b;font-size:13px;line-height:1.55;text-align:center;">
+                  Por segurança, o link expira automaticamente. Atendimento Monte Sinai - água, gás e limpeza.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
