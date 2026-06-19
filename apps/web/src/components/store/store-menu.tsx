@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { CategoryIcon } from './category-icon';
+import { StoreAppInstall } from './store-app-install';
 import { ThemeToggle } from './theme-toggle';
 import type { StorefrontSiteConfig, visibleStoreCategories } from '@/lib/site-config';
 
@@ -178,6 +179,11 @@ export function StoreMenu({ categories, config }: StoreMenuProps) {
                   </Link>
                 ))}
               </div>
+            </section>
+
+            <section className="store-menu-section" aria-label="Aplicativo da loja">
+              <strong>Aplicativo da loja</strong>
+              <StoreAppInstall />
             </section>
           </div>
         </>
