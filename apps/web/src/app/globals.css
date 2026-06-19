@@ -1027,6 +1027,80 @@ a {
   font-weight: 950;
 }
 
+.store-app-install {
+  display: grid;
+  gap: 8px;
+}
+
+.store-app-install > button {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--ms-blue) 28%, var(--ms-line));
+  border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ms-blue) 12%, var(--ms-card)), var(--ms-card));
+  padding: 10px 12px;
+  color: var(--ms-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-app-install > button:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.store-app-install-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--ms-blue);
+  color: #ffffff;
+}
+
+.store-app-install strong,
+.store-app-install small {
+  display: block;
+  line-height: 1.2;
+}
+
+.store-app-install strong {
+  font-size: 0.84rem;
+  font-weight: 950;
+}
+
+.store-app-install small {
+  margin-top: 4px;
+  color: var(--ms-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.store-app-install > p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ms-yellow) 18%, var(--ms-card));
+  padding: 10px 12px;
+  color: var(--ms-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.store-app-install > p svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--ms-blue);
+}
+
 .theme-toggle {
   display: inline-flex;
   min-height: 36px;
@@ -10346,7 +10420,8 @@ a.settings-list-row:hover {
 
 :root[data-theme='dark'] .store-menu-link,
 :root[data-theme='dark'] .store-menu-categories a,
-:root[data-theme='dark'] .store-menu-compact-links a {
+:root[data-theme='dark'] .store-menu-compact-links a,
+:root[data-theme='dark'] .store-app-install > button {
   background: var(--ms-card);
 }
 

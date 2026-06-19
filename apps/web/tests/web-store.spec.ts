@@ -24,6 +24,12 @@ test.describe('Monte Sinai official store', () => {
     await expect(page.getByRole('link', { name: /escolher/i }).first()).toBeVisible();
   });
 
+  test('offers storefront app installation from the menu', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: /abrir menu da loja/i }).click();
+    await expect(page.getByRole('button', { name: /instalar aplicativo/i })).toBeVisible();
+  });
+
   test('keeps the old catalog route pointing to the products page', async ({ page }) => {
     await page.goto('/catalogo?categoria=gas');
     await expect(page).toHaveURL(/\/produtos\?categoria=gas/);
