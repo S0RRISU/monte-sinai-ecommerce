@@ -2,18 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Chrome: site local",
+      "name": "Chrome: site Next",
       "type": "chrome",
       "request": "launch",
-      "url": "http://127.0.0.1:5500/index.html"
+      "url": "http://127.0.0.1:3000"
     },
     {
-      "name": "Python: gerar_foto.py",
-      "type": "python",
+      "name": "Chrome: painel Next",
+      "type": "chrome",
       "request": "launch",
-      "program": "${workspaceFolder}/gerar_foto.py",
-      "console": "integratedTerminal",
-      "envFile": "${workspaceFolder}/.env"
+      "url": "http://127.0.0.1:3100"
     }
   ]
 }

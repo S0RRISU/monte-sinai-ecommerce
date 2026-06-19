@@ -2,50 +2,40 @@
 
 ## Project overview
 
-- Static HTML/CSS/JS storefront for a local shop called Monte Sinai.
-- Uses Supabase for authentication, product/catalog data, orders, and admin dashboard.
-- Deploys as a static site on Netlify with `Publish directory: .` and no build command.
-- Main runtime files are plain HTML pages, a single CSS file, and a small client-side JS layer.
+- Monte Sinai monorepo using Next.js/React.
+- `apps/web` is the official storefront/PWA.
+- `apps/admin` is the administrator/developer panel/PWA.
+- Supabase remains the data/auth/storage backend.
 
-## What to know first
+## Core rules
 
-- `README.md` is the primary project documentation for deployment and Supabase setup.
-- `netlify.toml` configures routing, security headers, cache rules, and the static publish workflow.
-- `js/supabase.js` contains the Supabase project URL and public key used by every page.
-- The app is not a framework app; do not introduce React/Vite/Next.js or similar without explicit user request.
-- Pages under `pages/` and root HTML files use relative links and expect the site to live at the repository root.
+- Work one etapa at a time. Do not advance to the next etapa without user review.
+- Do not add archive/remendo folders. Use Git as the backup.
+- Do not solve UI or business-logic problems by adding a new layer over an old one; edit or replace the existing source responsible for the behavior, and remove obsolete code when replacement is safe.
+- Keep the root clean: source lives in `apps/`, shared assets in `assets/`, SQL in `supabase/`.
+- Do not reintroduce root `index.html`, `pages/`, `css/`, `js/`, old service workers, or static Netlify publish workflow.
+- Do not expose Supabase service role keys in frontend code.
+- SQL changes must be aditive, reviewed separately, and stored in `supabase/`.
 
-## Core files and directories
+## Important directories
 
-- `index.html` and `pages/*.html`: application pages and public site entry points.
-- `css/style.css`: global styling.
-- `js/script.js`: main client logic and page behavior.
-- `js/supabase.js`: Supabase initialization and auth settings.
-- `sw.js`, `site.webmanifest`, `robots.txt`, `sitemap.xml`: PWA, SEO, and caching support.
-- `assets/`: static images, banners, product pictures, and brand assets.
-- `supabase/`: SQL schema and seeds used for Supabase setup and migrations.
+- `apps/web/src`: official site source.
+- `apps/web/public`: public assets, manifest, SEO files for the site.
+- `apps/admin/src`: admin panel source.
+- `apps/admin/public`: admin/developer manifests and assets.
+- `assets`: final brand, hero, and product images.
+- `supabase`: migrations, seeds, functions, and setup SQL.
 
-## Supabase-specific guidance
+## Validation
 
-- Any Supabase schema or seed changes should be reflected in `supabase/` SQL files.
-- Admin access and user roles are controlled via the canonical RBAC SQL in `supabase/20260524-base-rbac-permissoes.sql`; older role files are legacy/context only.
-- The `README.md` includes Supabase setup steps: schema, seed, admin access, storage bucket, and email configuration.
-- The site uses Supabase Auth and RLS; avoid breaking table relationships or client-side queries without understanding the database schema.
+Run from the repository root:
 
-## Deployment and editing rules
+```powershell
+npm run lint
+npm run typecheck
+npm run build
+npm run test
+npm run ready
+```
 
-- Do not assume a build step; editing HTML/CSS/JS directly is the normal workflow.
-- Preserve the existing relative URL structure in HTML pages and assets.
-- When updating URLs or metadata, check `robots.txt`, `sitemap.xml`, and canonical tags across pages.
-- Avoid changing the runtime dependency on `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2` unless the user asks for a library upgrade.
-
-## Useful references
-
-- `README.md`: deployment, Supabase setup, and testing checklist.
-- `netlify.toml`: production route/caching/security config.
-- `supabase/`: all Supabase SQL migrations and seed data.
-
-## Suggested next customization
-
-- Add a specialized `skill` for Supabase deployment and site configuration tasks.
-- Add instructions for testing Supabase flows, image uploads, and checkout/WhatsApp behavior.
+If a command fails due to local environment issues, report the exact command and reason.
