@@ -1,7 +1,7 @@
 'use client';
 
 import type { User } from '@supabase/supabase-js';
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -23,6 +23,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { getLocalOrders, type SavedOrder } from '@/lib/checkout';
+import { buildExternalAppUrl, isRunningAsInstalledApp } from '@/lib/pwa-navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabase-client';
 import { money } from '@/lib/store-data';
 
@@ -112,6 +113,28 @@ type PedidoRow = {
   pedido_itens?: PedidoItemRow[] | null;
 };
 
+type TrackedOrderResponse = {
+  id?: string | null;
+  uuid?: string | null;
+  createdAt?: string | null;
+  status?: string | null;
+  confirmed?: boolean | null;
+  payment?: string | null;
+  paymentStatus?: string | null;
+  total?: number | string | null;
+  customer?: {
+    name?: string | null;
+    phone?: string | null;
+    address?: string | null;
+  } | null;
+  items?: Array<{
+    nome?: string | null;
+    variacao?: string | null;
+    quantidade?: number | string | null;
+    total?: number | string | null;
+  }> | null;
+};
+
 type OrdersSelectQuery = {
   order: (
     column: string,
@@ -127,8 +150,10 @@ type OrdersTable = {
 
 export function OrdersPageContent() {
   const router = useRouter();
-  const [orders] = useState<SavedOrder[]>(() => getLocalOrders());
+  const localStorageReady = useSyncExternalStore(subscribeToBrowserHydration, getBrowserSnapshot, getServerSnapshot);
+  const orders = useMemo(() => localStorageReady ? getLocalOrders() : [], [localStorageReady]);
   const [remoteOrders, setRemoteOrders] = useState<TrackedOrder[]>([]);
+  const [trackedLocalOrders, setTrackedLocalOrders] = useState<TrackedOrder[]>([]);
   const [remoteOrdersLoading, setRemoteOrdersLoading] = useState(false);
   const [remoteOrdersError, setRemoteOrdersError] = useState('');
   const [internalOrderFilter, setInternalOrderFilter] = useState<InternalOrderFilter>('today');
@@ -136,6 +161,7 @@ export function OrdersPageContent() {
   const [expandedOrderKey, setExpandedOrderKey] = useState('');
   const [expandedDetailsKey, setExpandedDetailsKey] = useState('');
   const initializedLatestOrder = useRef(false);
+  const authenticatedUserRef = useRef(false);
   const orderCardRefs = useRef(new Map<string, HTMLElement>());
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileAccess | null>(null);
@@ -143,7 +169,10 @@ export function OrdersPageContent() {
   const [, setPanelOpening] = useState(false);
   const [panelMessage, setPanelMessage] = useState('');
   const [panelError, setPanelError] = useState('');
-  const allCustomerOrders = useMemo(() => mergeCustomerOrders(remoteOrders, orders), [orders, remoteOrders]);
+  const allCustomerOrders = useMemo(
+    () => mergeCustomerOrders([...remoteOrders, ...trackedLocalOrders], orders),
+    [orders, remoteOrders, trackedLocalOrders]
+  );
   const summary = useMemo(() => buildOrderSummary(allCustomerOrders), [allCustomerOrders]);
   const internalAccess = getInternalAccess(profile, user);
   const panelBaseUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://127.0.0.1:3001';
@@ -197,6 +226,34 @@ export function OrdersPageContent() {
     }
   }, []);
 
+  const refreshTrackedLocalOrders = useCallback(async (silent = false) => {
+    if (!orders.length) {
+      setTrackedLocalOrders([]);
+      return;
+    }
+
+    if (!silent) setRemoteOrdersLoading(true);
+
+    try {
+      const supabase = getSupabaseBrowserClient() as unknown as RpcClient;
+      const results = await Promise.all(
+        orders.map(async (order) => {
+          const { data, error } = await supabase.rpc('track_order', {
+            p_codigo: order.code,
+            p_cliente_telefone: order.customerPhone
+          });
+
+          if (error) return null;
+          return mapTrackedOrderResponse(data);
+        })
+      );
+
+      setTrackedLocalOrders(results.filter((order): order is TrackedOrder => order !== null));
+    } finally {
+      if (!silent) setRemoteOrdersLoading(false);
+    }
+  }, [orders]);
+
   useEffect(() => {
     let active = true;
     const supabase = getSupabaseBrowserClient();
@@ -208,12 +265,14 @@ export function OrdersPageContent() {
         if (!active) return;
 
         const nextUser = data.user || null;
+        authenticatedUserRef.current = Boolean(nextUser);
         setUser(nextUser);
 
         if (!nextUser) {
           setProfile(null);
           setRemoteOrders([]);
           setRemoteOrdersError('');
+          await refreshTrackedLocalOrders();
           return;
         }
 
@@ -227,6 +286,7 @@ export function OrdersPageContent() {
 
         setProfile(profileData || null);
         await refreshRemoteOrders();
+        await refreshTrackedLocalOrders(true);
       } finally {
         if (active) {
           setCheckingAccess(false);
@@ -243,12 +303,18 @@ export function OrdersPageContent() {
     const ordersChannel = supabase
       .channel('store-orders-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
-        void refreshRemoteOrders(true);
+        if (authenticatedUserRef.current) void refreshRemoteOrders(true);
+        void refreshTrackedLocalOrders(true);
       })
       .subscribe();
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refreshRemoteOrders(true);
+      if (document.visibilityState !== 'visible') return;
+      if (authenticatedUserRef.current) void refreshRemoteOrders(true);
+      void refreshTrackedLocalOrders(true);
     };
+    const guestTrackingInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshTrackedLocalOrders(true);
+    }, 12_000);
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
 
@@ -256,10 +322,11 @@ export function OrdersPageContent() {
       active = false;
       subscription.unsubscribe();
       void supabase.removeChannel(ordersChannel);
+      window.clearInterval(guestTrackingInterval);
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [refreshRemoteOrders]);
+  }, [refreshRemoteOrders, refreshTrackedLocalOrders]);
 
   async function handleOpenInternalShortcut(nextPath: string) {
     setPanelError('');
@@ -267,6 +334,12 @@ export function OrdersPageContent() {
 
     if (!user || !internalAccess) {
       router.push(`/login?next=${encodeURIComponent('/pedidos')}`);
+      return;
+    }
+
+    if (isRunningAsInstalledApp()) {
+      setPanelOpening(true);
+      window.location.assign(buildExternalAppUrl(panelBaseUrl, nextPath));
       return;
     }
 
@@ -615,6 +688,18 @@ export function OrdersPageContent() {
   );
 }
 
+function subscribeToBrowserHydration() {
+  return () => undefined;
+}
+
+function getBrowserSnapshot() {
+  return true;
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
 function CustomerOrderCard({
   order,
   recent,
@@ -944,9 +1029,12 @@ function getDatabaseStatusValue(order: TrackedOrder) {
 }
 
 function mergeCustomerOrders(remoteOrders: TrackedOrder[], localOrders: SavedOrder[]): CustomerOrder[] {
-  const remoteCodes = new Set(remoteOrders.map((order) => normalizeCode(order.id)));
+  const uniqueRemoteOrders = Array.from(
+    new Map(remoteOrders.map((order) => [normalizeCode(order.id), order])).values()
+  );
+  const remoteCodes = new Set(uniqueRemoteOrders.map((order) => normalizeCode(order.id)));
   const localOnly = localOrders.filter((order) => !remoteCodes.has(normalizeCode(order.code)));
-  return [...remoteOrders, ...localOnly].sort((left, right) => {
+  return [...uniqueRemoteOrders, ...localOnly].sort((left, right) => {
     const leftDate = isTrackedOrder(left) ? left.createdAt : left.createdAt;
     const rightDate = isTrackedOrder(right) ? right.createdAt : right.createdAt;
     return new Date(rightDate || 0).getTime() - new Date(leftDate || 0).getTime();
@@ -967,6 +1055,32 @@ function mapPedidoRow(row: PedidoRow): TrackedOrder {
     customerPhone: row.cliente_telefone || '',
     address: row.endereco_entrega || '',
     items: (row.pedido_itens || []).map((item) => ({
+      nome: item.nome || 'Item',
+      variacao: item.variacao || '',
+      quantidade: toNumber(item.quantidade, 1),
+      total: toNumber(item.total)
+    }))
+  };
+}
+
+function mapTrackedOrderResponse(data: unknown): TrackedOrder | null {
+  if (!data || typeof data !== 'object') return null;
+  const row = data as TrackedOrderResponse;
+  if (!row.id) return null;
+
+  return {
+    id: row.id,
+    uuid: row.uuid || undefined,
+    createdAt: row.createdAt || undefined,
+    status: row.status || 'Recebido',
+    confirmed: row.confirmed ?? true,
+    payment: row.payment || 'Pagamento',
+    paymentStatus: row.paymentStatus || 'Pendente',
+    total: toNumber(row.total),
+    customerName: row.customer?.name || '',
+    customerPhone: row.customer?.phone || '',
+    address: row.customer?.address || '',
+    items: (row.items || []).map((item) => ({
       nome: item.nome || 'Item',
       variacao: item.variacao || '',
       quantidade: toNumber(item.quantidade, 1),

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image, { getImageProps } from 'next/image';
 import {
   ChevronRight,
   Droplets,
@@ -40,13 +41,40 @@ export async function HomeSections() {
 }
 
 function HeroSection() {
+  const alt = 'Monte Sinai: água, gás e limpeza na sua porta';
+  const { props: desktopImage } = getImageProps({
+    src: '/hero/monte-sinai-hero-desktop.png',
+    alt,
+    width: 1998,
+    height: 548,
+    sizes: '100vw',
+    quality: 72,
+    fetchPriority: 'high'
+  });
+  const { props: tabletImage } = getImageProps({
+    src: '/hero/monte-sinai-hero-tablet.png',
+    alt,
+    width: 1998,
+    height: 625,
+    sizes: '100vw',
+    quality: 70
+  });
+  const { props: mobileImage } = getImageProps({
+    src: '/hero/monte-sinai-hero-mobile.png',
+    alt,
+    width: 1998,
+    height: 787,
+    sizes: '100vw',
+    quality: 68
+  });
+
   return (
     <section className="hero-section home-banner-hero" aria-label="Monte Sinai">
       <Link href="/produtos" className="home-banner-link" aria-label="Comprar água, gás e produtos de limpeza">
         <picture>
-          <source media="(max-width: 680px)" srcSet="/hero/monte-sinai-hero-mobile.png" />
-          <source media="(max-width: 1024px)" srcSet="/hero/monte-sinai-hero-tablet.png" />
-          <img src="/hero/monte-sinai-hero-desktop.png" alt="Monte Sinai: água, gás e limpeza na sua porta" />
+          <source media="(max-width: 680px)" srcSet={mobileImage.srcSet} sizes={mobileImage.sizes} />
+          <source media="(max-width: 1024px)" srcSet={tabletImage.srcSet} sizes={tabletImage.sizes} />
+          <img {...desktopImage} alt={alt} />
         </picture>
         <span className="home-banner-kicker">
           <Sparkles className="size-4" />
@@ -125,7 +153,15 @@ function OfferBand() {
   return (
     <section className="combo-band">
       <Link href="/produtos?categoria=ofertas" className="combo-image-link" aria-label="Pedir produtos Monte Sinai pelo WhatsApp">
-        <img src="/hero/monte-sinai-offer-slim.png" alt="Tudo o que sua casa precisa, entregue rápido" />
+        <Image
+          src="/hero/monte-sinai-offer-slim.png"
+          alt="Tudo o que sua casa precisa, entregue rápido"
+          width={1800}
+          height={604}
+          sizes="(max-width: 760px) 94vw, 88vw"
+          quality={68}
+          loading="lazy"
+        />
       </Link>
     </section>
   );

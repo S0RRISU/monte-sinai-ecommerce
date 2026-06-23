@@ -1,10 +1,15 @@
 {
+  "id": "/",
   "name": "Monte Sinai",
   "short_name": "Monte Sinai",
   "description": "Loja oficial Monte Sinai - agua, gas e limpeza.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "handle_links": "preferred",
   "background_color": "#ffffff",
   "theme_color": "#003b91",
   "icons": [
