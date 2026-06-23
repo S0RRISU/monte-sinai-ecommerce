@@ -26,6 +26,7 @@ import {
   Tags,
 } from 'lucide-react';
 import { fetchStoreProfile, type StoreProfile } from '@/lib/profile-access';
+import { buildExternalAppUrl, isRunningAsInstalledApp } from '@/lib/pwa-navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabase-client';
 
 type ProfileAccess = StoreProfile;
@@ -201,6 +202,12 @@ export function CustomerAccountContent() {
 
     if (!user || !internalAccess) {
       router.push('/login?next=/conta');
+      return;
+    }
+
+    if (isRunningAsInstalledApp()) {
+      setPanelOpening(true);
+      window.location.assign(buildExternalAppUrl(panelBaseUrl, '/dashboard'));
       return;
     }
 

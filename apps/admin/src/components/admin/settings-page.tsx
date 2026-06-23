@@ -280,7 +280,7 @@ export function AdminSettingsPage() {
             ))}
           </nav>
 
-          <a className="settings-store-link" href={officialStoreUrl} target="_blank" rel="noreferrer">
+          <a className="settings-store-link" href={officialStoreUrl}>
             Abrir loja
             <ExternalLink className="size-4" />
           </a>

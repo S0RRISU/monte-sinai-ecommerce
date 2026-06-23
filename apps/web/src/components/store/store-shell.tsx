@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   AtSign,
   Clock,
@@ -18,6 +19,7 @@ import { HeaderAccountShortcut } from './header-account-shortcut';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { OrdersShortcut } from './orders-shortcut';
 import { StoreIndicatorsProvider } from './store-indicators';
+import { StoreAppInstallProvider, StoreFirstVisitInstall } from './store-app-install';
 import { StoreMenu } from './store-menu';
 import { WhatsAppFloatingButton } from './whatsapp-floating-button';
 
@@ -39,6 +41,7 @@ export async function StoreShell({
 
   return (
     <StoreIndicatorsProvider>
+    <StoreAppInstallProvider>
     <div className={`store-shell ${minimalHeader ? 'is-minimal-shell' : ''}`}>
       <TopNotice config={siteConfig} />
       <header className="store-header">
@@ -46,7 +49,15 @@ export async function StoreShell({
           <StoreMenu categories={visibleCategories} config={siteConfig} />
 
           <Link className="store-logo" href="/" aria-label={`${siteConfig.name} inicio`}>
-            <img src="/brand/monte-sinai-logo-transparente.png" alt={siteConfig.name} />
+            <Image
+              src="/brand/monte-sinai-logo-transparente.png"
+              alt={siteConfig.name}
+              width={256}
+              height={126}
+              sizes="160px"
+              quality={72}
+              priority
+            />
           </Link>
 
           <DeliveryLocationChip
@@ -77,6 +88,8 @@ export async function StoreShell({
         </form>
       </header>
 
+      <StoreFirstVisitInstall />
+
       {children}
 
       {hideFooter ? null : <footer className="store-footer">
@@ -106,7 +119,15 @@ export async function StoreShell({
 
         <div className="footer-main">
           <div className="footer-brand">
-            <img src="/brand/monte-sinai-logo-transparente.png" alt={siteConfig.name} />
+            <Image
+              src="/brand/monte-sinai-logo-transparente.png"
+              alt={siteConfig.name}
+              width={256}
+              height={126}
+              sizes="180px"
+              quality={70}
+              loading="lazy"
+            />
             <p>{siteConfig.tagline || 'Agua, gas e limpeza para abastecer sua casa.'}</p>
             <Link href="/produtos" className="footer-primary-link">
               Comprar agora
@@ -163,7 +184,15 @@ export async function StoreShell({
 
         <section className="footer-mobile-panel" aria-label="Rodape mobile">
           <div className="footer-mobile-brand">
-            <img src="/brand/monte-sinai-logo-transparente.png" alt={siteConfig.name} />
+            <Image
+              src="/brand/monte-sinai-logo-transparente.png"
+              alt={siteConfig.name}
+              width={224}
+              height={110}
+              sizes="150px"
+              quality={70}
+              loading="lazy"
+            />
             <p>{siteConfig.tagline || 'Agua, gas e limpeza com entrega local.'}</p>
           </div>
           <div className="footer-mobile-chips" aria-label="Categorias rapidas">
@@ -187,6 +216,7 @@ export async function StoreShell({
       {hideMobileNav ? null : <MobileBottomNav />}
       {hideWhatsApp ? null : <WhatsAppFloatingButton phone={siteConfig.whatsapp} />}
     </div>
+    </StoreAppInstallProvider>
     </StoreIndicatorsProvider>
   );
 }

@@ -1101,6 +1101,182 @@ a {
   color: var(--ms-blue);
 }
 
+.store-install-welcome {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: min(1180px, calc(100% - 32px));
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 10px auto 0;
+  border: 1px solid color-mix(in srgb, var(--ms-blue) 28%, var(--ms-line));
+  border-radius: 16px;
+  background: var(--ms-card);
+  padding: 9px 42px 9px 10px;
+  color: var(--ms-ink);
+  box-shadow: 0 10px 28px rgba(2, 28, 66, 0.1);
+  animation: store-install-welcome-in 300ms ease-out both;
+}
+
+.store-install-welcome-close {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--ms-line);
+  border-radius: 50%;
+  background: var(--ms-card);
+  color: var(--ms-muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.store-install-welcome-logo {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #ffffff, #e8f6ff);
+  box-shadow: inset 0 0 0 1px rgba(0, 86, 196, 0.1);
+}
+
+.store-install-welcome-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.store-install-welcome-copy {
+  min-width: 0;
+}
+
+.store-install-welcome-copy > span {
+  color: var(--ms-blue);
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.store-install-welcome-copy strong {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.86rem;
+  line-height: 1.15;
+}
+
+.store-install-welcome-copy p {
+  margin: 2px 0 0;
+  color: var(--ms-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.store-install-welcome-action {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--ms-blue), var(--ms-royal));
+  color: #ffffff;
+  padding: 0 14px;
+  font-size: 0.74rem;
+  font-weight: 950;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ms-blue) 22%, transparent);
+  cursor: pointer;
+}
+
+.store-install-welcome-help {
+  display: flex;
+  grid-column: 2 / -1;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--ms-yellow) 18%, var(--ms-card));
+  padding: 10px 11px;
+  color: var(--ms-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.store-install-welcome-help svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--ms-blue);
+}
+
+@keyframes store-install-welcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 720px) {
+  .store-install-welcome {
+    width: calc(100% - 20px);
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-top: 8px;
+    border-radius: 14px;
+    padding: 8px 36px 8px 8px;
+  }
+
+  .store-install-welcome-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .store-install-welcome-logo img {
+    width: 31px;
+    height: 31px;
+  }
+
+  .store-install-welcome-copy strong {
+    font-size: 0.78rem;
+  }
+
+  .store-install-welcome-copy p {
+    display: none;
+  }
+
+  .store-install-welcome-action {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.68rem;
+  }
+
+  .store-install-welcome-action svg {
+    display: none;
+  }
+
+  .store-install-welcome-help {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-install-welcome {
+    animation: none;
+  }
+}
+
 .theme-toggle {
   display: inline-flex;
   min-height: 36px;
@@ -1950,7 +2126,11 @@ a {
   color: var(--ms-blue);
   cursor: pointer;
   box-shadow: 0 10px 22px rgba(7, 20, 38, 0.1);
-  backdrop-filter: blur(10px);
+}
+
+.products-page .products-grid .product-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
 }
 
 .favorite-button:hover,
@@ -2065,6 +2245,19 @@ a {
 .product-card:hover .product-image-wrap img {
   transform: scale(1.035);
   filter: drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.24));
+}
+
+@media (hover: none) {
+  .product-card:hover {
+    border-color: var(--ms-line);
+    box-shadow: 0 8px 20px rgba(25, 55, 65, 0.05);
+    transform: none;
+  }
+
+  .product-card:hover .product-image-wrap img {
+    filter: none;
+    transform: none;
+  }
 }
 
 .product-image-fallback {
@@ -10423,6 +10616,18 @@ a.settings-list-row:hover {
 :root[data-theme='dark'] .store-menu-compact-links a,
 :root[data-theme='dark'] .store-app-install > button {
   background: var(--ms-card);
+}
+
+:root[data-theme='dark'] .store-install-welcome {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ms-deep) 94%, transparent);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+}
+
+:root[data-theme='dark'] .store-install-welcome-close {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--ms-card);
+  color: var(--ms-ink);
 }
 
 :root[data-theme='dark'] .store-menu-trigger {

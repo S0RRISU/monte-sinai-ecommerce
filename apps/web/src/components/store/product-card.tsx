@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Package } from 'lucide-react';
 import { money, type Product } from '@/lib/store-data';
 import { ProductFavoriteButton } from './product-favorite-button';
@@ -14,6 +15,7 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
   const hasOptions = Boolean(product.variations?.length);
   const optionsLabel = product.category === 'gas' ? 'marcas' : 'opções';
   const usesFallback = !product.image || product.slug === 'desinfetante-2l';
+  const usesOptimizedImage = product.image.startsWith('/') || product.image.includes('nnglqufeyergsgzafdek.supabase.co');
   const displayName = product.shortName?.trim() || product.name?.trim() || 'Produto';
 
   return (
@@ -36,7 +38,22 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
             <small>{product.categoryLabel}</small>
           </span>
         ) : (
-          <img src={product.image} alt={product.name} />
+          usesOptimizedImage ? (
+            <Image
+              src={product.image}
+              alt={product.name}
+              width={480}
+              height={480}
+              sizes={compact
+                ? '(max-width: 680px) 46vw, (max-width: 1100px) 28vw, 16vw'
+                : '(max-width: 520px) 46vw, (max-width: 900px) 30vw, (max-width: 1400px) 18vw, 14vw'}
+              quality={68}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <img src={product.image} alt={product.name} loading="lazy" decoding="async" fetchPriority="low" />
+          )
         )}
       </Link>
       <div className="product-card-body">

@@ -30,6 +30,17 @@ test.describe('Monte Sinai official store', () => {
     await expect(page.getByRole('button', { name: /instalar aplicativo/i })).toBeVisible();
   });
 
+  test('shows the install invitation only on the first visit', async ({ page }) => {
+    await page.goto('/');
+    const installInvitation = page.getByRole('dialog', { name: /instalar aplicativo monte sinai/i });
+    await expect(installInvitation).toBeVisible();
+    await installInvitation.getByRole('button', { name: /agora nao/i }).click();
+    await expect(installInvitation).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: /instalar aplicativo monte sinai/i })).toHaveCount(0);
+  });
+
   test('keeps the old catalog route pointing to the products page', async ({ page }) => {
     await page.goto('/catalogo?categoria=gas');
     await expect(page).toHaveURL(/\/produtos\?categoria=gas/);
@@ -75,5 +86,59 @@ test.describe('Monte Sinai official store', () => {
     await expect(page.getByRole('heading', { name: /configuracoes/i })).toBeVisible();
     await expect(page.getByRole('radio', { name: /sistema/i })).toBeVisible();
     await expect(page.getByText(/painel administrativo|abrir painel|acesso do painel/i)).toHaveCount(0);
+  });
+
+  test('refreshes the status of an order created without login', async ({ page }) => {
+    let trackedStatus = 'Recebido';
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('monte-sinai-orders-v1', JSON.stringify([{
+        code: 'MS-TEST-001',
+        orderId: '00000000-0000-0000-0000-000000000001',
+        createdAt: '2026-06-23T12:00:00.000Z',
+        customerName: 'Cliente visitante',
+        customerPhone: '11999999999',
+        address: 'Rua de teste, 10',
+        payment: 'Pix na entrega',
+        status: 'Recebido',
+        paymentStatus: 'Pendente',
+        subtotal: 15,
+        delivery: 0,
+        discount: 0,
+        total: 15,
+        items: []
+      }]));
+    });
+
+    await page.route('**/rest/v1/rpc/track_order', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'MS-TEST-001',
+          uuid: '00000000-0000-0000-0000-000000000001',
+          createdAt: '2026-06-23T12:00:00.000Z',
+          status: trackedStatus,
+          confirmed: true,
+          payment: 'Pix na entrega',
+          paymentStatus: 'Pendente',
+          total: 15,
+          customer: {
+            name: 'Cliente visitante',
+            phone: '11999999999',
+            address: 'Rua de teste, 10'
+          },
+          items: []
+        })
+      });
+    });
+
+    await page.goto('/pedidos');
+    await expect(page.getByRole('heading', { name: 'Pedido #MS-TEST-001' })).toBeVisible();
+    await expect(page.locator('.order-status-pill').filter({ hasText: 'Recebido' })).toBeVisible();
+
+    trackedStatus = 'Entregue';
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.locator('.order-status-pill').filter({ hasText: 'Entregue' })).toBeVisible();
   });
 });
